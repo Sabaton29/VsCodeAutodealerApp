@@ -247,14 +247,28 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
             let uploadedImageUrls: string[] = [];
             if (selectedImages.length > 0) {
                 try {
-                    const uploadPromises = selectedImages.map(async (file, index) => {
-                        const fileName = `unforeseen_${workOrder.id}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
-                        const path = `unforeseen-issues/${workOrder.id}/${fileName}`;
-                        // Simular subida exitosa por ahora
-                        return `uploaded_${Date.now()}_${index}`;
-                    });
-                    const results = await Promise.all(uploadPromises);
-                    uploadedImageUrls = results.filter(url => url && typeof url === 'string') as string[];
+                    console.log('🔍 EnhancedReportUnforeseenIssueModal - Subiendo imágenes:', selectedImages.length);
+                    
+                    // Usar handlePostProgressUpdate para subir las imágenes
+                    for (let i = 0; i < selectedImages.length; i++) {
+                        const file = selectedImages[i];
+                        const fileName = `unforeseen_${workOrder.id}_${Date.now()}_${i}.${file.name.split('.').pop()}`;
+                        
+                        try {
+                            // Subir usando handlePostProgressUpdate
+                            await data.handlePostProgressUpdate(workOrder.id, `Imagen ${i + 1} del imprevisto`, [file]);
+                            
+                            // Generar URL correcta para Supabase Storage
+                            const tempUrl = `https://xoakbkmfnoiwmjtrnscy.supabase.co/storage/v1/object/public/progress-updates/progress/${workOrder.id}/${fileName}`;
+                            uploadedImageUrls.push(tempUrl);
+                            
+                            console.log('✅ Imagen subida:', fileName, 'URL:', tempUrl);
+                        } catch (uploadError) {
+                            console.error('❌ Error subiendo imagen individual:', uploadError);
+                        }
+                    }
+                    
+                    console.log('🔍 EnhancedReportUnforeseenIssueModal - URLs subidas:', uploadedImageUrls);
                 } catch (uploadError) {
                     console.warn('Error subiendo imágenes, continuando sin ellas:', uploadError);
                     uploadedImageUrls = [];
@@ -323,7 +337,7 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
                             onClick={onCancel}
                             className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                         >
-                            <Icon name="close" className="w-6 h-6" />
+                            <Icon name="x-mark" className="w-6 h-6" />
                         </button>
                     </div>
 
@@ -377,7 +391,7 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
                                     Tomar Foto
                                 </button>
                                 <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
-                                    <Icon name="photo" className="w-4 h-4" />
+                                    <Icon name="image" className="w-4 h-4" />
                                     Seleccionar Archivos
                                     <input
                                         type="file"

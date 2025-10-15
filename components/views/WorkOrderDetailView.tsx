@@ -348,6 +348,20 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                 });
             }
         });
+
+        // Agregar fotos de los imprevistos
+        (workOrder.unforeseenIssues || []).forEach(issue => {
+            if (issue.imageUrls && issue.imageUrls.length > 0) {
+                issue.imageUrls.forEach(url => {
+                    allImages.push({
+                        src: url,
+                        type: 'Diagnóstico', // Usar tipo Diagnóstico para imprevistos
+                        timestamp: issue.timestamp,
+                        notes: `Imprevisto: ${issue.description}`
+                    });
+                });
+            }
+        });
         
         (workOrder.deliveryEvidenceImageUrls || []).forEach(url => {
             allImages.push({ src: url, type: 'Entrega', timestamp: workOrder.deliveryDate || new Date().toISOString(), notes: 'Evidencia de Entrega' });
@@ -787,6 +801,17 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
     
     const showProgressTracker = hasApprovedQuotes;
     
+    // Debug: verificar estado de cotizaciones
+    console.log('🔍 WorkOrderDetailView - quotes debug:', {
+        quotesCount: quotes.length,
+        quotes: quotes.map(q => ({ id: q.id, status: q.status })),
+        hasApprovedQuotes,
+        showProgressTracker,
+        condition: (showProgressTracker || quotes.length > 0),
+        approvedQuote: quotes.find(q => q.status === QuoteStatus.APROBADO),
+        firstQuote: quotes[0]
+    });
+    
     // Check if diagnostic data is actually meaningful (has content)
     const hasValidDiagnosticData = workOrder.diagnosticData && 
         typeof workOrder.diagnosticData === 'object' && 
@@ -936,7 +961,12 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                         </div>
                     )}
 
-                    {showProgressTracker && quotes.length > 0 && <ProgressTracker workOrder={workOrder} quote={quotes.find(q => q.status === QuoteStatus.APROBADO)!} client={client} vehicle={vehicle} hasPermission={hasPermission} onReportUnforeseenIssue={onReportUnforeseenIssue} />}
+                    {(showProgressTracker || quotes.length > 0) && (
+                        <div className="border-2 border-red-500 p-4 bg-red-900/20">
+                            <div className="text-red-400 font-bold mb-2">🔍 DEBUG: ProgressTracker Renderizado</div>
+                            <ProgressTracker workOrder={workOrder} quote={quotes.find(q => q.status === QuoteStatus.APROBADO) || quotes[0]} quotes={quotes} client={client} vehicle={vehicle} hasPermission={hasPermission} onReportUnforeseenIssue={onReportUnforeseenIssue} />
+                        </div>
+                    )}
                     
                     {/* Control de Calidad */}
                     {workOrder.stage === KanbanStage.CONTROL_CALIDAD && quotes.length > 0 && (

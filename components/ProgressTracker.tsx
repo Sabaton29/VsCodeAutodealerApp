@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { WorkOrder, Quote, QuoteItem, Permission, KanbanStage, Client, Vehicle } from '../types';
+import { WorkOrder, Quote, QuoteItem, Permission, KanbanStage, Client, Vehicle, QuoteStatus } from '../types';
 import { Icon } from './Icon';
 import { DataContext } from './DataContext';
 import { UIContext } from './UIContext';
@@ -8,6 +8,7 @@ import PrintableRepairReport from './PrintableRepairReport';
 interface ProgressTrackerProps {
     workOrder: WorkOrder;
     quote: Quote;
+    quotes?: Quote[]; // Agregar todas las cotizaciones aprobadas
     client?: Client;
     vehicle?: Vehicle;
     hasPermission: (permission: Permission) => boolean;
@@ -23,7 +24,7 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
-const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, client, vehicle, hasPermission, onReportUnforeseenIssue }) => {
+const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quotes = [], client, vehicle, hasPermission, onReportUnforeseenIssue }) => {
     const data = useContext(DataContext);
     const ui = useContext(UIContext);
 
@@ -55,9 +56,21 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, cli
     const { handlePostProgressUpdate, handleToggleTaskCompleted, staffMembers } = data;
     const { currentUser } = ui;
 
+    // Obtener todas las cotizaciones aprobadas
+    const approvedQuotes = quotes.filter(q => q.status === QuoteStatus.APROBADO);
+    
+    // Combinar todos los items de todas las cotizaciones aprobadas
+    const allApprovedItems = approvedQuotes.reduce((acc, q) => {
+        return [...acc, ...(q.items || [])];
+    }, [] as QuoteItem[]);
+    
+    // Debug: verificar cotizaciones aprobadas
+    console.log('🔍 ProgressTracker - approvedQuotes:', approvedQuotes.map(q => ({ id: q.id, status: q.status, itemsCount: q.items?.length || 0 })));
+    console.log('🔍 ProgressTracker - allApprovedItems:', allApprovedItems.length, 'items total');
+    
     // Verificar si todas las tareas están completas
-    const allTasksCompleted = quote?.items?.every(item => item.isCompleted) || false;
-    const hasQuote = !!quote;
+    const allTasksCompleted = allApprovedItems.every(item => item.isCompleted);
+    const hasQuote = approvedQuotes.length > 0;
 
     // Detectar cuando todas las tareas están completas
     useEffect(() => {
@@ -162,7 +175,7 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, cli
             <div>
                 <h3 className="font-bold text-white mb-2">Tareas Pendientes</h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    {(quote?.items || []).map(item => (
+                    {allApprovedItems.map(item => (
                         <div key={item.id} className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${item.isCompleted ? 'bg-green-900/20 border-green-700' : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800/70'} ${hasPermission('toggle:task_completed') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                             {/* Checkbox */}
                             <div className="flex-shrink-0 pt-0.5">
@@ -463,7 +476,7 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, cli
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
-                                                                ${(quote?.items || []).map(item => `
+                                                                ${allApprovedItems.map(item => `
                                                                     <tr>
                                                                         <td class="p-1 border border-gray-300 font-medium">
                                                                             ${item.description}
@@ -514,7 +527,7 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, cli
                                                 ${(() => {
                                                     // Recopilar todas las fotos de las tareas
                                                     const allTaskPhotos = [];
-                                                    (quote?.items || []).forEach(item => {
+                                                    allApprovedItems.forEach(item => {
                                                         if (item.imageUrls && item.imageUrls.length > 0) {
                                                             item.imageUrls.forEach(url => {
                                                                 allTaskPhotos.push({
