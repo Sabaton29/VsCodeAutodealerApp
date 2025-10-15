@@ -1,0 +1,86 @@
+// Script para debuggear la subida de fotos
+// Ejecutar en la consola del navegador de la aplicación
+
+console.log('🔍 Iniciando debug de subida de fotos...');
+
+// Función para verificar buckets
+async function checkBuckets() {
+    try {
+        // Obtener la instancia de Supabase del contexto global
+        const supabase = window.supabase || window.__supabase;
+        
+        if (!supabase) {
+            console.error('❌ No se encontró la instancia de Supabase');
+            console.log('💡 Asegúrate de estar en la página de la aplicación');
+            return;
+        }
+        
+        console.log('✅ Instancia de Supabase encontrada');
+        
+        // Listar buckets existentes
+        const { data: buckets, error: listError } = await supabase.storage.listBuckets();
+        
+        if (listError) {
+            console.error('❌ Error al listar buckets:', listError);
+            return;
+        }
+        
+        console.log('📦 Buckets disponibles:');
+        buckets.forEach(bucket => {
+            console.log(`  - ${bucket.name} (${bucket.public ? 'Público' : 'Privado'})`);
+        });
+        
+        // Verificar si existe progress-updates (el bucket correcto)
+        const progressUpdatesBucket = buckets.find(b => b.name === 'progress-updates');
+        
+        if (progressUpdatesBucket) {
+            console.log('✅ Bucket progress-updates existe (este es el correcto)');
+            console.log('📋 Configuración del bucket:', progressUpdatesBucket);
+        } else {
+            console.log('❌ Bucket progress-updates NO existe');
+            console.log('🔧 Necesitas crear el bucket desde el SQL Editor de Supabase');
+        }
+        
+    } catch (error) {
+        console.error('❌ Error general:', error);
+    }
+}
+
+// Función para verificar el estado actual de las fotos
+function checkCurrentPhotos() {
+    console.log('🔍 Verificando estado actual de las fotos...');
+    
+    // Buscar elementos de fotos en el DOM
+    const photoInputs = document.querySelectorAll('input[type="file"][accept="image/*"]');
+    console.log('📷 Inputs de fotos encontrados:', photoInputs.length);
+    
+    photoInputs.forEach((input, index) => {
+        console.log(`  Input ${index + 1}:`, {
+            id: input.id,
+            files: input.files?.length || 0,
+            accept: input.accept
+        });
+    });
+    
+    // Buscar previews de fotos
+    const photoPreviews = document.querySelectorAll('img[alt*="Foto"]');
+    console.log('🖼️ Previews de fotos encontrados:', photoPreviews.length);
+    
+    photoPreviews.forEach((img, index) => {
+        console.log(`  Preview ${index + 1}:`, {
+            src: img.src,
+            alt: img.alt,
+            width: img.width,
+            height: img.height
+        });
+    });
+}
+
+// Ejecutar verificaciones
+checkBuckets();
+checkCurrentPhotos();
+
+console.log('💡 Para probar la subida de fotos:');
+console.log('1. Selecciona una foto en una tarea');
+console.log('2. Marca la tarea como completada');
+console.log('3. Revisa la consola para ver los logs de debug');

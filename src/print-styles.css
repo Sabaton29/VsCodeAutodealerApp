@@ -1,0 +1,176 @@
+/* Estilos para impresión del reporte de reparación */
+@media print {
+    .print-report {
+        background: white !important;
+        color: black !important;
+        padding: 20px !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border-radius: 0 !important;
+    }
+    
+    .print-report h2,
+    .print-report h3 {
+        color: black !important;
+        border-bottom: 2px solid #333 !important;
+        padding-bottom: 10px !important;
+        margin-bottom: 15px !important;
+    }
+    
+    .print-report .text-white,
+    .print-report .text-gray-300 {
+        color: black !important;
+    }
+    
+    .print-report .bg-dark-light,
+    .print-report .bg-gray-800 {
+        background: white !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    .print-report .text-gray-500 {
+        color: #666 !important;
+    }
+    
+    .print-report .text-gray-400 {
+        color: #888 !important;
+    }
+    
+    /* Ocultar elementos que no se deben imprimir */
+    .print-report button,
+    .print-report input[type="file"],
+    .print-report .no-print {
+        display: none !important;
+    }
+    
+    /* Estilos para las tareas completadas */
+    .print-report .task-completed {
+        background: #f0f8f0 !important;
+        border-left: 4px solid #28a745 !important;
+        padding: 10px !important;
+        margin: 5px 0 !important;
+    }
+    
+    .print-report .task-completed .line-through {
+        text-decoration: line-through !important;
+        color: #28a745 !important;
+        font-weight: bold !important;
+    }
+    
+    /* Estilos para las fotos */
+    .print-report .item-photos {
+        margin-top: 10px !important;
+    }
+    
+    .print-report .item-photos img {
+        max-width: 100px !important;
+        max-height: 100px !important;
+        margin: 5px !important;
+        border: 1px solid #ddd !important;
+        border-radius: 4px !important;
+    }
+    
+    /* Estilos para el header de la empresa */
+    .print-report .company-header {
+        text-align: center !important;
+        margin-bottom: 30px !important;
+        border-bottom: 3px solid #333 !important;
+        padding-bottom: 20px !important;
+    }
+    
+    .print-report .company-header h1 {
+        font-size: 24px !important;
+        margin: 0 !important;
+        color: #333 !important;
+    }
+    
+    .print-report .company-header p {
+        margin: 5px 0 !important;
+        color: #666 !important;
+    }
+    
+    /* Estilos para la información del vehículo */
+    .print-report .vehicle-info {
+        background: #f8f9fa !important;
+        padding: 15px !important;
+        margin: 15px 0 !important;
+        border-radius: 5px !important;
+        border: 1px solid #ddd !important;
+    }
+    
+    .print-report .vehicle-info h4 {
+        margin: 0 0 10px 0 !important;
+        color: #333 !important;
+        font-size: 16px !important;
+    }
+    
+    .print-report .vehicle-info p {
+        margin: 5px 0 !important;
+        color: #666 !important;
+    }
+    
+    /* Estilos para el resumen de tareas */
+    .print-report .tasks-summary {
+        margin: 20px 0 !important;
+    }
+    
+    .print-report .tasks-summary h4 {
+        margin: 0 0 15px 0 !important;
+        color: #333 !important;
+        font-size: 18px !important;
+    }
+    
+    .print-report .task-item {
+        display: flex !important;
+        align-items: center !important;
+        margin: 10px 0 !important;
+        padding: 10px !important;
+        border: 1px solid #ddd !important;
+        border-radius: 5px !important;
+    }
+    
+    .print-report .task-item.completed {
+        background: #d4edda !important;
+        border-color: #c3e6cb !important;
+    }
+    
+    .print-report .task-checkbox {
+        margin-right: 10px !important;
+        width: 20px !important;
+        height: 20px !important;
+    }
+    
+    .print-report .task-description {
+        flex: 1 !important;
+        font-size: 14px !important;
+    }
+    
+    .print-report .task-description.completed {
+        text-decoration: line-through !important;
+        color: #28a745 !important;
+        font-weight: bold !important;
+    }
+    
+    /* Estilos para el footer */
+    .print-report .print-footer {
+        margin-top: 30px !important;
+        padding-top: 20px !important;
+        border-top: 2px solid #333 !important;
+        text-align: center !important;
+        color: #666 !important;
+        font-size: 12px !important;
+    }
+    
+    /* Ocultar scrollbars y elementos de UI */
+    .print-report * {
+        overflow: visible !important;
+    }
+    
+    .print-report .overflow-y-auto {
+        overflow: visible !important;
+    }
+    
+    .print-report .max-h-64 {
+        max-height: none !important;
+    }
+}

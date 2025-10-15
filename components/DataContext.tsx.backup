@@ -1,0 +1,1208 @@
+
+
+
+import React, { createContext, useState, useEffect, useMemo, useCallback, useContext } from 'react';
+import * as db from '../services/db';
+import {
+    Location, WorkOrder, WorkOrderStatus, Client, Vehicle, KanbanStage, StaffMember, Service,
+    InventoryItem, Supplier, PettyCashTransaction, Invoice, InvoiceStatus, PaymentMethod,
+    DiagnosticData, WorkOrderHistoryEntry, Quote, QuoteStatus, PurchaseOrder, PurchaseOrderStatus,
+    QuoteItem, DataContextType, UIContextType, UserRole, OperatingExpense, FinancialAccount, AppSettings, Permission, ServiceCategory, InventoryCategory,
+    PaymentTerms, DayOfWeek, TimeClockEntry, Loan, LoanPayment, ProgressLogEntry, DiagnosticType, UnforeseenIssue, Notification, NotificationType, Appointment, AppointmentStatus
+} from '../types';
+import {
+    LOCATIONS_DATA, WORK_ORDERS_DATA, CLIENTS_DATA, VEHICLES_DATA, KANBAN_STAGES_ORDER,
+    STAFF_DATA, SERVICES_DATA, INVENTORY_DATA, SUPPLIERS_DATA, PETTY_CASH_DATA,
+    INVOICES_DATA, QUOTES_DATA, PURCHASE_ORDERS_DATA, OPERATING_EXPENSES_DATA, FINANCIAL_ACCOUNTS_DATA, DEFAULT_SERVICE_CATEGORIES, DEFAULT_INVENTORY_CATEGORIES, TIME_CLOCK_DATA, LOANS_DATA, LOAN_PAYMENTS_DATA, NOTIFICATIONS_DATA, APPOINTMENTS_DATA
+} from '../constants';
+import { UIContext } from './UIContext';
+
+const DEFAULT_APP_SETTINGS: AppSettings = {
+    companyInfo: {
+        name: 'Autodealer Taller SAS',
+        nit: '900.123.456-7',
+        logoUrl: '/favicon.svg'
+    },
+    billingSettings: {
+        vatRate: 19,
+        currencySymbol: '$',
+        defaultTerms: 'El pago debe realizarse dentro de los 30 días posteriores a la fecha de la factura. Todos los trabajos están garantizados por 3 meses o 5,000 km, lo que ocurra primero.',
+        bankInfo: 'Cuenta de Ahorros Bancolombia #123-456789-00 a nombre de Autodealer Taller SAS.'
+    },
+    operationsSettings: {
+        serviceCategories: DEFAULT_SERVICE_CATEGORIES,
+        inventoryCategories: DEFAULT_INVENTORY_CATEGORIES,
+    }
+};
+
+
+export const DataContext = createContext<DataContextType | null>(null);
+
+const calculateDueDate = (issueDate: Date, terms?: PaymentTerms): Date => {
+    const date = new Date(issueDate);
+    if (!terms || terms.type === 'ON_DELIVERY') {
+        date.setDate(date.getDate() + 1); // Default to next day payment
+        return date;
+    }
+    if (terms.type === 'NET_DAYS') {
+        date.setDate(date.getDate() + terms.days);
+        return date;
+    }
+    if (terms.type === 'DAY_OF_WEEK') {
+        const dayMap: Record<DayOfWeek, number> = { 'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 'Jueves': 4, 'Viernes': 5, 'Sábado': 6 };
+        const targetDay = dayMap[terms.day];
+        const currentDay = date.getDay();
+        let daysToAdd = targetDay - currentDay;
+        if (daysToAdd <= 0) {
+            daysToAdd += 7;
+        }
+        date.setDate(date.getDate() + daysToAdd);
+        return date;
+    }
+    return date;
+};
+
+const fileToBase64 = (file: File): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.readAsDataURL(file);
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = error => reject(error);
+    });
+};
+
+
+export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+    const ui = useContext(UIContext);
+    const [isLoading, setIsLoading] = useState(true);
+    const [locations, setLocations] = useState<Location[]>([]);
+    const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
+    const [clients, setClients] = useState<Client[]>([]);
+    const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+    const [staffMembers, setStaffMembers] = useState<StaffMember[]>([]);
+    const [services, setServices] = useState<Service[]>([]);
+    const [inventoryItems, setInventoryItems] = useState<InventoryItem[]>([]);
+    const [suppliers, setSuppliers] = useState<Supplier[]>([]);
+    const [pettyCashTransactions, setPettyCashTransactions] = useState<PettyCashTransaction[]>([]);
+    const [operatingExpenses, setOperatingExpenses] = useState<OperatingExpense[]>([]);
+    const [invoices, setInvoices] = useState<Invoice[]>([]);
+    const [quotes, setQuotes] = useState<Quote[]>([]);
+    const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
+    const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
+    const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
+    const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
+    const [loans, setLoans] = useState<Loan[]>([]);
+    const [loanPayments, setLoanPayments] = useState<LoanPayment[]>([]);
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [appointments, setAppointments] = useState<Appointment[]>([]);
+
+    const createNotification = useCallback(async (
+        userIds: string | string[],
+        type: NotificationType,
+        message: string,
+        workOrderId?: string
+    ) => {
+        const targets = Array.isArray(userIds) ? userIds : [userIds];
+        if (targets.length === 0) return;
+
+        const newNotifications: Notification[] = targets.map(userId => ({
+            id: `N-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            userId,
+            type,
+            message,
+            workOrderId,
+            isRead: false,
+            timestamp: new Date().toISOString(),
+        }));
+        
+        setNotifications(prev => {
+            const updated = [...prev, ...newNotifications];
+            db.set('notifications', updated);
+            return updated;
+        });
+    }, []);
+
+    if (!ui) {
+        return null;
+    }
+    
+    // Generic state updater and DB persister
+    const createUpdater = <T,>(setter: React.Dispatch<React.SetStateAction<T[]>>, dbKey: string) => {
+        return (data: T[]) => {
+            setter(data);
+            db.set(dbKey, data);
+        };
+    };
+
+    // Generic save/update handler for items with an 'id' that returns the saved item
+    const createSaveHandler = <T extends { id: string }>(
+        items: T[], 
+        updater: (data: T[]) => void, 
+        isNew: (item: any) => boolean,
+        idPrefix = 'ID'
+    ) => {
+        return async (itemData: T | Omit<T, 'id'>): Promise<T> => {
+            let updatedItems;
+            let savedItem;
+            if (isNew(itemData)) {
+                const newId = `${idPrefix}-${items.length + 1 + Date.now().toString().slice(-4)}`;
+                const newItem = { ...itemData, id: newId } as T;
+                updatedItems = [...items, newItem];
+                savedItem = newItem;
+            } else {
+                updatedItems = items.map(item => item.id === (itemData as T).id ? { ...item, ...(itemData as T) } : item);
+                savedItem = updatedItems.find(i => i.id === (itemData as T).id)!;
+            }
+            updater(updatedItems);
+            return savedItem;
+        };
+    };
+
+    // Generic save/update handler for items with an 'id' that returns void
+    const createVoidSaveHandler = <T extends { id: string }>(
+        items: T[], 
+        updater: (data: T[]) => void, 
+        isNew: (item: any) => boolean,
+        idPrefix = 'ID'
+    ) => {
+        return async (itemData: T | Omit<T, 'id'>): Promise<void> => {
+            let updatedItems;
+            if (isNew(itemData)) {
+                const newId = `${idPrefix}-${items.length + 1 + Date.now().toString().slice(-4)}`;
+                const newItem = { ...itemData, id: newId } as T;
+                updatedItems = [...items, newItem];
+            } else {
+                updatedItems = items.map(item => item.id === (itemData as T).id ? { ...item, ...(itemData as T) } : item);
+            }
+            updater(updatedItems);
+        };
+    };
+
+     // Generic delete handler
+    const createDeleteHandler = <T extends { id: string }>(
+        items: T[],
+        updater: (data: T[]) => void
+    ) => {
+        return async (itemId: string) => {
+            updater(items.filter(item => item.id !== itemId));
+        };
+    };
+
+    const handleMarkNotificationAsRead = async (notificationId: string) => {
+        const updatedNotifications = notifications.map(n =>
+            n.id === notificationId ? { ...n, isRead: true } : n
+        );
+        setNotifications(updatedNotifications);
+        await db.set('notifications', updatedNotifications);
+    };
+
+    const handleMarkAllNotificationsAsRead = async () => {
+        if (!ui.currentUser) return;
+        const updatedNotifications = notifications.map(n =>
+            n.userId === ui.currentUser!.id && !n.isRead ? { ...n, isRead: true } : n
+        );
+        setNotifications(updatedNotifications);
+        await db.set('notifications', updatedNotifications);
+    };
+
+    const handleSaveLocation = createVoidSaveHandler(locations, createUpdater(setLocations, 'locations'), (d) => !('id' in d), 'L');
+    const handleDeleteLocation = createDeleteHandler(locations, createUpdater(setLocations, 'locations'));
+    const handleSaveFinancialAccount = createVoidSaveHandler(financialAccounts, createUpdater(setFinancialAccounts, 'financialAccounts'), (d) => !('id' in d), 'ACC');
+    const handleDeleteFinancialAccount = createDeleteHandler(financialAccounts, createUpdater(setFinancialAccounts, 'financialAccounts'));
+    
+    const handleSaveClient = async (clientData: Client | Omit<Client, 'id' | 'vehicleCount' | 'registrationDate'>) => {
+        let updatedClients;
+        if ('id' in clientData) {
+            updatedClients = clients.map(c => c.id === clientData.id ? { ...c, ...clientData } : c);
+        } else {
+             const newClient: Client = {
+                id: `C${clients.length + 100}`,
+                vehicleCount: 0,
+                registrationDate: new Date().toISOString().split('T')[0],
+                ...clientData
+            };
+            updatedClients = [...clients, newClient];
+        }
+        setClients(updatedClients);
+        await db.set('clients', updatedClients);
+    };
+    const handleSaveVehicle = createVoidSaveHandler(vehicles, createUpdater(setVehicles, 'vehicles'), (d) => !('id' in d), 'V');
+    const handleSaveStaffMember = async (staffData: StaffMember | Omit<StaffMember, 'id' | 'avatarUrl'>): Promise<void> => {
+        let updatedStaff;
+        if ('id' in staffData) { // Editing
+            updatedStaff = staffMembers.map(s => s.id === staffData.id ? { ...s, ...staffData } : s);
+        } else { // Creating
+            const newStaff: StaffMember = {
+                id: `S-${staffMembers.length + 1}`,
+                avatarUrl: `https://i.pravatar.cc/48?u=${Date.now()}`,
+                ...staffData,
+            };
+            updatedStaff = [...staffMembers, newStaff];
+        }
+        setStaffMembers(updatedStaff);
+        await db.set('staffMembers', updatedStaff);
+    };
+    const handleDeleteStaffMember = createDeleteHandler(staffMembers, createUpdater(setStaffMembers, 'staffMembers'));
+
+    const handleSaveService = createSaveHandler(services, createUpdater(setServices, 'services'), (d) => !('id' in d), 'SVC');
+    const handleDeleteService = createDeleteHandler(services, createUpdater(setServices, 'services'));
+    const handleSaveInventoryItem = createSaveHandler(inventoryItems, createUpdater(setInventoryItems, 'inventoryItems'), (d) => !('id' in d), 'INV');
+    const handleDeleteInventoryItem = createDeleteHandler(inventoryItems, createUpdater(setInventoryItems, 'inventoryItems'));
+    const handleSaveSupplier = createVoidSaveHandler(suppliers, createUpdater(setSuppliers, 'suppliers'), (d) => !('id' in d), 'SUP');
+    const handleDeleteSupplier = createDeleteHandler(suppliers, createUpdater(setSuppliers, 'suppliers'));
+    const handleAddTransaction = async (transactionData: Omit<PettyCashTransaction, 'id' | 'date'> & { receiptFile?: File | null }) => {
+        const newTransaction: PettyCashTransaction = {
+            id: `TR-${pettyCashTransactions.length + 1}`,
+            date: new Date().toISOString(),
+            ...transactionData,
+        };
+        const updatedTransactions = [...pettyCashTransactions, newTransaction];
+        setPettyCashTransactions(updatedTransactions);
+        await db.set('pettyCashTransactions', updatedTransactions);
+    };
+    const handleAddOperatingExpense = async (expenseData: Omit<OperatingExpense, 'id' | 'date'>): Promise<void> => {
+        const newExpense: OperatingExpense = {
+            id: `OE-${operatingExpenses.length + 1}`,
+            date: new Date().toISOString(),
+            ...expenseData
+        };
+        const updatedExpenses = [...operatingExpenses, newExpense];
+        setOperatingExpenses(updatedExpenses);
+        await db.set('operatingExpenses', updatedExpenses);
+    };
+    
+    const handleCreateWorkOrder = async (data: Omit<WorkOrder, 'id' | 'status' | 'date' | 'history'>): Promise<WorkOrder | undefined> => {
+        const generateToken = () => {
+            const randomPart = () => Math.random().toString(36).substring(2, 15);
+            return `tok-${Date.now().toString(36)}-${randomPart()}`;
+        };
+        const newWorkOrder: WorkOrder = {
+            id: `OT-${Date.now().toString().slice(-4)}`,
+            status: WorkOrderStatus.EN_PROCESO,
+            date: new Date().toISOString(),
+            history: [{ stage: data.stage, date: new Date().toISOString(), user: ui.currentUser?.name || 'Sistema' }],
+            ...data,
+            publicAccessToken: generateToken(),
+        };
+        const updatedWorkOrders = [...workOrders, newWorkOrder];
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+
+        const adminsAndManagers = staffMembers
+            .filter(s => s.role === UserRole.ADMINISTRADOR || s.role === UserRole.JEFE_TALLER)
+            .map(s => s.id);
+        
+        if (adminsAndManagers.length > 0) {
+            createNotification(
+                adminsAndManagers,
+                'WORK_ORDER_CREATED',
+                `Nueva OT #${newWorkOrder.id} creada para ${newWorkOrder.vehicle.plate}.`,
+                newWorkOrder.id
+            );
+        }
+        return newWorkOrder;
+    };
+
+    const handleSaveWorkOrder = async (data: { id: string; serviceRequested: string; advisorId?: string; staffMemberId?: string; comments?: string; }) => {
+        const updatedWorkOrders = workOrders.map(wo => 
+            wo.id === data.id ? { ...wo, ...data } : wo
+        );
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+    };
+    const handleUpdateWorkOrderDiagnosticType = async (workOrderId: string, newType: DiagnosticType) => {
+        const updatedWorkOrders = workOrders.map(wo => {
+            if (wo.id === workOrderId) {
+                const newHistoryEntry: WorkOrderHistoryEntry = {
+                    stage: wo.stage,
+                    date: new Date().toISOString(),
+                    user: ui.currentUser?.name || 'Sistema',
+                    notes: `Tipo de diagnóstico cambiado de "${wo.diagnosticType || 'No definido'}" a "${newType}".`
+                };
+                return {
+                    ...wo,
+                    diagnosticType: newType,
+                    history: [...(wo.history || []), newHistoryEntry]
+                };
+            }
+            return wo;
+        });
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+    };
+    const handleAssignTechnician = async (workOrderId: string, staffMemberId: string) => {
+        const updatedWorkOrders = workOrders.map(wo => 
+            wo.id === workOrderId ? { ...wo, staffMemberId } : wo
+        );
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+
+        createNotification(
+            staffMemberId,
+            'NEW_ASSIGNMENT',
+            `Se te ha asignado la Orden de Trabajo #${workOrderId}.`,
+            workOrderId
+        );
+    };
+    const handleAdvanceStage = async (workOrderId: string, currentStage: KanbanStage) => {
+        const currentIndex = KANBAN_STAGES_ORDER.indexOf(currentStage);
+        if (currentIndex < KANBAN_STAGES_ORDER.length - 1) {
+            const nextStage = KANBAN_STAGES_ORDER[currentIndex + 1];
+            const updatedWorkOrders = workOrders.map(wo =>
+                wo.id === workOrderId ? { ...wo, stage: nextStage, history: [...(wo.history || []), { stage: nextStage, date: new Date().toISOString(), user: ui.currentUser?.name || 'Sistema' }] } : wo
+            );
+            setWorkOrders(updatedWorkOrders);
+            await db.set('workOrders', updatedWorkOrders);
+        }
+    };
+    const handleCancelOrder = async (workOrderId: string) => {
+        const updatedWorkOrders = workOrders.map(wo =>
+            wo.id === workOrderId ? { ...wo, stage: KanbanStage.CANCELADO, status: WorkOrderStatus.CANCELADO, history: [...(wo.history || []), { stage: KanbanStage.CANCELADO, date: new Date().toISOString(), user: ui.currentUser?.name || 'Sistema' }] } : wo
+        );
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+
+        const adminsAndManagers = staffMembers
+            .filter(s => s.role === UserRole.ADMINISTRADOR || s.role === UserRole.JEFE_TALLER)
+            .map(s => s.id);
+        const workOrder = workOrders.find(wo => wo.id === workOrderId);
+    
+        if (adminsAndManagers.length > 0) {
+            createNotification(
+                adminsAndManagers,
+                'WORK_ORDER_CANCELED',
+                `La OT #${workOrderId} para ${workOrder?.vehicle.plate} ha sido CANCELADA.`,
+                workOrderId
+            );
+        }
+    };
+    const handleCreateInvoiceFromWorkOrder = async (workOrderId: string) => {
+        const workOrder = workOrders.find(wo => wo.id === workOrderId);
+        const client = clients.find(c => c.id === workOrder?.client.id);
+        if (!workOrder || !client) return;
+
+        const quotesToInvoice = quotes.filter(q => 
+            (workOrder.linkedQuoteIds || []).includes(q.id) &&
+            q.status === QuoteStatus.APROBADO &&
+            !q.linkedInvoiceId
+        );
+
+        if (quotesToInvoice.length === 0) {
+            alert("No hay cotizaciones aprobadas pendientes de facturar para esta orden.");
+            return;
+        }
+
+        const allItems = quotesToInvoice.flatMap(q => q.items);
+        const subtotal = allItems.reduce((sum, item) => sum + (item.unitPrice * item.quantity) - (item.discount || 0), 0);
+        const taxAmount = allItems.reduce((sum, item) => sum + ((item.unitPrice * item.quantity) - (item.discount || 0)) * (item.taxRate / 100), 0);
+        
+        const issueDate = new Date();
+        const dueDate = calculateDueDate(issueDate, client.paymentTerms);
+
+        const newInvoice: Invoice = {
+            id: `INV-${String(invoices.length + 1).padStart(3, '0')}`,
+            workOrderId: workOrderId,
+            clientId: client.id,
+            clientName: client.name,
+            vehicleSummary: `${workOrder.vehicle.make} ${workOrder.vehicle.model} (${workOrder.vehicle.plate})`,
+            issueDate: issueDate.toISOString().split('T')[0],
+            dueDate: dueDate.toISOString().split('T')[0],
+            subtotal: subtotal,
+            taxAmount: taxAmount,
+            total: subtotal + taxAmount,
+            status: InvoiceStatus.PENDIENTE,
+            locationId: workOrder.locationId,
+            items: allItems,
+            notes: quotesToInvoice.map(q => q.notes).filter(Boolean).join('\n---\n'),
+            paymentTerms: client.paymentTerms,
+            vatIncluded: true,
+        };
+
+        const updatedInvoices = [...invoices, newInvoice];
+        setInvoices(updatedInvoices);
+        await db.set('invoices', updatedInvoices);
+
+        const invoicedQuoteIds = new Set(quotesToInvoice.map(q => q.id));
+        const updatedQuotes = quotes.map(q => 
+            invoicedQuoteIds.has(q.id) ? { ...q, status: QuoteStatus.FACTURADO, linkedInvoiceId: newInvoice.id } : q
+        );
+        setQuotes(updatedQuotes);
+        await db.set('quotes', updatedQuotes);
+        
+        const updatedWorkOrders = workOrders.map(wo =>
+            wo.id === workOrderId ? { ...wo, stage: KanbanStage.ENTREGADO, status: WorkOrderStatus.FACTURADO, history: [...(wo.history || []), { stage: KanbanStage.ENTREGADO, date: new Date().toISOString(), user: ui.currentUser?.name || 'Sistema', notes: `Factura consolidada ${newInvoice.id} creada.` }] } : wo
+        );
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+    };
+    const handleRegisterPayment = async (invoiceId: string, paymentData: { amount: number; paymentMethod: PaymentMethod; date: string }) => {
+        const updatedInvoices = invoices.map(inv =>
+            inv.id === invoiceId ? { ...inv, status: InvoiceStatus.PAGADA } : inv
+        );
+        setInvoices(updatedInvoices);
+        await db.set('invoices', updatedInvoices);
+    };
+    const handleCancelInvoice = async (invoiceId: string) => {
+        const updatedInvoices = invoices.map(inv =>
+            inv.id === invoiceId ? { ...inv, status: InvoiceStatus.CANCELADA } : inv
+        );
+        setInvoices(updatedInvoices);
+        await db.set('invoices', updatedInvoices);
+    };
+     const handleSaveDiagnostic = async (workOrderId: string, data: DiagnosticData, staffIds: { advisorId?: string; mechanicId?: string; }, recommendedItems: QuoteItem[], diagnosticType: DiagnosticType) => {
+        const finalDiagnosticData: DiagnosticData = {};
+        for (const sectionTitle in data) {
+            if (Object.prototype.hasOwnProperty.call(data, sectionTitle)) {
+                const sectionData = data[sectionTitle];
+                const { imageFiles, ...restOfSection } = sectionData;
+                
+                let newImageUrls: string[] = restOfSection.imageUrls || [];
+                if (imageFiles && imageFiles.length > 0) {
+                    const uploadedUrls = await Promise.all(imageFiles.map(file => fileToBase64(file)));
+                    newImageUrls = [...newImageUrls, ...uploadedUrls];
+                }
+
+                finalDiagnosticData[sectionTitle] = {
+                    ...restOfSection,
+                    imageUrls: newImageUrls,
+                };
+            }
+        }
+        
+        const updatedWorkOrders = workOrders.map(wo => {
+            if (wo.id === workOrderId) {
+                const newStage = KanbanStage.PENDIENTE_COTIZACION;
+                return {
+                    ...wo,
+                    diagnosticData: finalDiagnosticData,
+                    diagnosticType: diagnosticType,
+                    advisorId: staffIds.advisorId || wo.advisorId,
+                    staffMemberId: staffIds.mechanicId || wo.staffMemberId,
+                    stage: newStage,
+                    recommendedItems,
+                    history: [...(wo.history || []), { stage: newStage, date: new Date().toISOString(), user: ui.currentUser?.name || 'Sistema', notes: "Diagnóstico completado." }]
+                };
+            }
+            return wo;
+        });
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+
+        const updatedWorkOrder = updatedWorkOrders.find(wo => wo.id === workOrderId);
+        if (updatedWorkOrder?.advisorId) {
+            createNotification(
+                updatedWorkOrder.advisorId,
+                'DIAGNOSTIC_COMPLETED',
+                `Diagnóstico completado para la OT #${workOrderId}. Listo para cotizar.`,
+                workOrderId
+            );
+        }
+    };
+    const handleSaveQuote = async (quoteData: Quote | Omit<Quote, 'id'>, actor?: string) => {
+        let savedQuote: Quote;
+        let finalQuotes: Quote[];
+
+        if ('id' in quoteData) {
+            savedQuote = quoteData;
+            finalQuotes = quotes.map(q => q.id === quoteData.id ? quoteData : q);
+        } else {
+            savedQuote = { ...quoteData, id: `COT-${String(quotes.length + 1).padStart(3, '0')}` };
+            finalQuotes = [...quotes, savedQuote];
+        }
+        setQuotes(finalQuotes);
+        await db.set('quotes', finalQuotes);
+
+        if(savedQuote.workOrderId) {
+            const updatedWorkOrders = workOrders.map(wo => {
+                if (wo.id === savedQuote.workOrderId) {
+                    const newStage = savedQuote.status === QuoteStatus.APROBADO ? KanbanStage.EN_REPARACION : KanbanStage.ESPERA_APROBACION;
+                    const notes = savedQuote.status === QuoteStatus.APROBADO ? `Cotización ${savedQuote.id} aprobada.` : `Cotización ${savedQuote.id} guardada.`;
+                    const newLinkedQuoteIds = [...new Set([...(wo.linkedQuoteIds || []), savedQuote.id])];
+                    const user = actor || ui.currentUser?.name || 'Sistema';
+                    return { ...wo, linkedQuoteIds: newLinkedQuoteIds, stage: newStage, history: [...(wo.history || []), { stage: newStage, date: new Date().toISOString(), user, notes }] };
+                }
+                return wo;
+            });
+            setWorkOrders(updatedWorkOrders);
+            await db.set('workOrders', updatedWorkOrders);
+        }
+
+        if (savedQuote.workOrderId && savedQuote.status === QuoteStatus.APROBADO) {
+            const workOrder = workOrders.find(wo => wo.id === savedQuote.workOrderId);
+            if (workOrder?.advisorId) {
+                createNotification(
+                    workOrder.advisorId,
+                    'QUOTE_APPROVED',
+                    `La cotización #${savedQuote.id} (${workOrder.vehicle.plate}) ha sido APROBADA por el cliente.`,
+                    workOrder.id
+                );
+            }
+        }
+    };
+    const handleRejectQuote = async (quoteId: string, actor?: string) => {
+        const quote = quotes.find(q => q.id === quoteId);
+        if (!quote) return;
+
+        const updatedQuotes = quotes.map(q => q.id === quoteId ? { ...q, status: QuoteStatus.RECHAZADO } : q);
+        setQuotes(updatedQuotes);
+        await db.set('quotes', updatedQuotes);
+        
+        if (quote.workOrderId) {
+            const workOrder = workOrders.find(wo => wo.id === quote.workOrderId);
+            if(workOrder) {
+                const newStage = KanbanStage.ATENCION_REQUERIDA;
+                const user = actor || ui.currentUser?.name || 'Sistema';
+                const updatedWorkOrders = workOrders.map(wo => 
+                    wo.id === workOrder.id ? { ...wo, stage: newStage, history: [...(wo.history || []), { stage: newStage, date: new Date().toISOString(), user, notes: `Cotización ${quote.id} rechazada.` }] } : wo
+                );
+                setWorkOrders(updatedWorkOrders);
+                await db.set('workOrders', updatedWorkOrders);
+
+                if (workOrder.advisorId) {
+                    createNotification(
+                        workOrder.advisorId,
+                        'QUOTE_REJECTED',
+                        `La cotización #${quoteId} (${workOrder.vehicle.plate}) ha sido RECHAZADA por el cliente.`,
+                        workOrder.id
+                    );
+                }
+            }
+        }
+    };
+    const handleDeleteQuote = createDeleteHandler(quotes, createUpdater(setQuotes, 'quotes'));
+    const handleSavePurchaseOrder = async (poData: Omit<PurchaseOrder, 'id'>) => {
+        const newPO = { ...poData, id: `OC-${String(purchaseOrders.length + 1).padStart(3, '0')}` };
+        setPurchaseOrders([...purchaseOrders, newPO]);
+        await db.set('purchaseOrders', [...purchaseOrders, newPO]);
+    };
+    const handleReceivePurchaseOrder = async (poId: string) => {
+        const po = purchaseOrders.find(p => p.id === poId);
+        if (!po) return;
+
+        let updatedInventory = [...inventoryItems];
+        po.items.forEach(poItem => {
+            updatedInventory = updatedInventory.map(invItem => {
+                if (invItem.id === poItem.inventoryItemId) {
+                    return { ...invItem, stock: invItem.stock + poItem.quantity };
+                }
+                return invItem;
+            });
+        });
+        setInventoryItems(updatedInventory);
+        await db.set('inventoryItems', updatedInventory);
+        
+        const updatedPOs = purchaseOrders.map(p => p.id === poId ? { ...p, status: PurchaseOrderStatus.RECIBIDO_COMPLETO } : p);
+        setPurchaseOrders(updatedPOs);
+        await db.set('purchaseOrders', updatedPOs);
+    };
+    
+    const handleRegisterItemCosts = async (workOrderId: string, costs: { itemId: string; costPrice: number; supplierId: string }[]) => {
+        const workOrder = workOrders.find(wo => wo.id === workOrderId);
+        if (!workOrder || (workOrder.linkedQuoteIds || []).length === 0) return;
+        const relevantQuoteIds = new Set(workOrder.linkedQuoteIds);
+
+        const updatedQuotes = quotes.map(q => {
+            if (relevantQuoteIds.has(q.id)) {
+                const newItems = q.items.map(item => {
+                    const costInfo = costs.find(c => c.itemId === item.id);
+                    if (costInfo) {
+                        return { ...item, costPrice: costInfo.costPrice, supplierId: costInfo.supplierId };
+                    }
+                    return item;
+                });
+                return { ...q, items: newItems };
+            }
+            return q;
+        });
+        setQuotes(updatedQuotes);
+        await db.set('quotes', updatedQuotes);
+    };
+
+    const handleRegisterDelivery = async (workOrderId: string, deliveryData: any) => {
+        const updatedWorkOrders = workOrders.map(wo => {
+            if (wo.id === workOrderId) {
+                return {
+                    ...wo,
+                    stage: KanbanStage.ENTREGADO,
+                    deliveryDate: new Date().toISOString(),
+                    ...deliveryData
+                };
+            }
+            return wo;
+        });
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+    };
+    
+    const handleSaveAppSettings = async (settings: AppSettings) => {
+        setAppSettings(settings);
+        await db.set('appSettings', settings);
+    };
+    
+    const handleUpdateStaffRole = async (staffId: string, newRole: UserRole) => {
+        const updatedStaffMembers = staffMembers.map(staff =>
+            staff.id === staffId ? { ...staff, role: newRole, customPermissions: [] } : staff
+        );
+        setStaffMembers(updatedStaffMembers);
+        await db.set('staffMembers', updatedStaffMembers);
+    };
+
+    const handleUpdateStaffPermissions = async (staffId: string, permissions: Permission[]) => {
+        const updatedStaffMembers = staffMembers.map(staff =>
+            staff.id === staffId ? { ...staff, customPermissions: permissions } : staff
+        );
+        setStaffMembers(updatedStaffMembers);
+        await db.set('staffMembers', updatedStaffMembers);
+    };
+    
+    const handleSaveServiceCategory = async (category: ServiceCategory | Omit<ServiceCategory, 'id'>) => {
+        if (!appSettings) return;
+        const opSettings = appSettings.operationsSettings;
+        let updatedCategories;
+        if ('id' in category) {
+            updatedCategories = opSettings.serviceCategories.map(c => c.id === category.id ? category : c);
+        } else {
+            updatedCategories = [...opSettings.serviceCategories, { ...category, id: `cat-svc-${Date.now()}` }];
+        }
+        await handleSaveAppSettings({ ...appSettings, operationsSettings: { ...opSettings, serviceCategories: updatedCategories } });
+    };
+    const handleDeleteServiceCategory = async (categoryId: string) => {
+        if (!appSettings) return;
+        const opSettings = appSettings.operationsSettings;
+        const updatedCategories = opSettings.serviceCategories.filter(c => c.id !== categoryId);
+        await handleSaveAppSettings({ ...appSettings, operationsSettings: { ...opSettings, serviceCategories: updatedCategories } });
+    };
+
+    const handleSaveInventoryCategory = async (category: InventoryCategory | Omit<InventoryCategory, 'id'>) => {
+        if (!appSettings) return;
+        const opSettings = appSettings.operationsSettings;
+        let updatedCategories;
+        if ('id' in category) {
+            updatedCategories = opSettings.inventoryCategories.map(c => c.id === category.id ? category : c);
+        } else {
+            updatedCategories = [...opSettings.inventoryCategories, { ...category, id: `cat-inv-${Date.now()}` }];
+        }
+        await handleSaveAppSettings({ ...appSettings, operationsSettings: { ...opSettings, inventoryCategories: updatedCategories } });
+    };
+    const handleDeleteInventoryCategory = async (categoryId: string) => {
+        if (!appSettings) return;
+        const opSettings = appSettings.operationsSettings;
+        const updatedCategories = opSettings.inventoryCategories.filter(c => c.id !== categoryId);
+        await handleSaveAppSettings({ ...appSettings, operationsSettings: { ...opSettings, inventoryCategories: updatedCategories } });
+    };
+    
+    const handleAssignAccountsToUser = async (staffId: string, accountIds: string[]) => {
+        const updatedAccounts = financialAccounts.map(acc => {
+            const isAssigned = accountIds.includes(acc.id);
+            const wasAssigned = acc.assignedUserIds?.includes(staffId);
+
+            if (isAssigned && !wasAssigned) {
+                return { ...acc, assignedUserIds: [...(acc.assignedUserIds || []), staffId] };
+            }
+            if (!isAssigned && wasAssigned) {
+                return { ...acc, assignedUserIds: acc.assignedUserIds?.filter(id => id !== staffId) };
+            }
+            return acc;
+        });
+        setFinancialAccounts(updatedAccounts);
+        await db.set('financialAccounts', updatedAccounts);
+    };
+
+    const handleSaveInvoiceCommissions = async (invoiceId: string, commissions: { itemId: string; commission: number }[]) => {
+        const commissionMap = new Map(commissions.map(c => [c.itemId, c.commission]));
+        const updatedInvoices = invoices.map(inv => {
+            if (inv.id === invoiceId) {
+                const updatedItems = inv.items.map(item => ({
+                    ...item,
+                    commission: commissionMap.get(item.id) ?? item.commission,
+                }));
+                return { ...inv, items: updatedItems };
+            }
+            return inv;
+        });
+        setInvoices(updatedInvoices);
+        await db.set('invoices', updatedInvoices);
+    };
+
+    const handleFactorInvoice = async (invoiceId: string, factoringData: Omit<Invoice['factoringInfo'], 'retentionReleased'>) => {
+        const invoiceToUpdate = invoices.find(inv => inv.id === invoiceId);
+        if (!invoiceToUpdate) return;
+        
+        const updatedInvoices = invoices.map(inv => 
+            inv.id === invoiceId ? { ...inv, status: InvoiceStatus.PAGADA_FACTORING, factoringInfo: factoringData } : inv
+        );
+        setInvoices(updatedInvoices);
+        await db.set('invoices', updatedInvoices);
+
+        // 1. Create operating expense for the commission
+        await handleAddOperatingExpense({
+            description: `Comisión Factoring Factura #${invoiceId} con ${factoringData.company}`,
+            category: 'Administrativos',
+            amount: factoringData.commission,
+            locationId: invoiceToUpdate.locationId,
+            accountId: factoringData.accountId,
+            userId: ui.currentUser?.id || 'S1',
+        });
+        
+        // 2. Create income transaction for the money received
+        const receivedAmount = invoiceToUpdate.total - factoringData.commission - factoringData.retentionAmount;
+        if (receivedAmount > 0) {
+            await handleAddTransaction({
+                type: 'income',
+                description: `Ingreso por Factoring Factura #${invoiceId}`,
+                amount: receivedAmount,
+                paymentMethod: 'Transferencia',
+                locationId: invoiceToUpdate.locationId,
+                accountId: factoringData.accountId,
+                userId: ui.currentUser?.id || 'S1',
+            });
+        }
+    };
+
+    const handleReleaseRetention = async (invoiceId: string, releaseData: { date: string; accountId: string; }) => {
+        const invoiceToUpdate = invoices.find(inv => inv.id === invoiceId);
+        if (!invoiceToUpdate || !invoiceToUpdate.factoringInfo) return;
+
+        const updatedInvoices = invoices.map(inv => {
+            if (inv.id === invoiceId && inv.factoringInfo) {
+                return {
+                    ...inv,
+                    status: InvoiceStatus.PAGADA,
+                    factoringInfo: {
+                        ...inv.factoringInfo,
+                        retentionReleased: releaseData
+                    }
+                };
+            }
+            return inv;
+        });
+        setInvoices(updatedInvoices);
+        await db.set('invoices', updatedInvoices);
+        
+        // Create income transaction for the released retention
+        await handleAddTransaction({
+            type: 'income',
+            description: `Liberación de retención Factura #${invoiceId}`,
+            amount: invoiceToUpdate.factoringInfo.retentionAmount,
+            paymentMethod: 'Transferencia',
+            locationId: invoiceToUpdate.locationId,
+            accountId: releaseData.accountId,
+            userId: ui.currentUser?.id || 'S1',
+        });
+    };
+    
+    const handleToggleInvoiceVat = async (invoiceId: string) => {
+        const invoiceToUpdate = invoices.find(inv => inv.id === invoiceId);
+        if (!invoiceToUpdate || !appSettings) return;
+
+        const newVatIncluded = !(invoiceToUpdate.vatIncluded ?? true);
+
+        const subtotal = invoiceToUpdate.items.reduce((acc, item) => {
+            const itemTotal = (item.unitPrice * item.quantity) - (item.discount || 0);
+            return acc + itemTotal;
+        }, 0);
+        
+        let newTaxAmount = 0;
+        let newTotal = 0;
+        
+        if (newVatIncluded) {
+            newTaxAmount = subtotal * (appSettings.billingSettings.vatRate / 100);
+            newTotal = subtotal + newTaxAmount;
+        } else {
+            newTaxAmount = 0;
+            newTotal = subtotal;
+        }
+
+        const updatedInvoices = invoices.map(inv =>
+            inv.id === invoiceId
+                ? {
+                    ...inv,
+                    vatIncluded: newVatIncluded,
+                    // Subtotal shouldn't change, it's the base
+                    taxAmount: newTaxAmount,
+                    total: newTotal,
+                  }
+                : inv
+        );
+        setInvoices(updatedInvoices);
+        await db.set('invoices', updatedInvoices);
+    };
+
+    const handleClockIn = async () => {
+        if (!ui.currentUser || ui.selectedLocationId === 'ALL_LOCATIONS') return;
+
+        const lastEntry = timeClockEntries
+            .filter(e => e.staffId === ui.currentUser.id)
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+
+        if (lastEntry?.type === 'in') {
+            console.warn("User is already clocked in.");
+            return;
+        }
+
+        const newEntry: TimeClockEntry = {
+            id: `TC-${Date.now()}`,
+            staffId: ui.currentUser.id,
+            locationId: ui.selectedLocationId,
+            timestamp: new Date().toISOString(),
+            type: 'in',
+        };
+        const updatedEntries = [...timeClockEntries, newEntry];
+        setTimeClockEntries(updatedEntries);
+        await db.set('timeClockEntries', updatedEntries);
+    };
+
+    const handleClockOut = async () => {
+        if (!ui.currentUser) return;
+
+         const lastEntry = timeClockEntries
+            .filter(e => e.staffId === ui.currentUser.id)
+            .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+        
+        if (!lastEntry || lastEntry.type === 'out') {
+            console.warn("User is not clocked in or last action was already clock out.");
+            return;
+        }
+
+        const newEntry: TimeClockEntry = {
+            id: `TC-${Date.now()}`,
+            staffId: ui.currentUser.id,
+            locationId: lastEntry.locationId,
+            timestamp: new Date().toISOString(),
+            type: 'out',
+        };
+        const updatedEntries = [...timeClockEntries, newEntry];
+        setTimeClockEntries(updatedEntries);
+        await db.set('timeClockEntries', updatedEntries);
+    };
+
+    const handleAddLoan = async (loanData: Omit<Loan, 'id' | 'issueDate'>): Promise<void> => {
+        const newLoan: Loan = {
+            id: `L-${String(loans.length + 1).padStart(3, '0')}`,
+            issueDate: new Date().toISOString(),
+            ...loanData,
+        };
+        const updatedLoans = [...loans, newLoan];
+        setLoans(updatedLoans);
+        await db.set('loans', updatedLoans);
+    };
+
+    const handleAddLoanPayment = async (paymentData: Omit<LoanPayment, 'id' | 'paymentDate'>): Promise<void> => {
+        const newPayment: LoanPayment = {
+            id: `LP-${String(loanPayments.length + 1).padStart(3, '0')}`,
+            paymentDate: new Date().toISOString(),
+            ...paymentData,
+        };
+        const updatedPayments = [...loanPayments, newPayment];
+        setLoanPayments(updatedPayments);
+        await db.set('loanPayments', updatedPayments);
+    };
+
+    const handlePostProgressUpdate = async (workOrderId: string, notes: string, files: File[]): Promise<void> => {
+        if (!ui.currentUser) return;
+
+        const imageUrls = await Promise.all(files.map(file => fileToBase64(file)));
+
+        const newLogEntry: ProgressLogEntry = {
+            id: `prog-${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            userId: ui.currentUser.id,
+            userName: ui.currentUser.name,
+            userRole: ui.currentUser.role,
+            notes,
+            imageUrls,
+        };
+
+        const updatedWorkOrders = workOrders.map(wo => {
+            if (wo.id === workOrderId) {
+                const updatedLog = [...(wo.progressLog || []), newLogEntry];
+                return { ...wo, progressLog: updatedLog };
+            }
+            return wo;
+        });
+
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+    };
+
+    const handleToggleTaskCompleted = async (workOrderId: string, quoteItemId: string, isCompleted: boolean): Promise<void> => {
+        const workOrder = workOrders.find(wo => wo.id === workOrderId);
+        if (!workOrder || (workOrder.linkedQuoteIds || []).length === 0) return;
+
+        const relevantQuoteIds = new Set(workOrder.linkedQuoteIds);
+
+        const updatedQuotes = quotes.map(quote => {
+            if (relevantQuoteIds.has(quote.id)) {
+                const updatedItems = quote.items.map(item =>
+                    item.id === quoteItemId ? { ...item, isCompleted } : item
+                );
+                return { ...quote, items: updatedItems };
+            }
+            return quote;
+        });
+
+        setQuotes(updatedQuotes);
+        await db.set('quotes', updatedQuotes);
+    };
+
+    const handleReportUnforeseenIssue = async (workOrderId: string, description: string): Promise<void> => {
+        if (!ui.currentUser) return;
+
+        const newIssue: UnforeseenIssue = {
+            reportedById: ui.currentUser.id,
+            timestamp: new Date().toISOString(),
+            description,
+        };
+        
+        const newStage = KanbanStage.ATENCION_REQUERIDA;
+        const notes = `Imprevisto reportado: ${description}`;
+
+        const updatedWorkOrders = workOrders.map(wo => {
+            if (wo.id === workOrderId) {
+                return {
+                    ...wo,
+                    stage: newStage,
+                    unforeseenIssues: [...(wo.unforeseenIssues || []), newIssue],
+                    history: [...(wo.history || []), { stage: newStage, date: new Date().toISOString(), user: ui.currentUser.name, notes }]
+                };
+            }
+            return wo;
+        });
+        
+        setWorkOrders(updatedWorkOrders);
+        await db.set('workOrders', updatedWorkOrders);
+
+        const workOrder = updatedWorkOrders.find(wo => wo.id === workOrderId);
+        if (workOrder?.advisorId) {
+            createNotification(
+                workOrder.advisorId,
+                'UNFORESEEN_ISSUE_REPORTED',
+                `Imprevisto reportado en la OT #${workOrderId} por ${ui.currentUser?.name}.`,
+                workOrderId
+            );
+        }
+    };
+
+    const handleSaveAppointment = createVoidSaveHandler(appointments, createUpdater(setAppointments, 'appointments'), (d) => !('id' in d), 'APP');
+    
+    const handleConfirmAppointment = async (appointmentId: string) => {
+        const updatedAppointments = appointments.map(app => 
+            app.id === appointmentId ? { ...app, status: AppointmentStatus.CONFIRMADA } : app
+        );
+        setAppointments(updatedAppointments);
+        await db.set('appointments', updatedAppointments);
+    };
+
+    const handleCancelAppointment = async (appointmentId: string) => {
+        const updatedAppointments = appointments.map(app => 
+            app.id === appointmentId ? { ...app, status: AppointmentStatus.CANCELADA } : app
+        );
+        setAppointments(updatedAppointments);
+        await db.set('appointments', updatedAppointments);
+    };
+    
+    const handleCreateWorkOrderFromAppointment = async (appointmentId: string) => {
+        const appointment = appointments.find(app => app.id === appointmentId);
+        if (!appointment) return;
+
+        const client = clients.find(c => c.id === appointment.clientId);
+        const vehicle = vehicles.find(v => v.id === appointment.vehicleId);
+
+        if (!client || !vehicle) {
+            console.error("Client or Vehicle not found for appointment");
+            return;
+        }
+
+        const workOrderData: Omit<WorkOrder, 'id' | 'status' | 'date' | 'history'> = {
+            client: { id: client.id, name: client.name },
+            vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, plate: vehicle.plate },
+            stage: KanbanStage.RECEPCION,
+            total: 0,
+            locationId: appointment.locationId,
+            serviceRequested: appointment.serviceRequested,
+            advisorId: appointment.advisorId,
+            timeInStage: '0d 0h 0m',
+            services: [],
+            linkedQuoteIds: [],
+            requiresInitialDiagnosis: true, // Default assumption
+        };
+
+        const newWorkOrder = await handleCreateWorkOrder(workOrderData);
+
+        if (newWorkOrder) {
+            const updatedAppointments = appointments.map(app => 
+                app.id === appointmentId 
+                    ? { ...app, status: AppointmentStatus.COMPLETADA, linkedWorkOrderId: newWorkOrder.id } 
+                    : app
+            );
+            setAppointments(updatedAppointments);
+            await db.set('appointments', updatedAppointments);
+        }
+    };
+
+    const handleRescheduleAppointment = async (appointmentId: string, newDateTime: string) => {
+        const updatedAppointments = appointments.map(app =>
+            app.id === appointmentId ? { ...app, appointmentDateTime: newDateTime } : app
+        );
+        setAppointments(updatedAppointments);
+        await db.set('appointments', updatedAppointments);
+    };
+
+
+    useEffect(() => {
+        const loadData = async () => {
+            setIsLoading(true);
+            const [
+                locationsData, workOrdersData, clientsData, vehiclesData, staffData, servicesData, inventoryData,
+                suppliersData, transactionsData, expensesData, invoicesData, quotesData, posData, accountsData, settingsData, timeClockData,
+                loansData, loanPaymentsData, notificationsData, appointmentsData
+            ] = await Promise.all([
+                db.get<Location[]>('locations').then(d => d || LOCATIONS_DATA),
+                db.get<WorkOrder[]>('workOrders').then(d => d || WORK_ORDERS_DATA),
+                db.get<Client[]>('clients').then(d => d || CLIENTS_DATA),
+                db.get<Vehicle[]>('vehicles').then(d => d || VEHICLES_DATA),
+                db.get<StaffMember[]>('staffMembers').then(d => d || STAFF_DATA),
+                db.get<Service[]>('services').then(d => d || SERVICES_DATA),
+                db.get<InventoryItem[]>('inventoryItems').then(d => d || INVENTORY_DATA),
+                db.get<Supplier[]>('suppliers').then(d => d || SUPPLIERS_DATA),
+                db.get<PettyCashTransaction[]>('pettyCashTransactions').then(d => d || PETTY_CASH_DATA),
+                db.get<OperatingExpense[]>('operatingExpenses').then(d => d || OPERATING_EXPENSES_DATA),
+                db.get<Invoice[]>('invoices').then(d => d || INVOICES_DATA),
+                db.get<Quote[]>('quotes').then(d => d || QUOTES_DATA),
+                db.get<PurchaseOrder[]>('purchaseOrders').then(d => d || PURCHASE_ORDERS_DATA),
+                db.get<FinancialAccount[]>('financialAccounts').then(d => d || FINANCIAL_ACCOUNTS_DATA),
+                db.get<AppSettings>('appSettings').then(d => d || DEFAULT_APP_SETTINGS),
+                db.get<TimeClockEntry[]>('timeClockEntries').then(d => d || TIME_CLOCK_DATA),
+                db.get<Loan[]>('loans').then(d => d || LOANS_DATA),
+                db.get<LoanPayment[]>('loanPayments').then(d => d || LOAN_PAYMENTS_DATA),
+                db.get<Notification[]>('notifications').then(d => d || NOTIFICATIONS_DATA),
+                db.get<Appointment[]>('appointments').then(d => d || APPOINTMENTS_DATA),
+            ]);
+            
+            // Sanitize work orders data to prevent crashes from old/malformed data
+            const sanitizedWorkOrders = workOrdersData.map(wo => ({
+                ...wo,
+                linkedQuoteIds: wo.linkedQuoteIds || [],
+                history: wo.history || [],
+                unforeseenIssues: wo.unforeseenIssues || [],
+                progressLog: wo.progressLog || [],
+                stage: wo.stage || KanbanStage.RECEPCION,
+                status: wo.status || WorkOrderStatus.EN_PROCESO,
+            }));
+
+            setLocations(locationsData);
+            setWorkOrders(sanitizedWorkOrders);
+            setClients(clientsData);
+            setVehicles(vehiclesData);
+            setStaffMembers(staffData);
+            setServices(servicesData);
+            setInventoryItems(inventoryData);
+            setSuppliers(suppliersData);
+            setPettyCashTransactions(transactionsData);
+            setOperatingExpenses(expensesData);
+            setInvoices(invoicesData);
+            setQuotes(quotesData);
+            setPurchaseOrders(posData);
+            setFinancialAccounts(accountsData);
+            setAppSettings(settingsData);
+            setTimeClockEntries(timeClockData);
+            setLoans(loansData);
+            setLoanPayments(loanPaymentsData);
+            setNotifications(notificationsData);
+            setAppointments(appointmentsData);
+
+            setIsLoading(false);
+        };
+        loadData();
+    }, []);
+
+
+    const value: DataContextType = {
+        isLoading,
+        locations,
+        workOrders,
+        clients,
+        vehicles,
+        staffMembers,
+        services,
+        inventoryItems,
+        suppliers,
+        pettyCashTransactions,
+        operatingExpenses,
+        invoices,
+        quotes,
+        purchaseOrders,
+        financialAccounts,
+        appSettings,
+        timeClockEntries,
+        loans,
+        loanPayments,
+        notifications,
+        appointments,
+        handleMarkNotificationAsRead,
+        handleMarkAllNotificationsAsRead,
+        handleSaveLocation,
+        handleDeleteLocation,
+        handleSaveAppSettings,
+        handleUpdateStaffRole,
+        handleUpdateStaffPermissions,
+        handleSaveServiceCategory,
+        handleDeleteServiceCategory,
+        handleSaveInventoryCategory,
+        handleDeleteInventoryCategory,
+        handleSaveFinancialAccount,
+        handleDeleteFinancialAccount,
+        handleAssignAccountsToUser,
+        handleCreateWorkOrder,
+        handleSaveWorkOrder,
+        handleCreateWorkOrderFromAppointment,
+        handleUpdateWorkOrderDiagnosticType,
+        handleSaveClient,
+        handleSaveVehicle,
+        handleSaveStaffMember,
+        handleDeleteStaffMember,
+        handleSaveService,
+        handleDeleteService,
+        handleSaveInventoryItem,
+        handleDeleteInventoryItem,
+        handleSaveSupplier,
+        handleDeleteSupplier,
+        handleAddTransaction,
+        handleAddOperatingExpense,
+        handleAssignTechnician,
+        handleAdvanceStage,
+        handleCancelOrder,
+        handleCreateInvoiceFromWorkOrder,
+        handleSaveInvoiceCommissions,
+        handleRegisterPayment,
+        handleCancelInvoice,
+        handleSaveDiagnostic,
+        handleSaveQuote,
+        handleRejectQuote,
+        handleDeleteQuote,
+        handleSavePurchaseOrder,
+        handleReceivePurchaseOrder,
+        handleRegisterItemCosts,
+        handleRegisterDelivery,
+        handleFactorInvoice,
+        handleReleaseRetention,
+        handleToggleInvoiceVat,
+        handleClockIn,
+        handleClockOut,
+        handleAddLoan,
+        handleAddLoanPayment,
+        handlePostProgressUpdate,
+        handleToggleTaskCompleted,
+        handleReportUnforeseenIssue,
+        handleSaveAppointment,
+        handleConfirmAppointment,
+        handleCancelAppointment,
+        handleRescheduleAppointment,
+    };
+
+    return (
+        <DataContext.Provider value={value}>
+            {children}
+        </DataContext.Provider>
+    );
+}

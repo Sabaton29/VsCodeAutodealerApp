@@ -1,0 +1,461 @@
+import React, { useMemo, useState, useEffect, useContext } from 'react';
+import { renderToString } from 'react-dom/server.browser';
+import { Icon } from '../Icon';
+import { Quote, QuoteStatus, WorkOrder, Permission, InventoryItem, Client, Vehicle, AppSettings } from '../../types';
+import { QUOTE_STATUS_DISPLAY_CONFIG } from '../../constants';
+import PrintableQuote from '../PrintableQuote';
+import { getQuoteDisplayId } from '../../utils/quoteId';
+import { DataContext } from '../DataContext';
+import ApproveQuoteForm from '../ApproveQuoteForm';
+
+interface QuoteDetailViewProps {
+    quote: Quote;
+    workOrder?: WorkOrder;
+    client?: Client;
+    vehicle?: Vehicle;
+    onBack: () => void;
+    onApprove: (quote: Quote) => void;
+    onReject: (quoteId: string) => void;
+    hasPermission: (permission: Permission) => boolean;
+    inventoryItems: InventoryItem[];
+    onEditQuote: (quote: Quote) => void;
+    appSettings: AppSettings | null;
+    getQuoteWithItems: (quoteId: string) => Promise<Quote | null>;
+}
+
+const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
+const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return 'No definida';
+    try {
+        return new Date(dateString).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch (error) {
+        console.error('Error formatting date:', error, dateString);
+        return 'Fecha inválida';
+    }
+};
+
+const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, client, vehicle, onBack, onApprove, onReject, hasPermission, inventoryItems, onEditQuote, appSettings, getQuoteWithItems }) => {
+    const [enrichedQuote, setEnrichedQuote] = useState<Quote>(quote);
+    const [showApproveForm, setShowApproveForm] = useState(false);
+    const dataContext = useContext(DataContext);
+
+    useEffect(() => {
+        // Solo cargar datos si no tenemos items o si los items están vacíos
+        if (!enrichedQuote.items || enrichedQuote.items.length === 0) {
+            console.log('🔍 QuoteDetailView - Loading quote with negotiated prices...');
+            getQuoteWithItems(quote.id).then(enrichedQuote => {
+                if (enrichedQuote && enrichedQuote.items && enrichedQuote.items.length > 0) {
+                    // Verificar que los items tengan unitPrice válidos antes de sobrescribir
+                    const hasValidPrices = enrichedQuote.items.some(item => 
+                        item.unitPrice && item.unitPrice > 0
+                    );
+                    
+                    if (hasValidPrices) {
+                        console.log('🔍 QuoteDetailView - Quote enriched with valid prices:', enrichedQuote);
+                        setEnrichedQuote(enrichedQuote);
+                    } else {
+                        console.log('🔍 QuoteDetailView - Enriched quote has no valid prices, keeping original');
+                        // NO sobrescribir si no hay precios válidos
+                    }
+                } else {
+                    console.log('🔍 QuoteDetailView - No items found, keeping original quote');
+                    // NO sobrescribir si no hay items
+                }
+            }).catch(error => {
+                console.error('Error enriching quote:', error);
+                // NO sobrescribir en caso de error
+            });
+        } else {
+            console.log('🔍 QuoteDetailView - Quote already has items, skipping reload');
+        }
+    }, [quote, getQuoteWithItems]);
+
+    const statusConfig = QUOTE_STATUS_DISPLAY_CONFIG[enrichedQuote.status] || { bg: 'bg-gray-200 dark:bg-gray-700', text: 'text-gray-800 dark:text-gray-200' };
+    console.log('🔍 QuoteDetailView status debug:', { id: enrichedQuote.id, status: enrichedQuote.status, hasConfig: !!QUOTE_STATUS_DISPLAY_CONFIG[enrichedQuote.status] });
+    const canReview = hasPermission('review:quote') && (enrichedQuote.status === QuoteStatus.ENVIADO);
+    const canApprove = hasPermission('approve:quote') && (enrichedQuote.status === QuoteStatus.REVISADO);
+    const canTakeAction = canReview || canApprove;
+
+    // Función de revisión (mostrar formulario de aprobación)
+    const handleReview = () => {
+        console.log('🔍 QuoteDetailView - Mostrando formulario de revisión y aprobación');
+        setShowApproveForm(true);
+    };
+
+    // Función para guardar la cotización desde el formulario de aprobación
+    const handleSaveFromApproveForm = async(finalQuoteData: Quote) => {
+        if (!dataContext) {
+            console.error('❌ QuoteDetailView: No hay contexto de datos disponible');
+            return;
+        }
+        
+        try {
+            console.log('🔍 QuoteDetailView - Guardando cotización desde formulario de aprobación:', finalQuoteData);
+            await (dataContext as any).handleSaveQuote(finalQuoteData.id, finalQuoteData);
+            setEnrichedQuote(finalQuoteData);
+            setShowApproveForm(false);
+            console.log('🔍 QuoteDetailView - Cotización guardada exitosamente');
+        } catch (error) {
+            console.error('Error saving quote from approve form:', error);
+        }
+    };
+
+    // Función para cancelar el formulario de aprobación
+    const handleCancelApproveForm = () => {
+        console.log('🔍 QuoteDetailView - Cancelando formulario de aprobación');
+        setShowApproveForm(false);
+    };
+
+    // Función de aprobación directa
+    const handleDirectApprove = async() => {
+        if (!dataContext) {
+            console.error('❌ QuoteDetailView: No hay contexto de datos disponible');
+            return;
+        }
+        
+        console.log('🚨 QuoteDetailView: Aprobando cotización directamente...');
+        try {
+            await (dataContext as any).handleApproveQuote(enrichedQuote.id);
+            console.log('🚨 QuoteDetailView: Aprobación completada, recargando datos...');
+            await dataContext.loadAllData();
+            console.log('🚨 QuoteDetailView: Datos recargados exitosamente');
+        } catch (error) {
+            console.error('❌ QuoteDetailView: Error aprobando cotización:', error);
+        }
+    };
+    const canEdit = hasPermission('manage:quotes') && enrichedQuote.status === QuoteStatus.BORRADOR;
+    
+    // Usar función centralizada para generar ID consistente
+    const sequentialQuoteId = useMemo(() => {
+        return getQuoteDisplayId(enrichedQuote.id, enrichedQuote.issueDate, true, enrichedQuote.sequentialId);
+    }, [enrichedQuote.id, enrichedQuote.issueDate, enrichedQuote.sequentialId]);
+    
+    const inventoryMap = useMemo(() => new Map(inventoryItems.map(i => [i.id, i])), [inventoryItems]);
+    
+    const totalUtility = useMemo(() => {
+        const inventoryUtility = enrichedQuote.items.reduce((acc, item) => {
+            if (item.type === 'inventory' && item.costPrice) {
+                return acc + (item.unitPrice - item.costPrice) * item.quantity;
+            }
+            return acc;
+        }, 0);
+
+        const servicesValue = enrichedQuote.items.reduce((acc, item) => {
+            if (item.type === 'service') {
+                return acc + (item.unitPrice * item.quantity);
+            }
+            return acc;
+        }, 0);
+        
+        return inventoryUtility + servicesValue;
+    }, [enrichedQuote.items]);
+
+    // Recalculate totals to ensure IVA is correct
+    const recalculatedTotals = useMemo(() => {
+        console.log('🔍 QuoteDetailView - Recalculating totals for items:', enrichedQuote.items);
+        console.log('🔍 QuoteDetailView - totalDiscount:', enrichedQuote.totalDiscount);
+        
+        const subtotal = enrichedQuote.items.reduce((acc, item) => {
+            console.log('🔍 QuoteDetailView - Processing item:', item);
+            console.log('🔍 QuoteDetailView - item.unitPrice:', item.unitPrice);
+            console.log('🔍 QuoteDetailView - item.quantity:', item.quantity);
+            console.log('🔍 QuoteDetailView - item.discount:', item.discount);
+            
+            // Usar directamente los valores del item sin sanitización excesiva
+            const unitPrice = item.unitPrice || 0;
+            const quantity = item.quantity || 0;
+            const discount = item.discount || 0;
+            
+            const itemTotal = (unitPrice * quantity) - discount;
+            console.log('🔍 QuoteDetailView - itemTotal:', itemTotal);
+            
+            return acc + itemTotal;
+        }, 0);
+        
+        // Aplicar descuento general al subtotal
+        const totalDiscount = enrichedQuote.totalDiscount || 0;
+        const subtotalWithDiscount = subtotal * (1 - totalDiscount / 100);
+        const discountAmount = subtotal - subtotalWithDiscount;
+        
+        const taxAmount = enrichedQuote.items.reduce((acc, item) => {
+            // Usar directamente los valores del item sin sanitización excesiva
+            const unitPrice = item.unitPrice || 0;
+            const quantity = item.quantity || 0;
+            const discount = item.discount || 0;
+            const taxRate = item.taxRate || 19;
+            
+            const itemTotal = (unitPrice * quantity) - discount;
+            const itemTax = itemTotal * (taxRate / 100);
+            return acc + itemTax;
+        }, 0);
+        
+        // Aplicar descuento general también al IVA
+        const taxAmountWithDiscount = taxAmount * (1 - totalDiscount / 100);
+        
+        const total = subtotalWithDiscount + taxAmountWithDiscount;
+        
+        console.log('🔍 QuoteDetailView - Calculated totals:', { 
+            subtotal, 
+            subtotalWithDiscount, 
+            discountAmount, 
+            taxAmount, 
+            taxAmountWithDiscount, 
+            total 
+        });
+        
+        return { 
+            subtotal: subtotalWithDiscount, // Mostrar el subtotal con descuento aplicado
+            taxAmount: taxAmountWithDiscount, // Mostrar el IVA con descuento aplicado
+            total,
+            discountAmount // Para mostrar en el resumen
+        };
+    }, [enrichedQuote.items, enrichedQuote.totalDiscount]);
+
+
+    const handlePrint = () => {
+        if (!client || !vehicle) {
+            alert('Faltan datos de cliente o vehículo para generar el reporte.');
+            return;
+        }
+
+        const reportHtml = renderToString(<PrintableQuote quote={quote} client={client} vehicle={vehicle} workOrder={workOrder} companyInfo={appSettings?.companyInfo || null} />);
+        
+        const fullHtml = `
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8" />
+                <title>Cotización ${quote.id}</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <link href="https://fonts.googleapis.com/css2?family=Impact&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+                <style> body { font-family: 'Inter', sans-serif; } </style>
+                <script>
+                    tailwind.config = {
+                        theme: { extend: { fontFamily: { heading: ['Impact', 'sans-serif'], sans: ['Inter', 'sans-serif'] }, colors: { brand: { red: '#C8102E' } } } }
+                    }
+                </script>
+            </head>
+            <body>${reportHtml}</body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        printWindow?.document.write(fullHtml);
+        printWindow?.document.close();
+    };
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <button onClick={onBack} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                        <Icon name="arrow-left" className="w-6 h-6" />
+                    </button>
+                    <div>
+                        <h1 className="text-3xl font-bold text-light-text dark:text-dark-text">Detalle de Cotización</h1>
+                        <p className="mt-1 text-gray-500 dark:text-gray-400">Cotización #{sequentialQuoteId} {workOrder && `(asociada a OT #${workOrder.id})`}</p>
+                    </div>
+                </div>
+                 <span className={`px-4 py-2 text-sm font-bold rounded-md ${statusConfig.bg} ${statusConfig.text}`}>
+                    {quote.status}
+                </span>
+            </div>
+
+            {/* Action Bar */}
+             <div className="bg-light dark:bg-dark-light rounded-xl p-3 flex flex-wrap items-center justify-end gap-3">
+                <button 
+                    onClick={() => onEditQuote(quote)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600/50 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                    disabled={!canEdit}
+                    title={canEdit ? "Editar cotización" : "Solo se pueden editar cotizaciones en estado 'Borrador'."}
+                >
+                    <Icon name="edit" className="w-4 h-4" /> Editar
+                </button>
+                <button 
+                    onClick={handlePrint}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600/50 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                    <Icon name="printer" className="w-4 h-4" /> Imprimir
+                </button>
+                 <button 
+                    onClick={() => onReject(quote.id)}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-red-700 hover:bg-red-600 dark:bg-red-800/80 dark:hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
+                    disabled={!canTakeAction}
+                >
+                    <Icon name="x" className="w-4 h-4" /> Rechazar
+                </button>
+                {canReview && (
+                    <button 
+                        onClick={handleReview}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-yellow-600 hover:bg-yellow-500 transition-colors"
+                    >
+                        <Icon name="edit" className="w-4 h-4" /> Revisar y Aprobar
+                    </button>
+                )}
+                {canApprove && (
+                    <button 
+                        onClick={handleDirectApprove}
+                        className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-green-600 hover:bg-green-500 transition-colors"
+                    >
+                        <Icon name="wrench" className="w-4 h-4" /> Aprobar e Iniciar Reparación
+                    </button>
+                )}
+            </div>
+            
+            {/* Main Content */}
+            <div className="bg-light dark:bg-dark-light rounded-xl p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-gray-200 dark:border-gray-700 pb-6">
+                    <div>
+                        <h3 className="font-bold text-light-text dark:text-white mb-2">Cliente</h3>
+                        <p className="text-gray-600 dark:text-gray-300">{enrichedQuote.clientName}</p>
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-light-text dark:text-white mb-2">Vehículo</h3>
+                        <p className="text-gray-600 dark:text-gray-300">{enrichedQuote.vehicleSummary}</p>
+                    </div>
+                     <div>
+                        <h3 className="font-bold text-light-text dark:text-white mb-2">Validez</h3>
+                        <p className="text-gray-600 dark:text-gray-300">Emitida: {formatDate(enrichedQuote.issueDate)}</p>
+                        <p className="text-gray-600 dark:text-gray-300">Expira: {enrichedQuote.expiryDate ? formatDate(enrichedQuote.expiryDate) : 'No definida'}</p>
+                    </div>
+                </div>
+
+                <div className="mt-6">
+                    <h3 className="text-xl font-bold text-light-text dark:text-white mb-4">Ítems de la Cotización</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                <tr>
+                                    <th className="px-4 py-2 text-left">Descripción</th>
+                                    <th className="px-4 py-2 text-center w-20">Cant.</th>
+                                    <th className="px-4 py-2 text-right w-32">Precio Unit.</th>
+                                    <th className="px-4 py-2 text-right w-32">Utilidad</th>
+                                    <th className="px-4 py-2 text-right w-32">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-light-text dark:text-dark-text">
+                                {(enrichedQuote.items || []).map(item => {
+                                    console.log('🔍 QuoteDetailView - Item data:', item);
+                                    console.log('🔍 QuoteDetailView - item.unitPrice:', item.unitPrice, 'type:', typeof item.unitPrice);
+                                    
+                                    const inventoryItem = item.type === 'inventory' ? inventoryMap.get(item.id) : null;
+                                    const currentStock = inventoryItem?.stock ?? 0;
+                                    const hasLowStock = !!inventoryItem && currentStock < item.quantity;
+                                    
+                                    // Usar directamente el unitPrice del item
+                                    const safeUnitPrice = item.unitPrice || 0;
+                                    
+                                    const safeCostPrice = item.costPrice || 0;
+                                    
+                                    const utility = item.type === 'inventory' 
+                                        ? (safeCostPrice ? (safeUnitPrice - safeCostPrice) * item.quantity : null)
+                                        : (safeUnitPrice * item.quantity);
+                                    const totalAfterDiscount = (safeUnitPrice * item.quantity) - (item.discount || 0);
+
+                                    return (
+                                        <tr key={item.id} className={item.suppliedByClient ? 'bg-blue-100/10 dark:bg-blue-900/10' : ''}>
+                                            <td className="px-4 py-3 font-medium">
+                                                <p>{item.description}</p>
+                                                {item.suppliedByClient && (
+                                                    <p className="text-xs text-blue-400 font-semibold">(Suministrado por Cliente)</p>
+                                                )}
+                                                <div className="flex items-center gap-2 mt-1">
+                                                    <span className={`text-xs px-1.5 py-0.5 rounded ${item.type === 'service' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/50 dark:text-blue-200' : 'bg-green-100 text-green-800 dark:bg-green-800/50 dark:text-green-200'}`}>{item.type === 'service' ? 'Servicio' : 'Repuesto'}</span>
+                                                    {inventoryItem && (
+                                                        <span className={`text-xs ${hasLowStock ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                            (Stock: {currentStock})
+                                                        </span>
+                                                    )}
+                                                    {hasLowStock && (
+                                                        <Icon name="exclamation-triangle" className="w-4 h-4 text-red-500 dark:text-red-400" title="Stock insuficiente" />
+                                                    )}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3 text-center">{item.quantity}</td>
+                                            <td className="px-4 py-3 text-right font-mono">
+                                                {formatCurrency(item.suppliedByClient ? 0 : (item.unitPrice || 0))}
+                                                {item.discount && item.discount > 0 && (
+                                                    <p className="text-xs text-red-500 dark:text-red-400" title="Descuento aplicado">(-{formatCurrency(item.discount)})</p>
+                                                )}
+                                            </td>
+                                            <td className={`px-4 py-3 text-right font-mono ${utility !== null && utility >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                {utility !== null ? formatCurrency(utility) : 'N/A'}
+                                            </td>
+                                            <td className="px-4 py-3 text-right font-mono text-gray-700 dark:text-gray-300">{formatCurrency(totalAfterDiscount)}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 mt-6 gap-6">
+                     <div className="text-sm text-gray-500 dark:text-gray-400">
+                        {quote.notes && (
+                            <>
+                                <h4 className="font-bold text-gray-800 dark:text-gray-300 mb-2">Notas Adicionales</h4>
+                                <p className="italic">"{quote.notes}"</p>
+                            </>
+                        )}
+                    </div>
+                     <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg space-y-2">
+                        <div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(recalculatedTotals.subtotal)}</span></div>
+                        
+                        {/* Descuento general - solo si existe */}
+                        {quote.totalDiscount && quote.totalDiscount > 0 && (
+                            <div className="flex justify-between items-center text-red-600 dark:text-red-400">
+                                <span>Descuento ({quote.totalDiscount}%):</span>
+                                <span className="font-mono">-{formatCurrency(recalculatedTotals.discountAmount || 0)}</span>
+                            </div>
+                        )}
+                        
+                        <div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>IVA:</span> <span className="font-mono">{formatCurrency(recalculatedTotals.taxAmount)}</span></div>
+                        {totalUtility > 0 && (
+                            <div className="flex justify-between items-center text-green-600 dark:text-green-400">
+                                <span>Utilidad Total Estimada:</span>
+                                <span className="font-mono">{formatCurrency(totalUtility)}</span>
+                            </div>
+                        )}
+                        <div className="flex justify-between items-center text-light-text dark:text-white text-xl font-bold border-t border-gray-200 dark:border-gray-700 pt-2 mt-2"><span>Total Cotizado:</span> <span className="font-mono text-brand-red">{formatCurrency(recalculatedTotals.total)}</span></div>
+                    </div>
+                </div>
+            </div>
+        
+        {/* Formulario de Aprobación Modal */}
+        {showApproveForm && dataContext && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black dark:bg-gray-900/60 backdrop-blur-sm">
+                <div className="relative w-full mx-4 bg-white dark:bg-dark-light rounded-2xl shadow-xl animate-fade-in-scale max-w-7xl">
+                    <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-800">
+                        <h2 className="text-lg font-bold text-light-text dark:text-dark-text">Revisar y Aprobar Cotización #{enrichedQuote.id}</h2>
+                        <button 
+                            onClick={handleCancelApproveForm} 
+                            className="p-1 rounded-full text-gray-400 hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
+                            aria-label="Cerrar modal"
+                        >
+                            <Icon name="x" className="w-6 h-6" />
+                        </button>
+                    </div>
+                    <div className="p-6 max-h-[85vh] overflow-y-auto">
+                        <ApproveQuoteForm
+                            quote={enrichedQuote}
+                            onSave={handleSaveFromApproveForm}
+                            onCancel={handleCancelApproveForm}
+                            services={dataContext?.services || []}
+                            inventoryItems={inventoryItems || []}
+                            locations={dataContext?.locations || []}
+                            onQuickAddItem={() => {}} // TODO: Implementar si es necesario
+                            justAddedQuoteItem={null}
+                            itemToReplaceId={null}
+                            onClearJustAddedItem={() => {}}
+                        />
+                    </div>
+                </div>
+            </div>
+        )}
+        </div>
+    );
+};
+
+export default QuoteDetailView;

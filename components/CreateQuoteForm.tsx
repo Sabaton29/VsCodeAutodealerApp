@@ -1,0 +1,461 @@
+import React, { useState, useMemo, useEffect } from 'react';
+import { WorkOrder, Service, InventoryItem, QuoteItem, Quote, ChecklistStatus, QuoteStatus, Location } from '../types';
+import { Icon } from './Icon';
+
+interface CreateQuoteFormProps {
+    workOrder: WorkOrder;
+    client?: { id: string; name: string };
+    vehicle?: { id: string; make: string; model: string; plate: string };
+    services: Service[];
+    inventoryItems: InventoryItem[];
+    locations: Location[];
+    appSettings: any;
+    onSave: (quoteData: Quote | Omit<Quote, 'id'>) => void;
+    onCancel: () => void;
+    onQuickAddItem: (name: string, placeholderId: string | undefined, currentItems: QuoteItem[]) => void;
+    justAddedQuoteItem: QuoteItem | null;
+    itemToReplaceId?: string | null;
+    onClearJustAddedItem: () => void;
+    initialData?: Quote;
+    initialItems?: QuoteItem[];
+}
+
+type SearchableItem = {
+    id: string;
+    type: 'service' | 'inventory';
+    name: string;
+    price: number;
+    taxRate: number;
+    category: string;
+}
+
+const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
+
+const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, vehicle, services, inventoryItems, locations, appSettings, onSave, onCancel, onQuickAddItem, justAddedQuoteItem, itemToReplaceId, onClearJustAddedItem, initialData, initialItems }) => {
+    const [items, setItems] = useState<QuoteItem[]>([]);
+    const [originalPrices, setOriginalPrices] = useState<Record<string, number>>({});
+    const [notes, setNotes] = useState<string>('');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+    const isEditing = !!initialData?.id;
+
+    useEffect(() => {
+        console.log('🔍 CreateQuoteForm - useEffect - isEditing:', isEditing);
+        console.log('🔍 CreateQuoteForm - useEffect - initialData:', initialData);
+        console.log('🔍 CreateQuoteForm - useEffect - initialItems:', initialItems);
+        console.log('🔍 CreateQuoteForm - useEffect - locations:', locations);
+        console.log('🔍 CreateQuoteForm - useEffect - services:', services);
+        console.log('🔍 CreateQuoteForm - useEffect - workOrder.locationId:', workOrder.locationId);
+        
+        // Don't process items until both locations and services are available
+        if (!locations || locations.length === 0 || !services || services.length === 0) {
+            console.log('🔍 CreateQuoteForm - useEffect - Waiting for locations and services to be available');
+            return;
+        }
+        
+        const itemsToLoad = isEditing ? initialData.items : (initialItems || []);
+        console.log('🔍 CreateQuoteForm - useEffect - itemsToLoad:', itemsToLoad);
+        
+        // PRESERVAR EXACTAMENTE los precios del JSONB - NO modificar a menos que sea explícitamente null/undefined
+        const normalizedItems = itemsToLoad.map(item => {
+            // PRESERVAR EXACTAMENTE el precio del JSONB - NO modificar a menos que sea explícitamente null/undefined
+            let unitPrice = item.unitPrice;
+            if (unitPrice === null || unitPrice === undefined) {
+                unitPrice = 0; // Solo establecer 0 si es null/undefined, NO si es 0 explícitamente
+            }
+            
+            // Si el ítem viene del diagnóstico y ya tiene un precio válido, preservarlo
+            const isFromDiagnostic = !isEditing && initialItems?.some(initItem => initItem.id === item.id);
+            if (isFromDiagnostic && unitPrice > 0) {
+                console.log(`🔍 CreateQuoteForm - Preserving diagnostic price for ${item.description}: ${unitPrice}`);
+                // No hacer nada, mantener el precio original
+            } else if (isFromDiagnostic && unitPrice === 0) {
+                console.log(`🔍 CreateQuoteForm - Diagnostic item with 0 price, attempting recalculation for ${item.description}`);
+            }
+            
+            console.log(`🔍 CreateQuoteForm - Processing item ${item.description}:`, {
+                type: item.type,
+                originalUnitPrice: item.unitPrice,
+                currentUnitPrice: unitPrice,
+                locationsAvailable: !!(locations && locations.length > 0),
+                serviceFound: !!(services.find(s => s.id === item.id)),
+                fromDiagnostic: !isEditing && initialItems?.some(initItem => initItem.id === item.id),
+                fullItem: item,
+            });
+            
+            // SOLO recalcular si el precio es explícitamente null/undefined (precio no guardado)
+            // NUNCA recalcular si el precio es 0 (puede ser un precio negociado válido)
+            // RECALCULAR si viene del diagnóstico y tiene precio 0 o null/undefined
+            if (item.type === 'service' && (unitPrice === null || unitPrice === undefined || (isFromDiagnostic && unitPrice === 0)) && locations && locations.length > 0) {
+                const location = locations.find(l => l.id === workOrder.locationId);
+                const hourlyRate = location?.hourlyRate || 95000;
+                const service = services.find(s => s.id === item.id);
+                
+                console.log(`🔍 CreateQuoteForm - Location calculation for ${item.description}:`, {
+                    location: location?.name,
+                    hourlyRate,
+                    service: service?.name,
+                    durationHours: service?.durationHours,
+                });
+                
+                if (service && service.durationHours) {
+                    // Modelo de Tarifa Plana: TODOS los servicios se calculan como duración × tarifa
+                    unitPrice = Math.round(hourlyRate * service.durationHours);
+                    console.log(`🔍 CreateQuoteForm - Tarifa Plana for service ${item.description}:`, {
+                        hourlyRate,
+                        durationHours: service.durationHours,
+                        calculatedPrice: unitPrice,
+                        modelo: 'TARIFA_PLANA',
+                        isFromDiagnostic,
+                        originalPrice: item.unitPrice,
+                    });
+                } else {
+                    console.log(`🔍 CreateQuoteForm - Cannot recalculate price for ${item.description}:`, {
+                        serviceFound: !!service,
+                        hasDurationHours: service?.durationHours,
+                    });
+                }
+            }
+            
+            // Para ítems de inventario que vienen del diagnóstico, preservar el precio si es válido
+            if (item.type === 'inventory' && isFromDiagnostic && unitPrice === 0) {
+                console.log(`🔍 CreateQuoteForm - Diagnostic inventory item with 0 price, looking up salePrice for ${item.description}`);
+                const inventoryItem = inventoryItems.find(i => i.id === item.id);
+                if (inventoryItem && inventoryItem.salePrice > 0) {
+                    unitPrice = inventoryItem.salePrice;
+                    console.log(`🔍 CreateQuoteForm - Updated inventory price from salePrice: ${unitPrice}`);
+                }
+            }
+            
+            const finalItem = {
+                ...item,
+                unitPrice: unitPrice,
+                quantity: item.quantity || 1, // Preservar cantidad del diagnóstico, o 1 por defecto
+                taxRate: item.taxRate || 19,
+            };
+            
+            console.log(`🔍 CreateQuoteForm - Final item ${item.description}:`, {
+                originalUnitPrice: item.unitPrice,
+                finalUnitPrice: finalItem.unitPrice,
+                originalQuantity: item.quantity,
+                finalQuantity: finalItem.quantity,
+                preservedFromJSONB: item.unitPrice === finalItem.unitPrice,
+                quantityPreserved: item.quantity === finalItem.quantity,
+            });
+            
+            return finalItem;
+        });
+        
+        console.log('🔍 CreateQuoteForm - useEffect - normalizedItems:', normalizedItems);
+        setItems(normalizedItems);
+        setNotes(isEditing ? initialData.notes || '' : '');
+        
+        const prices: Record<string, number> = {};
+        normalizedItems.forEach(item => {
+            if (item.type === 'inventory') {
+                prices[item.id] = item.unitPrice || 0;
+            }
+        });
+        setOriginalPrices(prices);
+    }, [initialData, initialItems, isEditing, locations, services, workOrder.locationId]);
+
+    useEffect(() => {
+        if (justAddedQuoteItem) {
+            if (itemToReplaceId) {
+                setItems(prev => prev.map(item => item.id === itemToReplaceId ? justAddedQuoteItem : item));
+            } else if (!items.some(i => i.id === justAddedQuoteItem.id)) {
+                setItems(prev => [...prev, justAddedQuoteItem]);
+            }
+            onClearJustAddedItem();
+        }
+    }, [justAddedQuoteItem, itemToReplaceId, onClearJustAddedItem, items]);
+
+    const diagnosticAttentionPoints = useMemo(() => {
+        if (!workOrder.diagnosticData) return [];
+        const points: { item: string; section: string; status: ChecklistStatus }[] = [];
+        for (const sectionTitle in workOrder.diagnosticData) {
+            const section = workOrder.diagnosticData[sectionTitle];
+            for (const item in section.items) {
+                const status = section.items[item];
+                if ([ChecklistStatus.MAL, ChecklistStatus.MANTEN, ChecklistStatus.CAMBIO].includes(status)) {
+                    points.push({ item, section: sectionTitle, status });
+                }
+            }
+            if (section.customItems) {
+                for (const customItem of section.customItems) {
+                     if ([ChecklistStatus.MAL, ChecklistStatus.MANTEN, ChecklistStatus.CAMBIO].includes(customItem.status) && customItem.name) {
+                        points.push({ item: customItem.name, section: sectionTitle, status: customItem.status });
+                    }
+                }
+            }
+        }
+        return points;
+    }, [workOrder.diagnosticData]);
+
+    const searchableItems = useMemo<SearchableItem[]>(() => {
+        console.log('🔍 CreateQuoteForm - searchableItems - services:', services);
+        console.log('🔍 CreateQuoteForm - searchableItems - locations:', locations);
+        console.log('🔍 CreateQuoteForm - searchableItems - workOrder.locationId:', workOrder.locationId);
+        
+        // Early return if locations is not available yet
+        if (!locations || locations.length === 0) {
+            console.log('🔍 CreateQuoteForm - locations not available yet, returning empty array');
+            return [];
+        }
+        
+        const serviceItems: SearchableItem[] = services.map(s => {
+            // Find the location to get the correct hourly rate
+            const location = locations.find(l => l.id === workOrder.locationId);
+            const hourlyRate = location?.hourlyRate || 95000; // Default to Cali rate
+            
+            // Modelo de Tarifa Plana: TODOS los servicios se calculan como duración × tarifa
+            const calculatedPrice = Math.round(hourlyRate * s.durationHours);
+            
+            console.log(`🔍 CreateQuoteForm - service ${s.name} (Tarifa Plana):`, {
+                durationHours: s.durationHours,
+                hourlyRate: hourlyRate,
+                calculatedPrice: calculatedPrice,
+                location: location?.name,
+                modelo: 'TARIFA_PLANA',
+            });
+            
+            return {
+                id: s.id, type: 'service', name: s.name, 
+                price: calculatedPrice,
+                taxRate: appSettings?.billingSettings?.vatRate || 19, category: s.category,
+            };
+        });
+        const inventoryItemsTyped: SearchableItem[] = inventoryItems.map(i => ({
+            id: i.id, type: 'inventory', name: i.name,
+            price: i.salePrice, taxRate: i.taxRate, category: i.category,
+        }));
+        return [...serviceItems, ...inventoryItemsTyped];
+    }, [services, inventoryItems, workOrder.locationId, locations, appSettings]);
+
+    const searchResults = useMemo(() => {
+        if (!searchTerm) return [];
+        return searchableItems.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [searchTerm, searchableItems]);
+
+    // Show loading state if data is not ready
+    if (!locations || locations.length === 0 || !services || services.length === 0) {
+        return (
+            <div className="flex items-center justify-center p-8">
+                <div className="text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-red mx-auto mb-4"></div>
+                    <p className="text-light-text dark:text-dark-text">Cargando datos de servicios y ubicaciones...</p>
+                </div>
+            </div>
+        );
+    }
+
+    const totals = useMemo(() => {
+        const subtotal = items.reduce((acc, item) => {
+            const quantity = item.quantity || 0;
+            const unitPrice = item.unitPrice || 0;
+            return acc + (quantity * unitPrice);
+        }, 0);
+        const taxAmount = items.reduce((acc, item) => {
+            const quantity = item.quantity || 0;
+            const unitPrice = item.unitPrice || 0;
+            const taxRate = item.taxRate || appSettings?.billingSettings?.vatRate || 19; // Use system VAT rate
+            return acc + (quantity * unitPrice * (taxRate / 100));
+        }, 0);
+        return { subtotal, taxAmount, total: subtotal + taxAmount };
+    }, [items, appSettings]);
+    
+    const handleAddItem = (item: SearchableItem) => {
+        if (items.some(i => i.id === item.id)) return;
+        
+        if (item.type === 'inventory') {
+            setOriginalPrices(prev => ({ ...prev, [item.id]: item.price }));
+        }
+
+        const newItem = {
+            id: item.id,
+            type: item.type,
+            description: item.name,
+            quantity: 1,
+            unitPrice: Number(item.price) || 0, // FORZAR que sea número
+            taxRate: Number(item.taxRate) || 19,
+            discount: 0,
+            suppliedByClient: false,
+        };
+        
+        console.log(`🚨 handleAddItem - NUEVO ITEM CREADO:`, newItem);
+        setItems(prev => [...prev, newItem]);
+        setSearchTerm('');
+    };
+    
+    const handleRemoveItem = (itemId: string) => {
+        setItems(prev => prev.filter(i => i.id !== itemId));
+    };
+    
+    const handleItemChange = (itemId: string, field: 'quantity' | 'unitPrice', value: number) => {
+        console.log(`🚨 CreateQuoteForm - handleItemChange:`, {
+            itemId,
+            field,
+            value,
+            valueType: typeof value,
+        });
+        setItems(prev => prev.map(i => i.id === itemId ? { ...i, [field]: value } : i));
+    };
+
+    const handleSuppliedByClientToggle = (itemId: string, isChecked: boolean) => {
+        setItems(prevItems => prevItems.map(item => {
+            if (item.id === itemId && item.type === 'inventory') {
+                if (isChecked) {
+                    return { ...item, suppliedByClient: true, unitPrice: 0, discount: 0 };
+                } else {
+                    const originalPrice = originalPrices[itemId] || 0;
+                    return { ...item, suppliedByClient: false, unitPrice: originalPrice };
+                }
+            }
+            return item;
+        }));
+    };
+
+    const handleSave = (status: QuoteStatus) => {
+        console.log('🔍 CreateQuoteForm - handleSave - items:', items);
+        console.log('🔍 CreateQuoteForm - handleSave - totals:', totals);
+        
+        // 🚨 SOLUCIÓN CRÍTICA: Asegurar que unitPrice SIEMPRE se guarde
+        const sanitizedItems = items.map(item => {
+            const sanitizedItem = {
+                id: item.id,
+                type: item.type,
+                description: item.description,
+                quantity: Number(item.quantity) || 1,
+                unitPrice: Number(item.unitPrice) || 0, // FORZAR que sea número
+                taxRate: Number(item.taxRate) || 19,
+                discount: Number(item.discount) || 0,
+                suppliedByClient: Boolean(item.suppliedByClient),
+            };
+            
+            console.log(`🚨 CreateQuoteForm - SANITIZANDO ITEM ${item.description}:`, {
+                original: item,
+                sanitized: sanitizedItem,
+            });
+            
+            return sanitizedItem;
+        });
+        
+        console.log('🚨🚨🚨 CreateQuoteForm - ANTES DE GUARDAR:', {
+            itemsOriginales: items,
+            sanitizedItems: sanitizedItems,
+            sanitizedItemsDETAILED: sanitizedItems.map(item => ({
+                id: item.id,
+                type: item.type,
+                description: item.description,
+                unitPrice: item.unitPrice,
+                unitPriceType: typeof item.unitPrice,
+                quantity: item.quantity,
+                TUDO_EL_ITEM: item,
+            })),
+        });
+        
+        // Recalculate totals with sanitized items
+        const sanitizedSubtotal = sanitizedItems.reduce((acc, item) => {
+            const quantity = item.quantity || 0;
+            const unitPrice = item.unitPrice || 0;
+            return acc + (quantity * unitPrice);
+        }, 0);
+        const sanitizedTaxAmount = sanitizedItems.reduce((acc, item) => {
+            const quantity = item.quantity || 0;
+            const unitPrice = item.unitPrice || 0;
+            const taxRate = item.taxRate || appSettings?.billingSettings?.vatRate || 19;
+            return acc + (quantity * unitPrice * (taxRate / 100));
+        }, 0);
+        const sanitizedTotal = sanitizedSubtotal + sanitizedTaxAmount;
+        
+        const quotePayload = {
+            workOrderId: workOrder.id,
+            clientId: workOrder.clientId,
+            clientName: client?.name || 'Cliente no encontrado',
+            vehicleSummary: `${vehicle?.make || 'N/A'} ${vehicle?.model || 'N/A'} (${vehicle?.plate || 'N/A'})`,
+            issueDate: new Date().toISOString().split('T')[0],
+            expiryDate: new Date(new Date().setDate(new Date().getDate() + 15)).toISOString().split('T')[0],
+            subtotal: sanitizedSubtotal,
+            taxAmount: sanitizedTaxAmount,
+            total: sanitizedTotal,
+            locationId: workOrder.locationId,
+            items: sanitizedItems, // ¡AGREGAR LOS ITEMS!
+            notes: notes,
+        };
+        
+        console.log('🔍 CreateQuoteForm - handleSave - quotePayload:', quotePayload);
+        
+        if (isEditing) {
+            const finalQuote = {
+                ...initialData,
+                ...quotePayload,
+                issueDate: initialData.issueDate,
+                expiryDate: initialData.expiryDate,
+                status: status,
+            };
+            console.log('🔍 CreateQuoteForm - handleSave - finalQuote (editing):', finalQuote);
+            onSave(finalQuote);
+        } else {
+            const finalQuote = {
+                ...quotePayload,
+                status: status,
+            };
+            console.log('🔍 CreateQuoteForm - handleSave - finalQuote (new):', finalQuote);
+            onSave(finalQuote);
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
+            <div className="lg:col-span-3 space-y-4">
+                 {!isEditing && diagnosticAttentionPoints.length > 0 && (
+                    <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700/50 rounded-lg p-3">
+                        <h3 className="font-semibold text-yellow-800 dark:text-yellow-200 flex items-center gap-2"><Icon name="exclamation-triangle" className="w-5 h-5" />Sugerencias del Diagnóstico</h3>
+                        <div className="mt-2 text-xs text-yellow-700 dark:text-yellow-300/80 max-h-24 overflow-y-auto space-y-1 pr-2">
+                            {diagnosticAttentionPoints.map((point, index) => (
+                                <div key={index} className="flex justify-between items-center bg-yellow-200/50 dark:bg-black dark:bg-gray-900/20 p-1.5 rounded">
+                                    <span>- {point.item} <span className="text-yellow-600 dark:text-yellow-400/60">({point.status})</span></span>
+                                    <button onClick={() => setSearchTerm(point.item)} className="px-2 py-0.5 bg-yellow-400/30 text-yellow-800 dark:text-yellow-200 rounded hover:bg-yellow-400/50 text-[10px] font-bold">BUSCAR</button>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                 )}
+                <div className="relative">
+                    <div className="relative">
+                        <Icon name="search" className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                        <input type="text" placeholder="Buscar servicio o repuesto para añadir..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setTimeout(() => setIsSearchFocused(false), 150)} className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50 focus:outline-none focus:ring-2 focus:ring-brand-red text-light-text dark:text-dark-text" />
+                    </div>
+                     {isSearchFocused && searchTerm && (
+                        <div className="absolute top-full mt-1 w-full bg-white dark:bg-dark-light border border-gray-200 dark:border-gray-700 rounded-lg z-10 max-h-60 overflow-y-auto shadow-lg">
+                           {searchResults.map(item => (<button key={`${item.type}-${item.id}`} onClick={() => handleAddItem(item)} className="w-full text-left flex justify-between items-center px-4 py-2 hover:bg-gray-100 dark:hover:bg-brand-red/20 text-light-text dark:text-dark-text"><div><p>{item.name}</p><p className="text-xs text-gray-500 dark:text-gray-400">{item.category}</p></div><div className="text-right"><p className="font-mono text-sm">{formatCurrency(item.price)}</p><span className={`text-xs px-1.5 py-0.5 rounded ${item.type === 'service' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/50 dark:text-blue-200' : 'bg-green-100 text-green-800 dark:bg-green-800/50 dark:text-green-200'}`}>{item.type === 'service' ? 'Servicio' : 'Repuesto'}</span></div></button>))}
+                            <button type="button" onClick={() => onQuickAddItem(searchTerm, undefined, items)} className="w-full text-left flex items-center px-4 py-2 hover:bg-gray-100 dark:hover:bg-brand-red/20 text-green-600 dark:text-green-400 border-t border-gray-200 dark:border-gray-700"><Icon name="plus" className="w-4 h-4 mr-2" /><span>Crear nuevo: "{searchTerm}"</span></button>
+                        </div>
+                    )}
+                </div>
+
+                <div className="overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-lg"><table className="w-full text-sm text-light-text dark:text-dark-text"><thead className="bg-gray-50 dark:bg-black dark:bg-gray-900/20 text-xs text-gray-700 dark:text-gray-400 uppercase"><tr><th className="px-4 py-2 text-left">Descripción</th><th className="px-2 py-2 text-center w-24">Cant.</th><th className="px-4 py-2 text-right w-36">Precio Unit.</th><th className="px-2 py-2 text-center w-28">Cliente Suministra</th><th className="px-4 py-2 text-right w-36">Total</th><th className="p-2 w-10"></th></tr></thead><tbody className="divide-y divide-gray-200 dark:divide-gray-800">{items.length > 0 ? items.map(item => item.type === 'placeholder' ? (<tr key={item.id} className="bg-yellow-100 dark:bg-yellow-900/20"><td className="px-4 py-2 font-medium italic text-yellow-800 dark:text-yellow-300 flex items-center gap-2"><Icon name="exclamation-triangle" className="w-4 h-4" />{item.description}</td><td colSpan={4} className="px-4 py-2"><button type="button" onClick={() => onQuickAddItem(item.description, item.id, items)} className="w-full text-center py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs font-bold">Definir Ítem</button></td><td className="p-2 text-center"><button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4" /></button></td></tr>) : (<tr key={item.id} className={item.suppliedByClient ? 'bg-blue-100/10 dark:bg-blue-900/10' : ''}><td className="px-4 py-2 font-medium">{item.description}</td><td className="px-2 py-1"><input type="number" value={item.quantity || 1} onChange={(e) => handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 1)} className="w-full text-center bg-gray-100 dark:bg-gray-800 rounded p-1 border border-gray-300 dark:border-gray-700" /></td><td className="px-2 py-1"><input type="text" value={item.unitPrice ? item.unitPrice.toLocaleString('es-CO') : '0'} disabled={!!item.suppliedByClient}                     onChange={(e) => {
+                        const cleanValue = e.target.value.replace(/[^0-9]/g, '');
+                        const numValue = parseFloat(cleanValue) || 0; // Usar parseFloat en lugar de parseInt
+                        console.log(`🚨 CreateQuoteForm - onChange precio:`, {
+                            originalValue: e.target.value,
+                            cleanValue,
+                            numValue,
+                            numValueType: typeof numValue,
+                        });
+                        handleItemChange(item.id, 'unitPrice', numValue);
+                    }} className="w-full text-right bg-gray-100 dark:bg-gray-800 rounded p-1 font-mono border border-gray-300 dark:border-gray-700 disabled:opacity-50" /></td><td className="px-2 py-2 text-center">{item.type === 'inventory' && (<input type="checkbox" checked={!!item.suppliedByClient} onChange={(e) => handleSuppliedByClientToggle(item.id, e.target.checked)} className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-brand-red focus:ring-brand-red focus:ring-2"/>)}</td><td className="px-4 py-2 text-right font-mono text-gray-600 dark:text-gray-300">{formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</td><td className="p-2 text-center"><button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4" /></button></td></tr>)) : (<tr><td colSpan={6} className="text-center py-8 text-gray-500">Añade ítems a la cotización.</td></tr>)}</tbody></table></div>
+            </div>
+
+            <div className="lg:col-span-2 space-y-4">
+                <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg"><h3 className="font-bold flex items-center gap-2 mb-2 text-light-text dark:text-dark-text"><Icon name="user" className="w-5 h-5 text-brand-red"/> Cliente</h3><p className="text-light-text dark:text-dark-text">{client?.name || 'Cliente no encontrado'}</p><p className="text-sm text-gray-500 dark:text-gray-400">{`${vehicle?.make || 'N/A'} ${vehicle?.model || 'N/A'} (${vehicle?.plate || 'N/A'})`}</p></div>
+                <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg"><h3 className="font-bold flex items-center gap-2 mb-2 text-light-text dark:text-dark-text"><Icon name="document-text" className="w-5 h-5 text-brand-red"/> Notas Adicionales</h3><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full text-sm p-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-brand-red focus:border-brand-red text-light-text dark:text-dark-text" placeholder="Añadir notas, condiciones o términos de validez..."></textarea></div>
+                <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg space-y-2"><div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(totals.subtotal)}</span></div><div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>IVA ({items[0]?.taxRate || 19}%):</span> <span className="font-mono">{formatCurrency(totals.taxAmount)}</span></div><div className="flex justify-between items-center text-light-text dark:text-white text-xl font-bold border-t border-gray-200 dark:border-gray-700 pt-2 mt-2"><span>Total:</span> <span className="font-mono text-brand-red">{formatCurrency(totals.total)}</span></div></div>
+                <div className="flex justify-end gap-3 pt-2"><button onClick={onCancel} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">Cancelar</button><button onClick={() => handleSave(QuoteStatus.ENVIADO)} className="px-4 py-2 text-sm font-semibold text-white bg-brand-red rounded-lg shadow-md hover:bg-red-700" disabled={items.some(i => i.type === 'placeholder') || items.length === 0}>{isEditing ? 'Guardar y Enviar' : 'Crear y Enviar Cotización'}</button></div>
+                 {items.some(i => i.type === 'placeholder') && (<p className="text-xs text-yellow-500 dark:text-yellow-400 text-right mt-2">Debe definir todos los ítems temporales antes de guardar.</p>)}
+            </div>
+        </div>
+    );
+};
+
+export default CreateQuoteForm;

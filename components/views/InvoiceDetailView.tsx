@@ -1,0 +1,348 @@
+import React, { useMemo } from 'react';
+import { renderToString } from 'react-dom/server.browser';
+import { Icon } from '../Icon';
+import { Invoice, Client, PaymentTerms, InvoiceStatus, WorkOrder, Vehicle, AppSettings } from '../../types';
+import { INVOICE_STATUS_DISPLAY_CONFIG } from '../../constants';
+import ToggleSwitch from '../ToggleSwitch';
+import PrintableInvoice from '../PrintableInvoice';
+
+interface InvoiceDetailViewProps {
+    invoice: Invoice;
+    workOrder?: WorkOrder;
+    client?: Client;
+    vehicle?: Vehicle;
+    appSettings: AppSettings | null;
+    onBack: () => void;
+    openModal: (type: 'MANAGE_COMMISSIONS' | 'FACTOR_INVOICE' | 'RELEASE_RETENTION', data: any) => void;
+    handleToggleInvoiceVat: (invoiceId: string) => void;
+}
+
+const formatCurrency = (value: number | string | undefined | null) => {
+    const numValue = typeof value === 'string' ? parseFloat(value) : (value || 0);
+    if (isNaN(numValue)) return '$ 0';
+    return new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(numValue);
+};
+
+const formatDate = (dateString: string | undefined | null) => {
+    if (!dateString) return 'Fecha no disponible';
+    try {
+        const date = new Date(dateString);
+        if (isNaN(date.getTime())) return 'Fecha inválida';
+        return date.toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
+    } catch (error) {
+        console.error('Error formatting date:', error, dateString);
+        return 'Fecha inválida';
+    }
+};
+
+const safeNumber = (value: any): number => {
+    if (typeof value === 'number') return isNaN(value) ? 0 : value;
+    if (typeof value === 'string') {
+        const parsed = parseFloat(value);
+        return isNaN(parsed) ? 0 : parsed;
+    }
+    return 0;
+};
+
+const formatPaymentTerms = (terms?: PaymentTerms): string => {
+    if (!terms) return 'Pago contra entrega';
+    switch (terms.type) {
+        case 'ON_DELIVERY': return 'Pago contra entrega';
+        case 'NET_DAYS': return `Neto ${terms.days} Días`;
+        case 'DAY_OF_WEEK': return `Pago los ${terms.day}`;
+        default: return 'N/A';
+    }
+};
+
+const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({ invoice, workOrder, client, vehicle, appSettings, onBack, openModal, handleToggleInvoiceVat }) => {
+    
+    // Debug: Verificar datos de la factura
+    console.log('🔍 InvoiceDetailView received data:', {
+        invoice: {
+            id: invoice.id,
+            subtotal: invoice.subtotal,
+            taxAmount: invoice.taxAmount,
+            total: invoice.total,
+            issueDate: invoice.issueDate,
+            dueDate: invoice.dueDate,
+            clientName: invoice.clientName,
+            vehicleSummary: invoice.vehicleSummary,
+            items: invoice.items?.map(item => ({
+                id: item.id,
+                description: item.description,
+                unitPrice: item.unitPrice,
+                quantity: item.quantity,
+                unitPriceType: typeof item.unitPrice,
+                quantityType: typeof item.quantity,
+            })),
+        },
+        workOrder: workOrder ? { id: workOrder.id, locationId: workOrder.locationId } : null,
+        client: client ? { id: client.id, name: client.name } : null,
+        vehicle: vehicle ? { make: vehicle.make, model: vehicle.model, plate: vehicle.plate } : null,
+    });
+    
+    const statusConfig = INVOICE_STATUS_DISPLAY_CONFIG[invoice.status] || { bg: 'bg-gray-200 dark:bg-gray-700', text: 'text-gray-800 dark:text-gray-200' };
+    const canFactor = (invoice.status === InvoiceStatus.PENDIENTE || invoice.status === InvoiceStatus.VENCIDA) && !invoice.factoringInfo;
+    const isVatIncluded = invoice.vatIncluded ?? true;
+    const isActionable = invoice.status === InvoiceStatus.PENDIENTE || invoice.status === InvoiceStatus.VENCIDA;
+
+    const totalUtility = useMemo(() => {
+        if (!invoice.items) return 0;
+
+        const factoringCost = invoice.factoringInfo?.commission || 0;
+        
+        const itemsUtility = invoice.items.reduce((acc, item) => {
+            const unitPrice = safeNumber(item.unitPrice);
+            const quantity = safeNumber(item.quantity);
+            const discount = safeNumber(item.discount);
+            const itemRevenue = (unitPrice * quantity) - discount;
+            let itemCost = safeNumber(item.commission);
+
+            if (item.type === 'inventory' && item.costPrice && !item.suppliedByClient) {
+                itemCost += safeNumber(item.costPrice) * quantity;
+            }
+            
+            return acc + (itemRevenue - itemCost);
+        }, 0);
+
+        return itemsUtility - factoringCost;
+
+    }, [invoice]);
+    
+    const handlePrint = () => {
+        if (!client || !vehicle) {
+            alert('Faltan datos de cliente o vehículo para generar el reporte.');
+            return;
+        }
+
+        const reportHtml = renderToString(<PrintableInvoice invoice={invoice} client={client} vehicle={vehicle} workOrder={workOrder} appSettings={appSettings} />);
+        
+        const fullHtml = `
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8" />
+                <title>Factura ${invoice.id}</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <link href="https://fonts.googleapis.com/css2?family=Impact&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+                <style> body { font-family: 'Inter', sans-serif; } </style>
+                <script>
+                    tailwind.config = {
+                        theme: { extend: { fontFamily: { heading: ['Impact', 'sans-serif'], sans: ['Inter', 'sans-serif'] }, colors: { brand: { red: '#C8102E' } } } }
+                    }
+                </script>
+            </head>
+            <body>${reportHtml}</body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(fullHtml);
+            printWindow.document.close();
+            // Wait for the content to be loaded before printing
+            setTimeout(() => {
+                printWindow.print();
+            }, 500);
+        } else {
+             alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
+        }
+    };
+
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-4">
+                    <button onClick={onBack} className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700/50 transition-colors">
+                        <Icon name="arrow-left" className="w-6 h-6" />
+                    </button>
+                    <div>
+                        <h1 className="text-3xl font-bold text-light-text dark:text-dark-text">Detalle de Factura</h1>
+                        <p className="mt-1 text-gray-500 dark:text-gray-400">Factura #{invoice.id}</p>
+                    </div>
+                </div>
+                 <span className={`px-4 py-2 text-sm font-bold rounded-md ${statusConfig.bg} ${statusConfig.text}`}>
+                    {invoice.status}
+                </span>
+            </div>
+
+            {/* Action Bar */}
+             <div className="bg-light dark:bg-dark-light rounded-xl p-3 flex flex-wrap items-center justify-end gap-3">
+                 {canFactor && (
+                    <button onClick={() => openModal('FACTOR_INVOICE', invoice)} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-purple-600 rounded-lg hover:bg-purple-500 transition-colors">
+                        <Icon name="credit-card" className="w-4 h-4" /> Vender Factura (Factoring)
+                    </button>
+                )}
+                {client?.isB2B && (
+                    <button onClick={() => openModal('MANAGE_COMMISSIONS', { invoice, client })} className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-500 transition-colors">
+                        <Icon name="percentage" className="w-4 h-4" /> Gestionar Comisiones
+                    </button>
+                )}
+                <button 
+                    onClick={handlePrint}
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600/50 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                    <Icon name="printer" className="w-4 h-4" /> Imprimir
+                </button>
+                <button 
+                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600/50 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50" 
+                    disabled
+                    title="Funcionalidad no disponible en esta demostración"
+                >
+                    <Icon name="paper-airplane" className="w-4 h-4" /> Enviar por Correo
+                </button>
+            </div>
+
+            {invoice.factoringInfo && (
+                <div className="bg-purple-900/20 border border-purple-700/50 rounded-xl p-5">
+                    <h3 className="font-bold text-purple-200 flex items-center gap-2 mb-3">
+                        <Icon name="credit-card" className="w-5 h-5"/> Factura Vendida (Factoring)
+                    </h3>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm items-start">
+                        <div>
+                            <p className="text-xs text-gray-400">Empresa</p>
+                            <p className="font-semibold text-gray-200">{invoice.factoringInfo.company}</p>
+                        </div>
+                         <div>
+                            <p className="text-xs text-gray-400">Fecha de Venta</p>
+                            <p className="font-semibold text-gray-200">{formatDate(invoice.factoringInfo.date)}</p>
+                        </div>
+                        <div>
+                            <p className="text-xs text-gray-400">Comisión</p>
+                            <p className="font-semibold text-red-400">{formatCurrency(invoice.factoringInfo.commission)}</p>
+                        </div>
+                         <div>
+                            <p className="text-xs text-gray-400">Retención</p>
+                            <p className={`font-semibold ${invoice.factoringInfo.retentionReleased ? 'text-green-400' : 'text-yellow-400'}`}>
+                                {formatCurrency(invoice.factoringInfo.retentionAmount)}
+                            </p>
+                             {invoice.factoringInfo.retentionReleased ? (
+                                <p className="text-xs text-green-400">(Liberada el {formatDate(invoice.factoringInfo.retentionReleased.date)})</p>
+                            ) : (
+                                <button 
+                                    onClick={() => openModal('RELEASE_RETENTION', invoice)}
+                                    className="mt-1 text-xs bg-yellow-500/20 text-yellow-300 px-2 py-1 rounded hover:bg-yellow-500/30">
+                                    Liberar Retención
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+            
+            {/* Main Content */}
+            <div className="bg-light dark:bg-dark-light rounded-xl p-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 border-b border-gray-200 dark:border-gray-700 pb-6">
+                    <div>
+                        <h3 className="font-bold text-light-text dark:text-white mb-2">Cliente</h3>
+                        <p className="text-gray-600 dark:text-gray-300">{invoice.clientName}</p>
+                    </div>
+                    <div>
+                        <h3 className="font-bold text-light-text dark:text-white mb-2">Vehículo</h3>
+                        <p className="text-gray-600 dark:text-gray-300">{invoice.vehicleSummary}</p>
+                    </div>
+                     <div>
+                        <h3 className="font-bold text-light-text dark:text-white mb-2">Fechas</h3>
+                        <p className="text-gray-600 dark:text-gray-300">Emitida: {formatDate(invoice.issueDate)}</p>
+                        <p className="text-gray-600 dark:text-gray-300">Vence: {formatDate(invoice.dueDate)}</p>
+                        <p className="text-xs text-gray-400">({formatPaymentTerms(invoice.paymentTerms)})</p>
+                    </div>
+                </div>
+
+                <div className="mt-6">
+                    <h3 className="text-xl font-bold text-light-text dark:text-white mb-4">Ítems de la Factura</h3>
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 text-xs text-gray-500 dark:text-gray-400 uppercase">
+                                <tr>
+                                    <th className="px-4 py-2 text-left">Descripción</th>
+                                    <th className="px-4 py-2 text-center w-20">Cant.</th>
+                                    <th className="px-4 py-2 text-right w-32">Precio Unit.</th>
+                                    <th className="px-4 py-2 text-right w-32">Comisión</th>
+                                    <th className="px-4 py-2 text-right w-32">Utilidad</th>
+                                    <th className="px-4 py-2 text-right w-32">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-light-text dark:text-dark-text">
+                                {invoice.items && invoice.items.length > 0 ? (
+                                    invoice.items.map(item => {
+                                        const itemRevenue = (item.unitPrice * item.quantity) - (item.discount || 0);
+                                        let utility: number | null = null;
+                                        let itemCost = item.commission || 0;
+                                        if (item.type === 'inventory' && item.costPrice && !item.suppliedByClient) {
+                                            itemCost += item.costPrice * item.quantity;
+                                        }
+                                        utility = itemRevenue - itemCost;
+
+                                        return (
+                                            <tr key={item.id}>
+                                                <td className="px-4 py-3 font-medium">
+                                                    <p>{item.description}</p>
+                                                    {item.suppliedByClient && <p className="text-xs text-blue-400 font-semibold">(Suministrado por Cliente)</p>}
+                                                    <span className={`text-xs px-1.5 py-0.5 rounded ${item.type === 'service' ? 'bg-blue-100 text-blue-800 dark:bg-blue-800/50 dark:text-blue-200' : 'bg-green-100 text-green-800 dark:bg-green-800/50 dark:text-green-200'}`}>{item.type === 'service' ? 'Servicio' : 'Repuesto'}</span>
+                                                </td>
+                                                <td className="px-4 py-3 text-center">{item.quantity}</td>
+                                                <td className="px-4 py-3 text-right font-mono">
+                                                     {formatCurrency(item.suppliedByClient ? 0 : safeNumber(item.unitPrice))}
+                                                    {safeNumber(item.discount) > 0 && (
+                                                        <p className="text-xs text-red-500 dark:text-red-400" title="Descuento aplicado">(-{formatCurrency(item.discount)})</p>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-red-400">
+                                                    {safeNumber(item.commission) > 0 ? `-${formatCurrency(item.commission)}` : '-'}
+                                                </td>
+                                                <td className={`px-4 py-3 text-right font-mono ${utility !== null && utility >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                    {utility !== null ? formatCurrency(utility) : 'N/A'}
+                                                </td>
+                                                <td className="px-4 py-3 text-right font-mono text-gray-700 dark:text-gray-300">{formatCurrency(itemRevenue)}</td>
+                                            </tr>
+                                        );
+                                    })
+                                ) : (
+                                    <tr>
+                                        <td colSpan={6} className="text-center py-6 text-gray-500 dark:text-gray-400">No hay ítems detallados para esta factura.</td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 mt-6 gap-6">
+                    <div className="space-y-4">
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                            {invoice.notes && (
+                                <>
+                                    <h4 className="font-bold text-gray-800 dark:text-gray-300 mb-2">Notas Adicionales</h4>
+                                    <p className="italic">"{invoice.notes}"</p>
+                                </>
+                            )}
+                        </div>
+                        <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg">
+                            <ToggleSwitch
+                                label="Incluir IVA en esta Factura"
+                                enabled={isVatIncluded}
+                                onChange={() => handleToggleInvoiceVat(invoice.id)}
+                                disabled={!isActionable}
+                                description={!isActionable ? 'Opción bloqueada para facturas pagadas o canceladas.' : 'Desactiva para no cobrar IVA.'}
+                            />
+                        </div>
+                    </div>
+                     <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg space-y-2">
+                        <div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(invoice.subtotal)}</span></div>
+                        <div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>IVA:</span> <span className="font-mono">{formatCurrency(invoice.taxAmount)}</span></div>
+                        <div className="flex justify-between items-center text-green-600 dark:text-green-400">
+                            <span>Utilidad Total Estimada:</span>
+                            <span className="font-mono">{formatCurrency(totalUtility)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-light-text dark:text-white text-xl font-bold border-t border-gray-200 dark:border-gray-700 pt-2 mt-2"><span>Total Factura:</span> <span className="font-mono text-brand-red">{formatCurrency(invoice.total)}</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+export default InvoiceDetailView;

@@ -1,0 +1,7 @@
+{
+  "name": "Autodealer Cloud",
+  "description": "Una aplicación de gestión integral basada en la nube para talleres automotrices en Colombia, que optimiza las operaciones internas, mejora la experiencia del cliente y asegura el cumplimiento de las regulaciones ambientales locales.",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}

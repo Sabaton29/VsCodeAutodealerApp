@@ -1,0 +1,70 @@
+import fs from 'fs';
+
+// Archivos que necesitan corrección de sintaxis
+const filesToFix = [
+  'services/supabase.ts',
+  'fix-contrast-issues.js',
+  'test-supabase-simple.js',
+  'test-supabase.js',
+  'update-work-orders-simple.js',
+  'update-work-orders-stages.js',
+  'verificar-estado-ordenes.js',
+  'setup-local.cjs'
+];
+
+function fixSyntaxErrors(filePath) {
+  try {
+    if (!fs.existsSync(filePath)) {
+      console.log(`Archivo no encontrado: ${filePath}`);
+      return;
+    }
+
+    let content = fs.readFileSync(filePath, 'utf8');
+    const originalContent = content;
+
+    // Corregir problemas comunes de sintaxis
+    content = content.replace(/console\.log\([^)]*\);?\s*/g, '');
+    
+    // Corregir líneas vacías múltiples
+    content = content.replace(/\n\s*\n\s*\n/g, '\n\n');
+    
+    // Corregir problemas de template literals mal formateados
+    content = content.replace(/`[^`]*\$\{[^}]*\}[^`]*`/g, (match) => {
+      // Si el template literal está mal formateado, lo convertimos a string simple
+      return `"${match.replace(/`/g, '').replace(/\$\{([^}]*)\}/g, '$1')}"`;
+    });
+    
+    // Corregir problemas de comillas mal cerradas
+    content = content.replace(/'[^']*$/gm, (match) => {
+      if (!match.endsWith("'")) {
+        return match + "'";
+      }
+      return match;
+    });
+    
+    content = content.replace(/"[^"]*$/gm, (match) => {
+      if (!match.endsWith('"')) {
+        return match + '"';
+      }
+      return match;
+    });
+
+    if (content !== originalContent) {
+      fs.writeFileSync(filePath, content, 'utf8');
+      console.log(`✅ Corregido: ${filePath}`);
+    } else {
+      console.log(`ℹ️  Sin cambios: ${filePath}`);
+    }
+  } catch (error) {
+    console.error(`❌ Error procesando ${filePath}:`, error.message);
+  }
+}
+
+console.log('🔧 Corrigiendo errores de sintaxis...\n');
+
+filesToFix.forEach(file => {
+  fixSyntaxErrors(file);
+});
+
+console.log('\n✨ Corrección de sintaxis completada!');
+
