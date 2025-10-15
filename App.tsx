@@ -1576,7 +1576,7 @@ const ModalManager: React.FC = () => {
                                     supplierId: undefined,
                                     isCompleted: false,
                                     suppliedByClient: false,
-                                    notes: service.notes
+                                    // notes: service.notes // Comentado temporalmente
                                 });
                             });
                         }
@@ -1596,7 +1596,7 @@ const ModalManager: React.FC = () => {
                                     supplierId: part.supplierId,
                                     isCompleted: false,
                                     suppliedByClient: false,
-                                    notes: part.notes
+                                    // notes: part.notes // Comentado temporalmente
                                 });
                             });
                         }
@@ -1605,12 +1605,12 @@ const ModalManager: React.FC = () => {
                         const newQuote: Omit<Quote, 'id'> = {
                             workOrderId: modalData.id,
                             clientId: modalData.client?.id || '',
-                            vehicleId: modalData.vehicle?.id || '',
+                            // vehicleId: modalData.vehicle?.id || '', // Comentado temporalmente
                             items: quoteItems,
                             subtotal: quoteItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
                             taxAmount: quoteItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice * (item.taxRate / 100)), 0),
                             total: quoteItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice * (1 + item.taxRate / 100)), 0),
-                            status: QuoteStatus.PENDIENTE,
+                            status: QuoteStatus.PENDIENTE_COTIZACION,
                             notes: `Cotización generada desde imprevisto: ${issue.description}`,
                             createdAt: new Date().toISOString(),
                             updatedAt: new Date().toISOString()

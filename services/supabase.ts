@@ -871,15 +871,33 @@ export const getQuoteWithItems = async (quoteId: string): Promise<any> => {
 // APP SETTINGS
 export const getAppSettings = async (): Promise<AppSettings | null> => {
     try {
+        // Primero intentar obtener un solo registro
         const { data, error } = await supabase
             .from('app_settings')
             .select('*')
             .single();
         
-        if (error) throw error;
+        if (error) {
+            // Si hay error por múltiples registros, obtener el más reciente
+            if (error.code === 'PGRST116') {
+                console.log('⚠️ Múltiples registros en app_settings, obteniendo el más reciente...');
+                const { data: multipleData, error: multipleError } = await supabase
+                    .from('app_settings')
+                    .select('*')
+                    .order('created_at', { ascending: false })
+                    .limit(1);
+                
+                if (multipleError) throw multipleError;
+                if (multipleData && multipleData.length > 0) {
+                    return transformData(multipleData[0], false) as AppSettings;
+                }
+            }
+            throw error;
+        }
+        
         return transformData(data, false) as AppSettings;
     } catch (error) {
-        handleSupabaseError(error, 'get app settings');
+        console.error('❌ Error obteniendo app settings:', error);
         return null;
     }
 };

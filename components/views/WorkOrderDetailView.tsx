@@ -1,7 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { renderToString } from 'react-dom/server.browser';
 import { Icon } from '../Icon';
-import { WorkOrder, Client, Vehicle, ChecklistStatus, Permission, DiagnosticData, Quote, QuoteStatus, KanbanStage, Supplier, AppSettings, CompanyInfo, StaffMember, DiagnosticType } from '../../types';
+import { WorkOrder, Client, Vehicle, ChecklistStatus, Permission, DiagnosticData, Quote, QuoteStatus, KanbanStage, Supplier, AppSettings, CompanyInfo, StaffMember, DiagnosticType, UnforeseenIssue } from '../../types';
 import PrintableDiagnosticReport from '../PrintableDiagnosticReport';
 import PrintableReceptionReport from '../PrintableReceptionReport';
 import { DIAGNOSTIC_CHECKLIST_SECTIONS, QUOTE_STATUS_DISPLAY_CONFIG } from '../../constants';
@@ -304,11 +304,11 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
         const allImages: { src: string; type: 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico'; timestamp: string; notes?: string; }[] = [];
 
         (workOrder.entryEvidenceImageUrls || []).forEach(url => {
-            allImages.push({ src: url, type: 'Ingreso', timestamp: workOrder.createdAt, notes: 'Evidencia de Ingreso' });
+            allImages.push({ src: url, type: 'Ingreso', timestamp: (workOrder as any).createdAt || new Date().toISOString(), notes: 'Evidencia de Ingreso' });
         });
         
         if (workOrder.diagnosticData) {
-            const diagnosticDate = (workOrder.history || []).find(h => h.stage === 'Diagnóstico')?.date || workOrder.createdAt;
+            const diagnosticDate = (workOrder.history || []).find(h => h.stage === 'Diagnóstico')?.date || (workOrder as any).createdAt || new Date().toISOString();
             Object.entries(workOrder.diagnosticData).forEach(([sectionTitle, sectionData]) => {
                 ((sectionData as any).imageUrls || []).forEach(url => {
                     allImages.push({
@@ -340,7 +340,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                             allImages.push({
                                 src: url,
                                 type: 'Avance',
-                                timestamp: workOrder.updatedAt || workOrder.createdAt,
+                                timestamp: (workOrder as any).updatedAt || (workOrder as any).createdAt || new Date().toISOString(),
                                 notes: `Tarea: ${item.description}`
                             });
                         });
@@ -426,6 +426,256 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
         } else {
             alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
         }
+    };
+
+    // Función para imprimir reporte de imprevisto
+    const handlePrintUnforeseenIssue = async(issue: any) => {
+        if (!client || !vehicle) {
+            alert('Faltan datos de cliente o vehículo para generar el reporte.');
+            return;
+        }
+
+        const companyInfo = appSettings?.companyInfo || {
+            name: 'Autodealer Taller SAS',
+            nit: '900.123.456-7',
+            logoUrl: '',
+        };
+
+        // Crear el HTML del reporte de imprevisto
+        const reportHtml = `
+            <!DOCTYPE html>
+            <html lang="es">
+            <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <title>Reporte de Imprevisto - ${workOrder.id}</title>
+                <script src="https://cdn.tailwindcss.com"></script>
+                <style>
+                    @media print {
+                        body { margin: 0; }
+                        .no-print { display: none; }
+                    }
+                </style>
+            </head>
+            <body class="bg-white text-black">
+                <div class="max-w-4xl mx-auto p-6">
+                    <!-- Header -->
+                    <div class="flex justify-between items-center mb-6 border-b-2 border-gray-300 pb-4">
+                        <div>
+                            <img src="${companyInfo.logoUrl || '/images/company/logo.png'}" alt="Logo" class="h-20 w-auto" onerror="this.style.display='none'">
+                        </div>
+                        <div class="text-right">
+                            <h1 class="text-2xl font-bold text-gray-900">Reporte de Imprevisto</h1>
+                            <p class="text-sm text-gray-600">Orden de Trabajo: <span class="font-bold">${workOrder.id}</span></p>
+                            <p class="text-sm text-gray-600">Fecha: <span class="font-bold">${new Date().toLocaleDateString('es-CO')}</span></p>
+                        </div>
+                    </div>
+
+                    <!-- Información del Cliente y Vehículo -->
+                    <div class="grid grid-cols-2 gap-6 mb-6">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg mb-2">Datos del Cliente</h3>
+                            <p class="text-sm"><span class="font-semibold">Nombre:</span> ${client.name || 'N/A'}</p>
+                            <p class="text-sm"><span class="font-semibold">Identificación:</span> ${client.idType || ''} ${client.idNumber || ''}</p>
+                            <p class="text-sm"><span class="font-semibold">Teléfono:</span> ${client.phone || 'N/A'}</p>
+                            <p class="text-sm"><span class="font-semibold">Email:</span> ${client.email || 'N/A'}</p>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <h3 class="font-bold text-lg mb-2">Datos del Vehículo</h3>
+                            <p class="text-sm"><span class="font-semibold">Marca/Modelo:</span> ${vehicle.make || ''} ${vehicle.model || ''}</p>
+                            <p class="text-sm"><span class="font-semibold">Placa:</span> ${vehicle.plate || 'N/A'}</p>
+                            <p class="text-sm"><span class="font-semibold">Año:</span> ${vehicle.year || 'N/A'}</p>
+                            <p class="text-sm"><span class="font-semibold">Kilometraje:</span> ${workOrder.mileage || 'N/A'}</p>
+                        </div>
+                    </div>
+
+                    <!-- Detalles del Imprevisto -->
+                    <div class="bg-orange-50 border border-orange-200 rounded-lg p-4 mb-6">
+                        <h3 class="font-bold text-lg mb-3 text-orange-800">Detalles del Imprevisto</h3>
+                        <div class="space-y-2">
+                            <p class="text-sm"><span class="font-semibold">Reportado por:</span> ${staffMap.get(issue.reportedById) || 'Desconocido'}</p>
+                            <p class="text-sm"><span class="font-semibold">Fecha:</span> ${formatDateTime(issue.timestamp)}</p>
+                            <p class="text-sm"><span class="font-semibold">Prioridad:</span> <span class="font-bold text-orange-600">${issue.priority?.toUpperCase() || 'MEDIA'}</span></p>
+                            <p class="text-sm"><span class="font-semibold">Descripción:</span></p>
+                            <p class="text-sm bg-white p-3 rounded border italic">"${issue.description}"</p>
+                        </div>
+                    </div>
+
+                    <!-- Servicios Requeridos -->
+                    ${issue.requiredServices && issue.requiredServices.length > 0 ? `
+                    <div class="mb-6">
+                        <h3 class="font-bold text-lg mb-3">Servicios Requeridos</h3>
+                        <div class="bg-gray-50 rounded-lg overflow-hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-200">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-sm font-semibold">Servicio</th>
+                                        <th class="px-4 py-2 text-center text-sm font-semibold">Cantidad</th>
+                                        <th class="px-4 py-2 text-right text-sm font-semibold">Precio Unit.</th>
+                                        <th class="px-4 py-2 text-right text-sm font-semibold">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${issue.requiredServices.map((service: any) => `
+                                        <tr class="border-b">
+                                            <td class="px-4 py-2 text-sm">${service.serviceName}</td>
+                                            <td class="px-4 py-2 text-center text-sm">${service.quantity}</td>
+                                            <td class="px-4 py-2 text-right text-sm">$${service.estimatedPrice.toLocaleString()}</td>
+                                            <td class="px-4 py-2 text-right text-sm font-semibold">$${(service.quantity * service.estimatedPrice).toLocaleString()}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Repuestos Requeridos -->
+                    ${issue.requiredParts && issue.requiredParts.length > 0 ? `
+                    <div class="mb-6">
+                        <h3 class="font-bold text-lg mb-3">Repuestos Requeridos</h3>
+                        <div class="bg-gray-50 rounded-lg overflow-hidden">
+                            <table class="w-full">
+                                <thead class="bg-gray-200">
+                                    <tr>
+                                        <th class="px-4 py-2 text-left text-sm font-semibold">Repuesto</th>
+                                        <th class="px-4 py-2 text-center text-sm font-semibold">Cantidad</th>
+                                        <th class="px-4 py-2 text-right text-sm font-semibold">Precio Unit.</th>
+                                        <th class="px-4 py-2 text-right text-sm font-semibold">Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${issue.requiredParts.map((part: any) => `
+                                        <tr class="border-b">
+                                            <td class="px-4 py-2 text-sm">${part.partName}</td>
+                                            <td class="px-4 py-2 text-center text-sm">${part.quantity}</td>
+                                            <td class="px-4 py-2 text-right text-sm">$${part.estimatedPrice.toLocaleString()}</td>
+                                            <td class="px-4 py-2 text-right text-sm font-semibold">$${(part.quantity * part.estimatedPrice).toLocaleString()}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Resumen de Costos -->
+                    ${issue.estimatedCost && issue.estimatedCost > 0 ? `
+                    <div class="bg-gray-100 p-4 rounded-lg">
+                        <h3 class="font-bold text-lg mb-2">Resumen de Costos Estimados</h3>
+                        <div class="text-right">
+                            <p class="text-lg font-bold text-gray-900">Total Estimado: $${issue.estimatedCost.toLocaleString()}</p>
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Evidencia Fotográfica -->
+                    ${issue.imageUrls && issue.imageUrls.length > 0 ? `
+                    <div class="mt-6">
+                        <h3 class="font-bold text-lg mb-3">Evidencia Fotográfica del Daño</h3>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+                            ${issue.imageUrls.map((imageUrl: string, imgIndex: number) => `
+                                <div class="bg-gray-50 p-2 rounded border">
+                                    <img src="${imageUrl}" alt="Evidencia ${imgIndex + 1}" class="w-full h-32 object-cover rounded" onerror="this.style.display='none'">
+                                    <p class="text-xs text-center mt-1 text-gray-600">Evidencia ${imgIndex + 1}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                    ` : ''}
+
+                    <!-- Notas Adicionales -->
+                    ${issue.notes ? `
+                    <div class="mt-6">
+                        <h3 class="font-bold text-lg mb-2">Notas Adicionales</h3>
+                        <p class="text-sm bg-gray-50 p-3 rounded border">${issue.notes}</p>
+                    </div>
+                    ` : ''}
+
+                    <!-- Footer -->
+                    <div class="mt-8 pt-4 border-t border-gray-300 text-center text-xs text-gray-500">
+                        <p>Este reporte fue generado automáticamente el ${new Date().toLocaleString('es-CO')}</p>
+                        <p>${companyInfo.name} - ${companyInfo.nit}</p>
+                    </div>
+                </div>
+            </body>
+            </html>
+        `;
+
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.open();
+            printWindow.document.write(reportHtml);
+            printWindow.document.close();
+        } else {
+            alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
+        }
+    };
+
+    // Función para crear cotización desde imprevisto
+    const handleCreateQuoteFromIssue = (issue: any) => {
+        // Convertir el imprevisto en una cotización
+        const quoteItems: any[] = [];
+        
+        // Agregar servicios del imprevisto
+        if (issue.requiredServices) {
+            issue.requiredServices.forEach((service: any) => {
+                quoteItems.push({
+                    id: `service_${service.serviceId}_${Date.now()}`,
+                    type: 'service',
+                    description: service.serviceName,
+                    quantity: service.quantity,
+                    unitPrice: service.estimatedPrice,
+                    taxRate: 19,
+                    discount: 0,
+                    costPrice: service.estimatedPrice * 0.7, // Asumir 30% de margen
+                    supplierId: undefined,
+                    isCompleted: false,
+                    suppliedByClient: false,
+                });
+            });
+        }
+        
+        // Agregar repuestos del imprevisto
+        if (issue.requiredParts) {
+            issue.requiredParts.forEach((part: any) => {
+                quoteItems.push({
+                    id: `part_${part.partId}_${Date.now()}`,
+                    type: 'inventory',
+                    description: part.partName,
+                    quantity: part.quantity,
+                    unitPrice: part.estimatedPrice,
+                    taxRate: 19,
+                    discount: 0,
+                    costPrice: part.estimatedPrice * 0.6, // Asumir 40% de margen
+                    supplierId: part.supplierId,
+                    isCompleted: false,
+                    suppliedByClient: false,
+                });
+            });
+        }
+        
+        if (quoteItems.length === 0) {
+            alert('No hay servicios o repuestos en este imprevisto para crear una cotización.');
+            return;
+        }
+        
+        // Crear la cotización
+        const newQuote = {
+            workOrderId: workOrder.id,
+            clientId: workOrder.client?.id || '',
+            items: quoteItems,
+            subtotal: quoteItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0),
+            taxAmount: quoteItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice * (item.taxRate / 100)), 0),
+            total: quoteItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice * (1 + item.taxRate / 100)), 0),
+            status: 'PENDIENTE_COTIZACION' as any,
+            notes: `Cotización generada desde imprevisto: ${issue.description}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        // Llamar a la función de crear cotización
+        onCreateQuote(workOrder, true);
     };
 
     const attentionPoints = useMemo(() => {
@@ -584,11 +834,66 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                             </div>
                             {(workOrder.unforeseenIssues || []).map((issue, index) => (
                                 <div key={index} className="bg-black dark:bg-gray-900/20 p-3 rounded-lg">
-                                    <div className="flex items-center gap-2 text-xs mb-1">
-                                        <span className="font-bold text-white">{staffMap.get(issue.reportedById) || 'Desconocido'}</span>
-                                        <span className="text-gray-400">· {formatDateTime(issue.timestamp)}</span>
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2 text-xs">
+                                            <span className="font-bold text-white">{staffMap.get(issue.reportedById) || 'Desconocido'}</span>
+                                            <span className="text-gray-400">· {formatDateTime(issue.timestamp)}</span>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <button 
+                                                onClick={() => handlePrintUnforeseenIssue(issue)}
+                                                className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-gray-300 bg-blue-600/50 rounded hover:bg-blue-600 transition-colors"
+                                            >
+                                                <Icon name="printer" className="w-3 h-3" />
+                                                Imprimir
+                                            </button>
+                                            <button 
+                                                onClick={() => handleCreateQuoteFromIssue(issue)}
+                                                className="flex items-center gap-1 px-2 py-1 text-xs font-semibold text-gray-300 bg-green-600/50 rounded hover:bg-green-600 transition-colors"
+                                            >
+                                                <Icon name="plus" className="w-3 h-3" />
+                                                Cotizar
+                                            </button>
+                                        </div>
                                     </div>
                                     <p className="text-sm text-gray-300 italic">"{issue.description}"</p>
+                                    
+                                    {/* Mostrar servicios y repuestos si existen */}
+                                    {(issue.requiredServices && issue.requiredServices.length > 0) && (
+                                        <div className="mt-2">
+                                            <p className="text-xs text-gray-400 mb-1">Servicios requeridos:</p>
+                                            <ul className="text-xs text-gray-300 space-y-1">
+                                                {issue.requiredServices.map((service, sIndex) => (
+                                                    <li key={sIndex} className="flex justify-between">
+                                                        <span>{service.serviceName}</span>
+                                                        <span className="text-green-400">${service.estimatedPrice.toLocaleString()}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    
+                                    {(issue.requiredParts && issue.requiredParts.length > 0) && (
+                                        <div className="mt-2">
+                                            <p className="text-xs text-gray-400 mb-1">Repuestos requeridos:</p>
+                                            <ul className="text-xs text-gray-300 space-y-1">
+                                                {issue.requiredParts.map((part, pIndex) => (
+                                                    <li key={pIndex} className="flex justify-between">
+                                                        <span>{part.partName}</span>
+                                                        <span className="text-green-400">${part.estimatedPrice.toLocaleString()}</span>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        </div>
+                                    )}
+                                    
+                                    {issue.estimatedCost && issue.estimatedCost > 0 && (
+                                        <div className="mt-2 pt-2 border-t border-gray-700">
+                                            <p className="text-xs text-gray-400">
+                                                Costo estimado total: <span className="text-green-400 font-bold">${issue.estimatedCost.toLocaleString()}</span>
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             ))}
                          </div>
@@ -813,7 +1118,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                             <h3 className="font-bold text-white flex items-center gap-2 mb-3"><Icon name="document-text" className="w-5 h-5 text-brand-red"/> Cotizaciones ({quotes.length})</h3>
                             <div className="space-y-4">
                                 {quotes
-                                    .sort((a, b) => new Date(b.createdAt || b.issueDate).getTime() - new Date(a.createdAt || a.issueDate).getTime())
+                                    .sort((a, b) => new Date((b as any).createdAt || b.issueDate).getTime() - new Date((a as any).createdAt || a.issueDate).getTime())
                                     .map((quote, index) => {
                                     // Usar función centralizada para generar ID consistente
                                     const displayId = getQuoteDisplayId(quote.id, quote.issueDate, true, quote.sequentialId);

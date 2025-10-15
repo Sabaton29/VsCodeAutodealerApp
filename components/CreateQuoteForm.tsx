@@ -39,6 +39,11 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const isEditing = !!initialData?.id;
 
+    // Separar ítems por tipo
+    const serviceItems = items.filter(item => item.type === 'service');
+    const partsItems = items.filter(item => item.type === 'inventory');
+    const placeholderItems = items.filter(item => item.type === 'placeholder');
+
     useEffect(() => {
         console.log('🔍 CreateQuoteForm - useEffect - isEditing:', isEditing);
         console.log('🔍 CreateQuoteForm - useEffect - initialData:', initialData);
@@ -370,7 +375,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
         
         const quotePayload = {
             workOrderId: workOrder.id,
-            clientId: workOrder.clientId,
+            clientId: workOrder.client?.id || '',
             clientName: client?.name || 'Cliente no encontrado',
             vehicleSummary: `${vehicle?.make || 'N/A'} ${vehicle?.model || 'N/A'} (${vehicle?.plate || 'N/A'})`,
             issueDate: new Date().toISOString().split('T')[0],
@@ -434,23 +439,251 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
                     )}
                 </div>
 
-                <div className="overflow-x-auto border border-gray-200 dark:border-gray-800 rounded-lg"><table className="w-full text-sm text-light-text dark:text-dark-text"><thead className="bg-gray-50 dark:bg-black dark:bg-gray-900/20 text-xs text-gray-700 dark:text-gray-400 uppercase"><tr><th className="px-4 py-2 text-left">Descripción</th><th className="px-2 py-2 text-center w-24">Cant.</th><th className="px-4 py-2 text-right w-36">Precio Unit.</th><th className="px-2 py-2 text-center w-28">Cliente Suministra</th><th className="px-4 py-2 text-right w-36">Total</th><th className="p-2 w-10"></th></tr></thead><tbody className="divide-y divide-gray-200 dark:divide-gray-800">{items.length > 0 ? items.map(item => item.type === 'placeholder' ? (<tr key={item.id} className="bg-yellow-100 dark:bg-yellow-900/20"><td className="px-4 py-2 font-medium italic text-yellow-800 dark:text-yellow-300 flex items-center gap-2"><Icon name="exclamation-triangle" className="w-4 h-4" />{item.description}</td><td colSpan={4} className="px-4 py-2"><button type="button" onClick={() => onQuickAddItem(item.description, item.id, items)} className="w-full text-center py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs font-bold">Definir Ítem</button></td><td className="p-2 text-center"><button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4" /></button></td></tr>) : (<tr key={item.id} className={item.suppliedByClient ? 'bg-blue-100/10 dark:bg-blue-900/10' : ''}><td className="px-4 py-2 font-medium">{item.description}</td><td className="px-2 py-1"><input type="number" value={item.quantity || 1} onChange={(e) => handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 1)} className="w-full text-center bg-gray-100 dark:bg-gray-800 rounded p-1 border border-gray-300 dark:border-gray-700" /></td><td className="px-2 py-1"><input type="text" value={item.unitPrice ? item.unitPrice.toLocaleString('es-CO') : '0'} disabled={!!item.suppliedByClient}                     onChange={(e) => {
+                {/* Servicios Requeridos */}
+                <div className="space-y-4">
+                    <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700/50 rounded-lg p-4">
+                        <h3 className="font-bold text-lg mb-3 text-blue-800 dark:text-blue-200 flex items-center gap-2">
+                            <Icon name="wrench" className="w-5 h-5" />
+                            Servicios Requeridos
+                        </h3>
+                        
+                        {serviceItems.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-light-text dark:text-dark-text">
+                                    <thead className="bg-blue-100 dark:bg-blue-800/30 text-xs text-blue-800 dark:text-blue-200 uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Servicio</th>
+                                            <th className="px-2 py-2 text-center w-24">Cant.</th>
+                                            <th className="px-4 py-2 text-right w-36">Precio Unit.</th>
+                                            <th className="px-4 py-2 text-right w-36">Total</th>
+                                            <th className="p-2 w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-blue-200 dark:divide-blue-700/30">
+                                        {serviceItems.map(item => (
+                                            <tr key={item.id} className="hover:bg-blue-50 dark:hover:bg-blue-900/10">
+                                                <td className="px-4 py-2 font-medium">{item.description}</td>
+                                                <td className="px-2 py-1">
+                                                    <input 
+                                                        type="number" 
+                                                        value={item.quantity || 1} 
+                                                        onChange={(e) => handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 1)} 
+                                                        className="w-full text-center bg-white dark:bg-gray-800 rounded p-1 border border-blue-300 dark:border-blue-600" 
+                                                    />
+                                                </td>
+                                                <td className="px-2 py-1">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.unitPrice ? item.unitPrice.toLocaleString('es-CO') : '0'} 
+                                                        onChange={(e) => {
+                                                            const cleanValue = e.target.value.replace(/[^0-9]/g, '');
+                                                            const numValue = parseFloat(cleanValue) || 0;
+                                                            handleItemChange(item.id, 'unitPrice', numValue);
+                                                        }} 
+                                                        className="w-full text-right bg-white dark:bg-gray-800 rounded p-1 font-mono border border-blue-300 dark:border-blue-600" 
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-mono text-blue-600 dark:text-blue-300 font-semibold">
+                                                    {formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    <button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-400">
+                                                        <Icon name="trash" className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <p className="text-center py-4 text-blue-600 dark:text-blue-400 italic">
+                                No hay servicios agregados. Busca y agrega servicios desde el campo de búsqueda.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Repuestos Requeridos */}
+                    <div className="bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-700/50 rounded-lg p-4">
+                        <h3 className="font-bold text-lg mb-3 text-green-800 dark:text-green-200 flex items-center gap-2">
+                            <Icon name="inventory" className="w-5 h-5" />
+                            Repuestos Requeridos
+                        </h3>
+                        
+                        {partsItems.length > 0 ? (
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm text-light-text dark:text-dark-text">
+                                    <thead className="bg-green-100 dark:bg-green-800/30 text-xs text-green-800 dark:text-green-200 uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Repuesto</th>
+                                            <th className="px-2 py-2 text-center w-24">Cant.</th>
+                                            <th className="px-4 py-2 text-right w-36">Precio Unit.</th>
+                                            <th className="px-2 py-2 text-center w-28">Cliente Suministra</th>
+                                            <th className="px-4 py-2 text-right w-36">Total</th>
+                                            <th className="p-2 w-10"></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-green-200 dark:divide-green-700/30">
+                                        {partsItems.map(item => (
+                                            <tr key={item.id} className={`hover:bg-green-50 dark:hover:bg-green-900/10 ${item.suppliedByClient ? 'bg-blue-100/10 dark:bg-blue-900/10' : ''}`}>
+                                                <td className="px-4 py-2 font-medium">{item.description}</td>
+                                                <td className="px-2 py-1">
+                                                    <input 
+                                                        type="number" 
+                                                        value={item.quantity || 1} 
+                                                        onChange={(e) => handleItemChange(item.id, 'quantity', parseFloat(e.target.value) || 1)} 
+                                                        className="w-full text-center bg-white dark:bg-gray-800 rounded p-1 border border-green-300 dark:border-green-600" 
+                                                    />
+                                                </td>
+                                                <td className="px-2 py-1">
+                                                    <input 
+                                                        type="text" 
+                                                        value={item.unitPrice ? item.unitPrice.toLocaleString('es-CO') : '0'} 
+                                                        disabled={!!item.suppliedByClient}
+                                                        onChange={(e) => {
                         const cleanValue = e.target.value.replace(/[^0-9]/g, '');
-                        const numValue = parseFloat(cleanValue) || 0; // Usar parseFloat en lugar de parseInt
-                        console.log(`🚨 CreateQuoteForm - onChange precio:`, {
-                            originalValue: e.target.value,
-                            cleanValue,
-                            numValue,
-                            numValueType: typeof numValue,
-                        });
+                                                            const numValue = parseFloat(cleanValue) || 0;
                         handleItemChange(item.id, 'unitPrice', numValue);
-                    }} className="w-full text-right bg-gray-100 dark:bg-gray-800 rounded p-1 font-mono border border-gray-300 dark:border-gray-700 disabled:opacity-50" /></td><td className="px-2 py-2 text-center">{item.type === 'inventory' && (<input type="checkbox" checked={!!item.suppliedByClient} onChange={(e) => handleSuppliedByClientToggle(item.id, e.target.checked)} className="h-5 w-5 rounded border-gray-600 bg-gray-700 text-brand-red focus:ring-brand-red focus:ring-2"/>)}</td><td className="px-4 py-2 text-right font-mono text-gray-600 dark:text-gray-300">{formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}</td><td className="p-2 text-center"><button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-400"><Icon name="trash" className="w-4 h-4" /></button></td></tr>)) : (<tr><td colSpan={6} className="text-center py-8 text-gray-500">Añade ítems a la cotización.</td></tr>)}</tbody></table></div>
+                                                        }} 
+                                                        className="w-full text-right bg-white dark:bg-gray-800 rounded p-1 font-mono border border-green-300 dark:border-green-600 disabled:opacity-50" 
+                                                    />
+                                                </td>
+                                                <td className="px-2 py-2 text-center">
+                                                    <input 
+                                                        type="checkbox" 
+                                                        checked={!!item.suppliedByClient} 
+                                                        onChange={(e) => handleSuppliedByClientToggle(item.id, e.target.checked)} 
+                                                        className="h-5 w-5 rounded border-green-600 bg-green-700 text-brand-red focus:ring-brand-red focus:ring-2"
+                                                    />
+                                                </td>
+                                                <td className="px-4 py-2 text-right font-mono text-green-600 dark:text-green-300 font-semibold">
+                                                    {formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}
+                                                </td>
+                                                <td className="p-2 text-center">
+                                                    <button onClick={() => handleRemoveItem(item.id)} className="text-red-500 hover:text-red-400">
+                                                        <Icon name="trash" className="w-4 h-4" />
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        ) : (
+                            <p className="text-center py-4 text-green-600 dark:text-green-400 italic">
+                                No hay repuestos agregados. Busca y agrega repuestos desde el campo de búsqueda.
+                            </p>
+                        )}
+                    </div>
+
+                    {/* Ítems temporales (placeholders) */}
+                    {placeholderItems.length > 0 && (
+                        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700/50 rounded-lg p-4">
+                            <h3 className="font-bold text-lg mb-3 text-yellow-800 dark:text-yellow-200 flex items-center gap-2">
+                                <Icon name="exclamation-triangle" className="w-5 h-5" />
+                                Ítems por Definir
+                            </h3>
+                            <div className="space-y-2">
+                                {placeholderItems.map(item => (
+                                    <div key={item.id} className="flex items-center justify-between bg-yellow-100 dark:bg-yellow-800/30 p-3 rounded">
+                                        <div className="flex items-center gap-2">
+                                            <Icon name="exclamation-triangle" className="w-4 h-4 text-yellow-600" />
+                                            <span className="font-medium italic text-yellow-800 dark:text-yellow-300">{item.description}</span>
+                                        </div>
+                                        <div className="flex gap-2">
+                                            <button 
+                                                type="button" 
+                                                onClick={() => onQuickAddItem(item.description, item.id, items)} 
+                                                className="px-3 py-1 bg-yellow-500 text-white rounded hover:bg-yellow-600 text-xs font-bold"
+                                            >
+                                                Definir Ítem
+                                            </button>
+                                            <button 
+                                                onClick={() => handleRemoveItem(item.id)} 
+                                                className="text-red-500 hover:text-red-400"
+                                            >
+                                                <Icon name="trash" className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
 
             <div className="lg:col-span-2 space-y-4">
                 <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg"><h3 className="font-bold flex items-center gap-2 mb-2 text-light-text dark:text-dark-text"><Icon name="user" className="w-5 h-5 text-brand-red"/> Cliente</h3><p className="text-light-text dark:text-dark-text">{client?.name || 'Cliente no encontrado'}</p><p className="text-sm text-gray-500 dark:text-gray-400">{`${vehicle?.make || 'N/A'} ${vehicle?.model || 'N/A'} (${vehicle?.plate || 'N/A'})`}</p></div>
                 <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg"><h3 className="font-bold flex items-center gap-2 mb-2 text-light-text dark:text-dark-text"><Icon name="document-text" className="w-5 h-5 text-brand-red"/> Notas Adicionales</h3><textarea value={notes} onChange={e => setNotes(e.target.value)} rows={3} className="w-full text-sm p-2 bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-700 rounded-md focus:ring-brand-red focus:border-brand-red text-light-text dark:text-dark-text" placeholder="Añadir notas, condiciones o términos de validez..."></textarea></div>
-                <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg space-y-2"><div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>Subtotal:</span> <span className="font-mono">{formatCurrency(totals.subtotal)}</span></div><div className="flex justify-between items-center text-gray-600 dark:text-gray-300"><span>IVA ({items[0]?.taxRate || 19}%):</span> <span className="font-mono">{formatCurrency(totals.taxAmount)}</span></div><div className="flex justify-between items-center text-light-text dark:text-white text-xl font-bold border-t border-gray-200 dark:border-gray-700 pt-2 mt-2"><span>Total:</span> <span className="font-mono text-brand-red">{formatCurrency(totals.total)}</span></div></div>
+                <div className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 p-4 rounded-lg space-y-3">
+                    <h3 className="font-bold text-lg mb-3 text-light-text dark:text-dark-text flex items-center gap-2">
+                        <Icon name="chart" className="w-5 h-5 text-brand-red"/>
+                        Resumen de Costos
+                    </h3>
+                    
+                    {/* Servicios */}
+                    {serviceItems.length > 0 && (
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+                            <h4 className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Servicios</h4>
+                            <div className="space-y-1">
+                                {serviceItems.map(item => (
+                                    <div key={item.id} className="flex justify-between text-sm">
+                                        <span className="text-blue-700 dark:text-blue-300">{item.description}</span>
+                                        <span className="font-mono text-blue-600 dark:text-blue-400">
+                                            {formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}
+                                        </span>
+                                    </div>
+                                ))}
+                                <div className="flex justify-between font-semibold text-blue-800 dark:text-blue-200 border-t border-blue-200 dark:border-blue-700 pt-1">
+                                    <span>Subtotal Servicios:</span>
+                                    <span className="font-mono">
+                                        {formatCurrency(serviceItems.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0))}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Repuestos */}
+                    {partsItems.length > 0 && (
+                        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+                            <h4 className="font-semibold text-green-800 dark:text-green-200 mb-2">Repuestos</h4>
+                            <div className="space-y-1">
+                                {partsItems.map(item => (
+                                    <div key={item.id} className="flex justify-between text-sm">
+                                        <span className="text-green-700 dark:text-green-300">{item.description}</span>
+                                        <span className="font-mono text-green-600 dark:text-green-400">
+                                            {formatCurrency((item.quantity || 0) * (item.unitPrice || 0))}
+                                        </span>
+                                    </div>
+                                ))}
+                                <div className="flex justify-between font-semibold text-green-800 dark:text-green-200 border-t border-green-200 dark:border-green-700 pt-1">
+                                    <span>Subtotal Repuestos:</span>
+                                    <span className="font-mono">
+                                        {formatCurrency(partsItems.reduce((acc, item) => acc + ((item.quantity || 0) * (item.unitPrice || 0)), 0))}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                    
+                    {/* Totales */}
+                    <div className="space-y-2 pt-2 border-t border-gray-300 dark:border-gray-600">
+                        <div className="flex justify-between items-center text-gray-600 dark:text-gray-300">
+                            <span>Subtotal:</span> 
+                            <span className="font-mono">{formatCurrency(totals.subtotal)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-gray-600 dark:text-gray-300">
+                            <span>IVA ({items[0]?.taxRate || 19}%):</span> 
+                            <span className="font-mono">{formatCurrency(totals.taxAmount)}</span>
+                        </div>
+                        <div className="flex justify-between items-center text-light-text dark:text-white text-xl font-bold border-t border-gray-200 dark:border-gray-700 pt-2 mt-2">
+                            <span>Total:</span> 
+                            <span className="font-mono text-brand-red">{formatCurrency(totals.total)}</span>
+                        </div>
+                    </div>
+                </div>
                 <div className="flex justify-end gap-3 pt-2"><button onClick={onCancel} className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600">Cancelar</button><button onClick={() => handleSave(QuoteStatus.ENVIADO)} className="px-4 py-2 text-sm font-semibold text-white bg-brand-red rounded-lg shadow-md hover:bg-red-700" disabled={items.some(i => i.type === 'placeholder') || items.length === 0}>{isEditing ? 'Guardar y Enviar' : 'Crear y Enviar Cotización'}</button></div>
                  {items.some(i => i.type === 'placeholder') && (<p className="text-xs text-yellow-500 dark:text-yellow-400 text-right mt-2">Debe definir todos los ítems temporales antes de guardar.</p>)}
             </div>
