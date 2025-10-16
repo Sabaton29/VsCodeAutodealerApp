@@ -6,61 +6,44 @@
 .drag-over {
     background-color: rgba(200, 16, 46, 0.2) !important;
     outline: 2px dashed rgba(200, 16, 46, 0.5);
-    outline-offset: -2px;
 }
 
-.dragging {
-    opacity: 0.5;
-    cursor: grabbing;
+/* Estilos básicos para la aplicación */
+body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+    background-color: #f9fafb;
 }
 
-/* Animaciones personalizadas */
-@keyframes fadeInScale {
-    0% { 
-        opacity: 0; 
-        transform: scale(0.95); 
-    }
-    100% { 
-        opacity: 1; 
-        transform: scale(1); 
-    }
+#root {
+    min-height: 100vh;
 }
 
-.fade-in-scale {
-    animation: fadeInScale 0.2s ease-out forwards;
-}
-
-/* Estilos para modo oscuro */
-.dark {
-    color-scheme: dark;
-}
-
-/* Estilos para scrollbars */
-::-webkit-scrollbar {
-    width: 8px;
-}
-
-::-webkit-scrollbar-track {
-    background: #f1f1f1;
-}
-
-::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
+/* Estilos para botones básicos */
+button {
+    cursor: pointer;
+    border: none;
+    padding: 8px 16px;
     border-radius: 4px;
+    background-color: #c8102e;
+    color: white;
 }
 
-::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+button:hover {
+    background-color: #a00d26;
 }
 
-.dark ::-webkit-scrollbar-track {
-    background: #374151;
+/* Estilos para inputs */
+input, textarea, select {
+    padding: 8px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+    font-size: 14px;
 }
 
-.dark ::-webkit-scrollbar-thumb {
-    background: #6b7280;
-}
-
-.dark ::-webkit-scrollbar-thumb:hover {
-    background: #9ca3af;
+input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: #c8102e;
+    box-shadow: 0 0 0 3px rgba(200, 16, 46, 0.1);
 }
