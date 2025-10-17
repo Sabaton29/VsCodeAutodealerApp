@@ -1,9 +1,3 @@
-
-
-
-
-
-
 import React, { useContext, useMemo, lazy, Suspense } from 'react';
 import { DataContext } from './components/DataContext';
 import { UIContext } from './components/UIContext';
@@ -83,7 +77,7 @@ const AppointmentsView = lazy(() => import('./components/views/AppointmentsView'
 const WorkOrderDetailView = lazy(() => import('./components/views/WorkOrderDetailView'));
 
 import { STAGE_DISPLAY_CONFIG } from './constants';
-// CLOUDFLARE PAGES FIX - Force new build
+// CLOUDFLARE PAGES FORCE REBUILD - DataContext fix
 import { QuoteItem, Quote, DiagnosticType, Notification, UnforeseenIssue } from './types';
 
 // Loading spinner component
