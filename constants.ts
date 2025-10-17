@@ -445,28 +445,3 @@ export const DIAGNOSTIC_LEVELS: Record<DiagnosticType, string[]> = {
         'Pruebas Técnicas',
     ],
 };
-
-export const COLOMBIAN_CAR_MAKES: { [make: string]: string[] } = {
-    'Chevrolet': ['Spark', 'Onix', 'Sail', 'Tracker', 'Captiva', 'D-Max', 'Joy', 'Equinox'],
-    'Renault': ['Kwid', 'Sandero', 'Logan', 'Stepway', 'Duster', 'Oroch', 'Captur'],
-    'Mazda': ['2', '3', 'CX-5', 'CX-30', 'CX-50', 'BT-50'],
-    'Nissan': ['March', 'Versa', 'Kicks', 'Frontier', 'X-Trail', 'Qashqai', 'Altima'],
-    'Kia': ['Picanto', 'Rio', 'Soluto', 'Sportage', 'Seltos', 'Niro'],
-    'Toyota': ['Yaris', 'Corolla', 'Corolla Cross', 'Hilux', 'Fortuner', 'Prado', 'RAV4', 'Camry'],
-    'Suzuki': ['Swift', 'S-Cross', 'Vitara', 'Jimny', 'Grand Vitara'],
-    'Ford': ['Fiesta', 'EcoSport', 'Ranger', 'Escape', 'Explorer', 'Bronco', 'Raptor'],
-    'Volkswagen': ['Gol', 'Voyage', 'Polo', 'Virtus', 'Nivus', 'T-Cross', 'Amarok'],
-    'Hyundai': ['Grand i10', 'Accent', 'HB20', 'Creta', 'Tucson', 'Santa Fe'],
-    'Foton': ['Tunland'],
-    'JAC': ['S2', 'S3'],
-    'Changan': ['CS15', 'CS35'],
-    'DFSK': ['580'],
-    'Peugeot': ['208', '2008', '3008'],
-    'Citroën': ['C3', 'C4 Cactus'],
-    'Jeep': ['Renegade', 'Compass', 'Wrangler'],
-    'Mitsubishi': ['Montero Sport', 'L200'],
-    'Honda': ['CR-V', 'HR-V'],
-    'Mercedes-Benz': ['Clase A', 'Clase C', 'GLC'],
-    'BMW': ['Serie 1', 'Serie 3', 'X1', 'X3'],
-    'Audi': ['A3', 'A4', 'Q3', 'Q5'],
-};

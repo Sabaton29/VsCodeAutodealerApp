@@ -4,6 +4,7 @@ import { Icon } from '../Icon';
 import { WorkOrder, Client, Vehicle, ChecklistStatus, Permission, DiagnosticData, Quote, QuoteStatus, KanbanStage, Supplier, AppSettings, CompanyInfo, StaffMember, DiagnosticType, UnforeseenIssue } from '../../types';
 import PrintableDiagnosticReport from '../PrintableDiagnosticReport';
 import PrintableReceptionReport from '../PrintableReceptionReport';
+import PrintableQualityControlReport from '../PrintableQualityControlReport';
 import { DIAGNOSTIC_CHECKLIST_SECTIONS, QUOTE_STATUS_DISPLAY_CONFIG } from '../../constants';
 import FuelGauge from '../FuelGauge';
 import VehicleDiagram from '../VehicleDiagram';
@@ -971,7 +972,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                             client={client} 
                             vehicle={vehicle} 
                             hasPermission={hasPermission} 
-                            onBack={onBack}
+                            onBack={onBack} 
                             staffMembers={staffMembers}
                         />
                     )}
@@ -1005,6 +1006,10 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                             const isApproved = qualityControlEntry.notes?.includes('APROBADO') || 
                                              qualityControlEntry.notes?.includes('Listo para Entrega') ||
                                              workOrder.stage === 'Listo para Entrega';
+                            
+                            // Estado para controlar si está expandido
+                            const [isExpanded, setIsExpanded] = React.useState(false);
+                            
                             return (
                                 <div className="bg-dark-light rounded-xl p-6">
                                     <div className="flex items-center justify-between mb-4">
@@ -1012,42 +1017,80 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                             <Icon name="check-circle" className="w-6 h-6" />
                                             Control de Calidad Completado
                                         </h2>
-                                        <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                            isApproved 
-                                                ? 'bg-green-600 text-white' 
-                                                : 'bg-red-600 text-white'
-                                        }`}>
-                                            {isApproved ? '✅ APROBADO' : '❌ RECHAZADO'}
+                                        <div className="flex items-center gap-3">
+                                            <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                                isApproved 
+                                                    ? 'bg-green-600 text-white' 
+                                                    : 'bg-red-600 text-white'
+                                            }`}>
+                                                {isApproved ? '✅ APROBADO' : '❌ RECHAZADO'}
+                                            </div>
+                                            <button
+                                                onClick={() => setIsExpanded(!isExpanded)}
+                                                className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                                                title={isExpanded ? "Ocultar detalles" : "Ver detalles"}
+                                            >
+                                                <Icon name={isExpanded ? "chevron-up" : "chevron-down"} className="w-5 h-5" />
+                                            </button>
                                         </div>
                                     </div>
                                     
-                                    <div className="bg-gray-800 rounded-lg p-4 space-y-3">
-                                        <div className="flex items-center gap-3">
-                                            <Icon name="user" className="w-5 h-5 text-gray-400" />
-                                            <span className="text-gray-300">
-                                                <strong className="text-white">Inspector:</strong> {
-                                                    qualityControlEntry.user || 'N/A'
-                                                }
-                                            </span>
-                                        </div>
-                                        
-                                        <div className="flex items-center gap-3">
-                                            <Icon name="calendar" className="w-5 h-5 text-gray-400" />
-                                            <span className="text-gray-300">
-                                                <strong className="text-white">Fecha:</strong> {
-                                                    new Date(qualityControlEntry.date).toLocaleDateString('es-CO')
-                                                }
-                                            </span>
-                                        </div>
-                                        
-                                        <div className="flex items-start gap-3">
-                                            <Icon name="document-text" className="w-5 h-5 text-gray-400 mt-0.5" />
-                                            <div className="text-gray-300">
-                                                <strong className="text-white">Observaciones:</strong>
-                                                <p className="mt-1">{qualityControlEntry.notes}</p>
+                                    {isExpanded && (
+                                        <div className="bg-gray-800 rounded-lg p-4 space-y-4">
+                                            <div className="flex items-center gap-3">
+                                                <Icon name="user" className="w-5 h-5 text-gray-400" />
+                                                <span className="text-gray-300">
+                                                    <strong className="text-white">Inspector:</strong> {
+                                                        qualityControlEntry.user || 'N/A'
+                                                    }
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="flex items-center gap-3">
+                                                <Icon name="calendar" className="w-5 h-5 text-gray-400" />
+                                                <span className="text-gray-300">
+                                                    <strong className="text-white">Fecha:</strong> {
+                                                        new Date(qualityControlEntry.date).toLocaleDateString('es-CO')
+                                                    }
+                                                </span>
+                                            </div>
+                                            
+                                            <div className="flex items-start gap-3">
+                                                <Icon name="document-text" className="w-5 h-5 text-gray-400 mt-0.5" />
+                                                <div className="text-gray-300">
+                                                    <strong className="text-white">Observaciones:</strong>
+                                                    <p className="mt-1">{qualityControlEntry.notes}</p>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Aquí irían los detalles del checklist si los tuviéramos */}
+                                            <div className="border-t border-gray-700 pt-4">
+                                                <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
+                                                    <Icon name="clipboard-check" className="w-5 h-5" />
+                                                    Detalles del Control
+                                                </h4>
+                                                <div className="text-gray-300 text-sm">
+                                                    <p>• <strong>Estado:</strong> {isApproved ? 'Aprobado' : 'Rechazado'}</p>
+                                                    <p>• <strong>Resultado:</strong> {isApproved ? 'El vehículo cumple con todos los estándares de calidad' : 'El vehículo requiere correcciones adicionales'}</p>
+                                                    <p>• <strong>Proceso:</strong> Control de calidad completado exitosamente</p>
+                                                </div>
+                                            </div>
+                                            
+                                            {/* Botón para versión imprimible */}
+                                            <div className="flex justify-end pt-4 border-t border-gray-700">
+                                                <button
+                                                    onClick={() => {
+                                                        // Aquí abriríamos el modal de versión imprimible
+                                                        console.log('🔍 Abrir versión imprimible del control de calidad');
+                                                    }}
+                                                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
+                                                >
+                                                    <Icon name="printer" className="w-4 h-4" />
+                                                    Versión Imprimible
+                                                </button>
                                             </div>
                                         </div>
-                                    </div>
+                                    )}
                                 </div>
                             );
                         } else {

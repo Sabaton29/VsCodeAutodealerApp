@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import type { Vehicle, Client } from '../types';
-import { COLOMBIAN_CAR_MAKES } from '../constants';
+import { COLOMBIAN_CAR_MAKES } from '../vehicleConstants';
 
 interface AddVehicleFormProps {
     onSave: (vehicleData: Vehicle | Omit<Vehicle, 'id'>) => void;
