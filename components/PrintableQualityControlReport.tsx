@@ -12,6 +12,7 @@ interface PrintableQualityControlReportProps {
         category: string;
         isChecked: boolean;
         notes?: string;
+        status?: 'ok' | 'no-ok' | 'na' | 'unset';
     }>;
     overallNotes: string;
     isApproved: boolean;
@@ -32,26 +33,29 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
 }) => {
     const getCategoryTitle = (category: string) => {
         switch (category) {
-            case 'safety': return 'Seguridad';
-            case 'functionality': return 'Funcionalidad';
-            case 'appearance': return 'Apariencia';
-            case 'documentation': return 'Documentación';
+            case 'exterior': return 'Exterior del vehículo limpio';
+            case 'funcionalidad': return 'Funcionamiento y Pruebas';
+            case 'verificacion': return 'Verificación de Tareas';
+            case 'documentacion': return 'Documentación y Entrega';
             default: return 'General';
         }
     };
 
     const getCategoryIcon = (category: string) => {
         switch (category) {
-            case 'safety': return '🛡️';
-            case 'functionality': return '⚙️';
-            case 'appearance': return '👁️';
-            case 'documentation': return '📄';
+            case 'exterior': return '🚗';
+            case 'funcionalidad': return '⚙️';
+            case 'verificacion': return '✅';
+            case 'documentacion': return '📋';
             default: return '✓';
         }
     };
 
-    const categories = ['safety', 'functionality', 'appearance', 'documentation'];
-    const completedChecks = qualityChecks.filter(item => item.isChecked).length;
+    const categories = ['exterior', 'funcionalidad', 'verificacion', 'documentacion'];
+    // Contar elementos que tienen una respuesta (OK, NO OK, o N/A)
+    const completedChecks = qualityChecks.filter(item => 
+        item.status === 'ok' || item.status === 'no-ok' || item.status === 'na'
+    ).length;
     const totalChecks = qualityChecks.length;
 
     return (
@@ -160,7 +164,29 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                 <div className="mt-6 space-y-4">
                     {categories.map(category => {
                         const categoryItems = qualityChecks.filter(item => item.category === category);
-                        const completedInCategory = categoryItems.filter(item => item.isChecked).length;
+                        const completedInCategory = categoryItems.filter(item => 
+                            item.status === 'ok' || item.status === 'no-ok' || item.status === 'na'
+                        ).length;
+                        
+                        const getStatusIcon = (status?: string) => {
+                            switch (status) {
+                                case 'ok': return '✅';
+                                case 'no-ok': return '❌';
+                                case 'na': return '➖';
+                                case 'unset': return '❓';
+                                default: return '❓';
+                            }
+                        };
+
+                        const getStatusText = (status?: string) => {
+                            switch (status) {
+                                case 'ok': return 'OK';
+                                case 'no-ok': return 'NO OK';
+                                case 'na': return 'N/A';
+                                case 'unset': return 'Sin evaluar';
+                                default: return 'Sin evaluar';
+                            }
+                        };
                         
                         return (
                             <div key={category} className="border border-gray-300 rounded-lg p-4">
@@ -178,12 +204,17 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                                     {categoryItems.map(item => (
                                         <div key={item.id} className="flex items-start space-x-3 p-2 bg-gray-50 rounded">
                                             <span className="text-lg">
-                                                {item.isChecked ? '✅' : '❌'}
+                                                {getStatusIcon(item.status)}
                                             </span>
                                             <div className="flex-1">
-                                                <p className="text-sm font-medium text-gray-900">
-                                                    {item.description}
-                                                </p>
+                                                <div className="flex items-center justify-between">
+                                                    <p className="text-sm font-medium text-gray-900">
+                                                        {item.description}
+                                                    </p>
+                                                    <span className="text-xs font-semibold px-2 py-1 rounded bg-gray-200 text-gray-700">
+                                                        {getStatusText(item.status)}
+                                                    </span>
+                                                </div>
                                                 {item.notes && (
                                                     <p className="text-xs text-gray-600 mt-1 italic">
                                                         Notas: {item.notes}

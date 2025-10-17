@@ -100,37 +100,86 @@ const PrintableQuote: React.FC<PrintableQuoteProps> = ({ quote, client, vehicle,
                         </div>
                     </div>
 
-                    {/* Items Table */}
-                    <div className="mt-6">
-                         <table className="w-full text-sm">
-                            <thead className="bg-gray-200">
-                                <tr>
-                                    <th className="px-2 py-2 text-left font-bold w-[40%]">Descripción</th>
-                                    <th className="px-2 py-2 text-center font-bold">Cant.</th>
-                                    <th className="px-2 py-2 text-right font-bold">Vlr. Unitario</th>
-                                    <th className="px-2 py-2 text-right font-bold">Descuento</th>
-                                    <th className="px-2 py-2 text-right font-bold">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {(quote.items || []).map(item => (
-                                    <tr key={item.id}>
-                                        <td className="px-2 py-2 align-top">
-                                            <p className="font-semibold">{item.description}</p>
-                                            <p className="text-xs text-gray-600">{item.type === 'service' ? 'Servicio' : 'Repuesto'}</p>
-                                            {item.suppliedByClient && (
-                                                <p className="text-xs text-blue-600 font-bold italic">(Suministrado por el Cliente)</p>
-                                            )}
-                                        </td>
-                                        <td className="px-2 py-2 text-center align-top">{item.quantity}</td>
-                                        <td className="px-2 py-2 text-right align-top">{formatCurrency(item.suppliedByClient ? 0 : item.unitPrice)}</td>
-                                        <td className="px-2 py-2 text-right align-top text-red-600">{formatCurrency(item.discount || 0)}</td>
-                                        <td className="px-2 py-2 text-right align-top">{formatCurrency((item.quantity * item.unitPrice) - (item.discount || 0))}</td>
+                    {/* Servicios */}
+                    {quote.items?.filter(item => item.type === 'service').length > 0 && (
+                        <div className="mt-6 mb-4">
+                            <h4 className="text-sm font-bold text-blue-600 mb-2">Servicios Requeridos</h4>
+                            <table className="w-full text-sm">
+                                <thead className="bg-blue-100">
+                                    <tr>
+                                        <th className="px-2 py-2 text-left font-bold w-[40%]">Servicio</th>
+                                        <th className="px-2 py-2 text-center font-bold">Cant.</th>
+                                        <th className="px-2 py-2 text-right font-bold">Vlr. Unitario</th>
+                                        <th className="px-2 py-2 text-right font-bold">Descuento</th>
+                                        <th className="px-2 py-2 text-right font-bold">Total</th>
                                     </tr>
-                                ))}
-                            </tbody>
-                        </table>
-                    </div>
+                                </thead>
+                                <tbody className="divide-y divide-blue-200">
+                                    {quote.items.filter(item => item.type === 'service').map(item => (
+                                        <tr key={item.id}>
+                                            <td className="px-2 py-2 align-top">
+                                                <p className="font-semibold">{item.description}</p>
+                                                {item.suppliedByClient && (
+                                                    <p className="text-xs text-blue-600 font-bold italic">(Suministrado por el Cliente)</p>
+                                                )}
+                                            </td>
+                                            <td className="px-2 py-2 text-center align-top">{item.quantity}</td>
+                                            <td className="px-2 py-2 text-right align-top">{formatCurrency(item.suppliedByClient ? 0 : item.unitPrice)}</td>
+                                            <td className="px-2 py-2 text-right align-top text-red-600">{formatCurrency(item.discount || 0)}</td>
+                                            <td className="px-2 py-2 text-right align-top">{formatCurrency((item.quantity * item.unitPrice) - (item.discount || 0))}</td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+
+                    {/* Repuestos */}
+                    {quote.items?.filter(item => item.type === 'inventory').length > 0 && (() => {
+                        const inventoryItems = quote.items.filter(item => item.type === 'inventory');
+                        const hasClientSuppliedItems = inventoryItems.some(item => item.suppliedByClient);
+                        
+                        return (
+                            <div className="mt-6 mb-4">
+                                <h4 className="text-sm font-bold text-green-600 mb-2">Repuestos Requeridos</h4>
+                                <table className="w-full text-sm">
+                                    <thead className="bg-green-100">
+                                        <tr>
+                                            <th className="px-2 py-2 text-left font-bold w-[40%]">Repuesto</th>
+                                            <th className="px-2 py-2 text-center font-bold">Cant.</th>
+                                            <th className="px-2 py-2 text-right font-bold">Vlr. Unitario</th>
+                                            {hasClientSuppliedItems && (
+                                                <th className="px-2 py-2 text-center font-bold">Cliente Suministra</th>
+                                            )}
+                                            <th className="px-2 py-2 text-right font-bold">Descuento</th>
+                                            <th className="px-2 py-2 text-right font-bold">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-green-200">
+                                        {inventoryItems.map(item => (
+                                            <tr key={item.id}>
+                                                <td className="px-2 py-2 align-top">
+                                                    <p className="font-semibold">{item.description}</p>
+                                                    {item.suppliedByClient && (
+                                                        <p className="text-xs text-blue-600 font-bold italic">(Suministrado por el Cliente)</p>
+                                                    )}
+                                                </td>
+                                                <td className="px-2 py-2 text-center align-top">{item.quantity}</td>
+                                                <td className="px-2 py-2 text-right align-top">{formatCurrency(item.suppliedByClient ? 0 : item.unitPrice)}</td>
+                                                {hasClientSuppliedItems && (
+                                                    <td className="px-2 py-2 text-center align-top">
+                                                        {item.suppliedByClient ? '✓' : '✗'}
+                                                    </td>
+                                                )}
+                                                <td className="px-2 py-2 text-right align-top text-red-600">{formatCurrency(item.discount || 0)}</td>
+                                                <td className="px-2 py-2 text-right align-top">{formatCurrency((item.quantity * item.unitPrice) - (item.discount || 0))}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            </div>
+                        );
+                    })()}
                     
                     {/* Totals & Notes */}
                     <div className="mt-6 flex justify-between items-start page-break-inside-avoid">

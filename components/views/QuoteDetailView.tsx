@@ -91,7 +91,7 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
         
         try {
             console.log('🔍 QuoteDetailView - Guardando cotización desde formulario de aprobación:', finalQuoteData);
-            await (dataContext as any).handleSaveQuote(finalQuoteData.id, finalQuoteData);
+            await (dataContext as any).handleSaveQuote(finalQuoteData);
             setEnrichedQuote(finalQuoteData);
             setShowApproveForm(false);
             console.log('🔍 QuoteDetailView - Cotización guardada exitosamente');
@@ -123,7 +123,7 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
             console.error('❌ QuoteDetailView: Error aprobando cotización:', error);
         }
     };
-    const canEdit = hasPermission('manage:quotes') && enrichedQuote.status === QuoteStatus.BORRADOR;
+    const canEdit = hasPermission('manage:quotes') && (enrichedQuote.status === QuoteStatus.BORRADOR || enrichedQuote.status === QuoteStatus.ENVIADO);
     
     // Usar función centralizada para generar ID consistente
     const sequentialQuoteId = useMemo(() => {
@@ -268,7 +268,7 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
                     onClick={() => onEditQuote(quote)}
                     className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-600/50 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" 
                     disabled={!canEdit}
-                    title={canEdit ? "Editar cotización" : "Solo se pueden editar cotizaciones en estado 'Borrador'."}
+                    title={canEdit ? "Editar cotización" : "Solo se pueden editar cotizaciones en estado 'Borrador' o 'Enviado'."}
                 >
                     <Icon name="edit" className="w-4 h-4" /> Editar
                 </button>
@@ -323,19 +323,27 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
 
                 <div className="mt-6">
                     <h3 className="text-xl font-bold text-light-text dark:text-white mb-4">Ítems de la Cotización</h3>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead className="bg-gray-100 dark:bg-black dark:bg-gray-900/20 text-xs text-gray-500 dark:text-gray-400 uppercase">
-                                <tr>
-                                    <th className="px-4 py-2 text-left">Descripción</th>
-                                    <th className="px-4 py-2 text-center w-20">Cant.</th>
-                                    <th className="px-4 py-2 text-right w-32">Precio Unit.</th>
-                                    <th className="px-4 py-2 text-right w-32">Utilidad</th>
-                                    <th className="px-4 py-2 text-right w-32">Total</th>
-                                </tr>
-                            </thead>
-                            <tbody className="divide-y divide-gray-200 dark:divide-gray-800 text-light-text dark:text-dark-text">
-                                {(enrichedQuote.items || []).map(item => {
+                    
+                    {/* Servicios */}
+                    {enrichedQuote.items?.filter(item => item.type === 'service').length > 0 && (
+                        <div className="mb-6">
+                            <h4 className="text-lg font-semibold text-blue-600 dark:text-blue-400 mb-3 flex items-center gap-2">
+                                <Icon name="wrench" className="w-5 h-5" />
+                                Servicios Requeridos
+                            </h4>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-blue-100 dark:bg-blue-900/20 text-xs text-blue-800 dark:text-blue-300 uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Servicio</th>
+                                            <th className="px-4 py-2 text-center w-20">Cant.</th>
+                                            <th className="px-4 py-2 text-right w-32">Precio Unit.</th>
+                                            <th className="px-4 py-2 text-right w-32">Utilidad</th>
+                                            <th className="px-4 py-2 text-right w-32">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-blue-200 dark:divide-blue-800 text-light-text dark:text-dark-text">
+                                        {enrichedQuote.items.filter(item => item.type === 'service').map(item => {
                                     console.log('🔍 QuoteDetailView - Item data:', item);
                                     console.log('🔍 QuoteDetailView - item.unitPrice:', item.unitPrice, 'type:', typeof item.unitPrice);
                                     
@@ -385,10 +393,88 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
                                             <td className="px-4 py-3 text-right font-mono text-gray-700 dark:text-gray-300">{formatCurrency(totalAfterDiscount)}</td>
                                         </tr>
                                     );
-                                })}
-                            </tbody>
-                        </table>
-                    </div>
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Repuestos */}
+                    {enrichedQuote.items?.filter(item => item.type === 'inventory').length > 0 && (
+                        <div className="mb-6">
+                            <h4 className="text-lg font-semibold text-green-600 dark:text-green-400 mb-3 flex items-center gap-2">
+                                <Icon name="inventory" className="w-5 h-5" />
+                                Repuestos Requeridos
+                            </h4>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-sm">
+                                    <thead className="bg-green-100 dark:bg-green-900/20 text-xs text-green-800 dark:text-green-300 uppercase">
+                                        <tr>
+                                            <th className="px-4 py-2 text-left">Repuesto</th>
+                                            <th className="px-4 py-2 text-center w-20">Cant.</th>
+                                            <th className="px-4 py-2 text-right w-32">Precio Unit.</th>
+                                            <th className="px-4 py-2 text-right w-32">Cliente Suministra</th>
+                                            <th className="px-4 py-2 text-right w-32">Utilidad</th>
+                                            <th className="px-4 py-2 text-right w-32">Total</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-green-200 dark:divide-green-800 text-light-text dark:text-dark-text">
+                                        {enrichedQuote.items.filter(item => item.type === 'inventory').map(item => {
+                                            const inventoryItem = inventoryMap.get(item.id);
+                                            const currentStock = inventoryItem?.stock ?? 0;
+                                            const hasLowStock = currentStock < item.quantity;
+                                            
+                                            const safeUnitPrice = item.unitPrice || 0;
+                                            const safeCostPrice = item.costPrice || 0;
+                                            
+                                            const utility = safeCostPrice ? (safeUnitPrice - safeCostPrice) * item.quantity : null;
+                                            const totalAfterDiscount = (safeUnitPrice * item.quantity) - (item.discount || 0);
+
+                                            return (
+                                                <tr key={item.id} className={item.suppliedByClient ? 'bg-blue-100/10 dark:bg-blue-900/10' : ''}>
+                                                    <td className="px-4 py-3 font-medium">
+                                                        <p>{item.description}</p>
+                                                        {item.suppliedByClient && (
+                                                            <p className="text-xs text-blue-400 font-semibold">(Suministrado por Cliente)</p>
+                                                        )}
+                                                        <div className="flex items-center gap-2 mt-1">
+                                                            <span className="text-xs px-1.5 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-800/50 dark:text-green-200">Repuesto</span>
+                                                            <span className={`text-xs ${hasLowStock ? 'text-red-500 dark:text-red-400' : 'text-gray-500 dark:text-gray-400'}`}>
+                                                                (Stock: {currentStock})
+                                                            </span>
+                                                            {hasLowStock && (
+                                                                <Icon name="exclamation-triangle" className="w-4 h-4 text-red-500 dark:text-red-400" title="Stock insuficiente" />
+                                                            )}
+                                                        </div>
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">{item.quantity}</td>
+                                                    <td className="px-4 py-3 text-right font-mono">
+                                                        {formatCurrency(item.suppliedByClient ? 0 : (item.unitPrice || 0))}
+                                                        {item.discount && item.discount > 0 && (
+                                                            <p className="text-xs text-red-500 dark:text-red-400" title="Descuento aplicado">(-{formatCurrency(item.discount)})</p>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-center">
+                                                        <input 
+                                                            type="checkbox" 
+                                                            checked={item.suppliedByClient || false} 
+                                                            disabled 
+                                                            className="w-4 h-4 text-green-600 bg-gray-100 border-gray-300 rounded focus:ring-green-500 dark:focus:ring-green-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                                                        />
+                                                    </td>
+                                                    <td className={`px-4 py-3 text-right font-mono ${utility !== null && utility >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                                                        {utility !== null ? formatCurrency(utility) : 'N/A'}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-mono text-gray-700 dark:text-gray-300">{formatCurrency(totalAfterDiscount)}</td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    )}
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 mt-6 gap-6">

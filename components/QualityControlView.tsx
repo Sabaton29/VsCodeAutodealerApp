@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { WorkOrder, Quote, Client, Vehicle, Permission, KanbanStage } from '../types';
+import { WorkOrder, Quote, Client, Vehicle, Permission, KanbanStage, StaffMember, UserRole } from '../types';
 import { Icon } from './Icon';
 import { DataContext } from './DataContext';
 import { UIContext } from './UIContext';
@@ -12,39 +12,70 @@ interface QualityControlViewProps {
     vehicle?: Vehicle;
     hasPermission: (permission: Permission) => boolean;
     onBack: () => void;
+    onClose?: () => void; // Nueva prop para cerrar sin navegar
+    staffMembers: StaffMember[];
 }
 
 interface QualityCheckItem {
     id: string;
     description: string;
-    category: 'safety' | 'functionality' | 'appearance' | 'documentation';
-    isChecked: boolean;
+    category: 'exterior' | 'funcionalidad' | 'verificacion' | 'documentacion';
+    status: 'ok' | 'no-ok' | 'na' | 'unset';
     notes?: string;
-    images?: string[];
 }
 
-const QUALITY_CHECK_ITEMS: QualityCheckItem[] = [
-    // Seguridad
-    { id: 'safety-1', description: 'Verificar que no hay fugas de fluidos', category: 'safety', isChecked: false },
-    { id: 'safety-2', description: 'Comprobar funcionamiento de frenos', category: 'safety', isChecked: false },
-    { id: 'safety-3', description: 'Verificar luces y señalización', category: 'safety', isChecked: false },
-    { id: 'safety-4', description: 'Comprobar dirección y suspensión', category: 'safety', isChecked: false },
-    
-    // Funcionalidad
-    { id: 'func-1', description: 'Motor arranca correctamente', category: 'functionality', isChecked: false },
-    { id: 'func-2', description: 'Transmisión funciona sin problemas', category: 'functionality', isChecked: false },
-    { id: 'func-3', description: 'Sistema eléctrico operativo', category: 'functionality', isChecked: false },
-    { id: 'func-4', description: 'Aire acondicionado/calefacción funciona', category: 'functionality', isChecked: false },
-    
-    // Apariencia
-    { id: 'app-1', description: 'Limpieza general del vehículo', category: 'appearance', isChecked: false },
-    { id: 'app-2', description: 'Pintura sin daños adicionales', category: 'appearance', isChecked: false },
-    { id: 'app-3', description: 'Interior limpio y ordenado', category: 'appearance', isChecked: false },
-    
-    // Documentación
-    { id: 'doc-1', description: 'Reporte de reparación completo', category: 'documentation', isChecked: false },
-    { id: 'doc-2', description: 'Fotografías de evidencia', category: 'documentation', isChecked: false },
-    { id: 'doc-3', description: 'Garantía documentada', category: 'documentation', isChecked: false },
+interface QualityCategory {
+    id: string;
+    title: string;
+    icon: string;
+    items: QualityCheckItem[];
+}
+
+const QUALITY_CATEGORIES: QualityCategory[] = [
+    {
+        id: 'exterior',
+        title: 'Exterior del vehículo limpio',
+        icon: 'car',
+        items: [
+            { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería', category: 'exterior', status: 'unset' },
+            { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante', category: 'exterior', status: 'unset' },
+            { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar', category: 'exterior', status: 'unset' },
+        ]
+    },
+    {
+        id: 'funcionalidad',
+        title: 'Funcionamiento y Pruebas',
+        icon: 'cog',
+        items: [
+            { id: 'func-1', description: 'El vehículo enciende correctamente', category: 'funcionalidad', status: 'unset' },
+            { id: 'func-2', description: 'No hay luces de advertencia en el tablero', category: 'funcionalidad', status: 'unset' },
+            { id: 'func-3', description: 'El motor funciona sin ruidos anormales', category: 'funcionalidad', status: 'unset' },
+            { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto', category: 'funcionalidad', status: 'unset' },
+            { id: 'func-5', description: 'El sistema de A/C y calefacción funciona', category: 'funcionalidad', status: 'unset' },
+            { id: 'func-6', description: 'Los frenos responden adecuadamente', category: 'funcionalidad', status: 'unset' },
+        ]
+    },
+    {
+        id: 'verificacion',
+        title: 'Verificación de Tareas',
+        icon: 'check-circle',
+        items: [
+            { id: 'verif-1', description: 'Se completaron todos los trabajos aprobados en la cotización', category: 'verificacion', status: 'unset' },
+            { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)', category: 'verificacion', status: 'unset' },
+            { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)', category: 'verificacion', status: 'unset' },
+            { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos', category: 'verificacion', status: 'unset' },
+        ]
+    },
+    {
+        id: 'documentacion',
+        title: 'Documentación y Entrega',
+        icon: 'document-text',
+        items: [
+            { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados', category: 'documentacion', status: 'unset' },
+            { id: 'doc-2', description: 'La orden de trabajo está completamente documentada', category: 'documentacion', status: 'unset' },
+            { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento', category: 'documentacion', status: 'unset' },
+        ]
+    }
 ];
 
 const QualityControlView: React.FC<QualityControlViewProps> = ({ 
@@ -53,17 +84,19 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
     client, 
     vehicle, 
     hasPermission, 
-    onBack 
+    onBack,
+    onClose,
+    staffMembers 
 }) => {
     const data = useContext(DataContext);
     const ui = useContext(UIContext);
     
-    const [qualityChecks, setQualityChecks] = useState<QualityCheckItem[]>(QUALITY_CHECK_ITEMS);
-    const [overallNotes, setOverallNotes] = useState('');
-    const [isApproved, setIsApproved] = useState<boolean | null>(null);
+    const [qualityChecks, setQualityChecks] = useState<QualityCheckItem[]>(() => 
+        QUALITY_CATEGORIES.flatMap(category => category.items)
+    );
+    const [finalNotes, setFinalNotes] = useState('');
+    const [selectedInspector, setSelectedInspector] = useState<string>('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [selectedImages, setSelectedImages] = useState<File[]>([]);
-    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
     const [showPrintableReport, setShowPrintableReport] = useState(false);
     const [finalResult, setFinalResult] = useState<{
         isApproved: boolean;
@@ -71,103 +104,75 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
         inspectionDate: string;
     } | null>(null);
 
-    const handleCheckItem = (itemId: string, checked: boolean) => {
+    // Inicializar inspector por defecto
+    useEffect(() => {
+        if (staffMembers.length > 0 && !selectedInspector) {
+            const defaultInspector = staffMembers.find(member => 
+                member.role === UserRole.ADMINISTRADOR || member.name.toLowerCase().includes('admin')
+            ) || staffMembers[0];
+            setSelectedInspector(defaultInspector.id);
+        }
+    }, [staffMembers, selectedInspector]);
+
+    const handleStatusChange = (itemId: string, status: 'ok' | 'no-ok' | 'na') => {
         setQualityChecks(prev => 
             prev.map(item => 
-                item.id === itemId ? { ...item, isChecked: checked } : item
+                item.id === itemId ? { ...item, status } : item
             )
         );
     };
 
-    const handleItemNotes = (itemId: string, notes: string) => {
-        setQualityChecks(prev => 
-            prev.map(item => 
-                item.id === itemId ? { ...item, notes } : item
-            )
-        );
-    };
-
-    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(event.target.files || []);
-        if (files.length > 0) {
-            setSelectedImages(prev => [...prev, ...files]);
-            
-            // Crear previews
-            const newPreviews = files.map(file => URL.createObjectURL(file));
-            setImagePreviews(prev => [...prev, ...newPreviews]);
+    const getStatusButtonClass = (itemId: string, status: 'ok' | 'no-ok' | 'na') => {
+        const currentStatus = qualityChecks.find(item => item.id === itemId)?.status || 'unset';
+        const isSelected = currentStatus === status;
+        
+        const baseClass = "px-3 py-1 text-xs font-medium rounded-md transition-colors cursor-pointer";
+        
+        if (!isSelected) {
+            return `${baseClass} bg-gray-700 text-gray-300 hover:bg-gray-600`;
+        }
+        
+        switch (status) {
+            case 'ok':
+                return `${baseClass} bg-green-600 text-white`;
+            case 'no-ok':
+                return `${baseClass} bg-red-600 text-white`;
+            case 'na':
+                return `${baseClass} bg-gray-600 text-white`;
+            default:
+                return baseClass;
         }
     };
 
-    const removeImage = (index: number) => {
-        setSelectedImages(prev => prev.filter((_, i) => i !== index));
-        setImagePreviews(prev => {
-            URL.revokeObjectURL(prev[index]);
-            return prev.filter((_, i) => i !== index);
+    const getCategoryProgress = (categoryId: string) => {
+        const categoryItems = qualityChecks.filter(item => item.category === categoryId);
+        const completedItems = categoryItems.filter(item => item.status === 'ok' || item.status === 'no-ok' || item.status === 'na').length;
+        return { completed: completedItems, total: categoryItems.length };
+    };
+
+    const getOverallProgress = () => {
+        const totalItems = qualityChecks.length;
+        const completedItems = qualityChecks.filter(item => item.status === 'ok' || item.status === 'no-ok' || item.status === 'na').length;
+        return { completed: completedItems, total: totalItems };
+    };
+
+    const canApprove = () => {
+        const overall = getOverallProgress();
+        const hasNotes = finalNotes.trim().length > 0;
+        const hasInspector = selectedInspector !== '';
+        
+        // Verificar que todas las categorías tengan al menos un item completado
+        const categoriesCompleted = QUALITY_CATEGORIES.every(category => {
+            const progress = getCategoryProgress(category.id);
+            return progress.completed > 0;
         });
+        
+        return overall.completed === overall.total && hasNotes && hasInspector && categoriesCompleted;
     };
-
-    const getCategoryIcon = (category: string) => {
-        switch (category) {
-            case 'safety': return 'check-circle';
-            case 'functionality': return 'cog';
-            case 'appearance': return 'eye';
-            case 'documentation': return 'document-text';
-            default: return 'check-circle';
-        }
-    };
-
-    const getCategoryColor = (category: string) => {
-        switch (category) {
-            case 'safety': return 'text-red-500';
-            case 'functionality': return 'text-blue-500';
-            case 'appearance': return 'text-green-500';
-            case 'documentation': return 'text-purple-500';
-            default: return 'text-gray-500';
-        }
-    };
-
-    const getCategoryTitle = (category: string) => {
-        switch (category) {
-            case 'safety': return 'Seguridad';
-            case 'functionality': return 'Funcionalidad';
-            case 'appearance': return 'Apariencia';
-            case 'documentation': return 'Documentación';
-            default: return 'General';
-        }
-    };
-
-    const completedChecks = qualityChecks.filter(item => item.isChecked).length;
-    const totalChecks = qualityChecks.length;
-    const completionPercentage = (completedChecks / totalChecks) * 100;
-
-    // Validaciones más estrictas para aprobar
-    const safetyChecks = qualityChecks.filter(item => item.category === 'safety');
-    const functionalityChecks = qualityChecks.filter(item => item.category === 'functionality');
-    const appearanceChecks = qualityChecks.filter(item => item.category === 'appearance');
-    const documentationChecks = qualityChecks.filter(item => item.category === 'documentation');
-    
-    const allSafetyCompleted = safetyChecks.every(item => item.isChecked);
-    const allFunctionalityCompleted = functionalityChecks.every(item => item.isChecked);
-    const allAppearanceCompleted = appearanceChecks.every(item => item.isChecked);
-    const allDocumentationCompleted = documentationChecks.every(item => item.isChecked);
-    
-    const canApprove = completedChecks === totalChecks && 
-                      allSafetyCompleted && 
-                      allFunctionalityCompleted && 
-                      allAppearanceCompleted && 
-                      allDocumentationCompleted &&
-                      overallNotes.trim().length > 0;
 
     const handleSubmit = async (approved: boolean) => {
-        if (!canApprove && approved) {
-            let missingItems = [];
-            if (!allSafetyCompleted) missingItems.push('Seguridad');
-            if (!allFunctionalityCompleted) missingItems.push('Funcionalidad');
-            if (!allAppearanceCompleted) missingItems.push('Apariencia');
-            if (!allDocumentationCompleted) missingItems.push('Documentación');
-            if (overallNotes.trim().length === 0) missingItems.push('Notas Generales');
-            
-            (ui as any).showNotification?.('warning', `Debes completar: ${missingItems.join(', ')}`);
+        if (!canApprove() && approved) {
+            (ui as any).showNotification?.('warning', 'Debes completar todas las verificaciones, seleccionar inspector y agregar observaciones');
             return;
         }
 
@@ -176,79 +181,51 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
             console.log('🔍 QualityControlView - Iniciando control de calidad:', {
                 workOrderId: workOrder.id,
                 approved,
-                completedChecks,
-                totalChecks,
-                allSafetyCompleted,
-                allFunctionalityCompleted,
-                allAppearanceCompleted,
-                allDocumentationCompleted,
-                hasNotes: overallNotes.trim().length > 0
+                selectedInspector,
+                hasNotes: finalNotes.trim().length > 0,
+                completedItems: getOverallProgress().completed,
+                totalItems: getOverallProgress().total
             });
             
-            // Debug: Verificar qué funciones están disponibles en data
-            console.log('🔍 QualityControlView - Funciones disponibles en data:', {
-                hasHandleAdvanceStage: typeof data.handleAdvanceStage === 'function',
-                hasHandleRetreatStage: typeof data.handleRetreatStage === 'function',
-                hasHandleUpdateWorkOrderHistory: typeof data.handleUpdateWorkOrderHistory === 'function',
-                dataKeys: Object.keys(data).filter(key => key.includes('handle'))
-            });
-            
-            // Subir imágenes si las hay
-            let uploadedImageUrls: string[] = [];
-            if (selectedImages.length > 0) {
-                const uploadPromises = selectedImages.map(async (file, index) => {
-                    const fileName = `quality_control_${workOrder.id}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
-                    const path = `quality-control/${workOrder.id}/${fileName}`;
-                    // Importar directamente el servicio de Supabase
-                    const { uploadFileToStorage } = await import('../services/supabase');
-                    return await uploadFileToStorage(file, 'progress-updates', path);
-                });
-                uploadedImageUrls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
-            }
+            const inspector = staffMembers.find(member => member.id === selectedInspector);
+            const inspectorName = inspector?.name || 'Inspector de Calidad';
 
             // Crear entrada de historial
             const historyEntry = {
                 stage: approved ? KanbanStage.LISTO_ENTREGA : KanbanStage.EN_REPARACION,
                 timestamp: new Date().toISOString(),
                 notes: approved 
-                    ? `Control de Calidad APROBADO. Verificaciones completadas: ${completedChecks}/${totalChecks}. Notas: ${overallNotes}`
-                    : `Control de Calidad RECHAZADO. Verificaciones completadas: ${completedChecks}/${totalChecks}. Notas: ${overallNotes}`,
-                imageUrls: uploadedImageUrls,
-                staffMemberId: (data as any).currentUser?.id || 'system',
+                    ? `Control de Calidad APROBADO por ${inspectorName}. Verificaciones completadas: ${getOverallProgress().completed}/${getOverallProgress().total}. Observaciones: ${finalNotes}`
+                    : `Control de Calidad RECHAZADO por ${inspectorName}. Observaciones: ${finalNotes}`,
+                imageUrls: [],
+                staffMemberId: selectedInspector,
             };
 
             // Actualizar historial
+            console.log('🔍 QualityControlView - Guardando control de calidad:', {
+                workOrderId: workOrder.id,
+                historyEntry,
+                qualityChecks: qualityChecks.map(item => ({
+                    id: item.id,
+                    description: item.description,
+                    status: item.status
+                })),
+                finalNotes,
+                selectedInspector
+            });
             await (data as any).handleUpdateWorkOrderHistory(workOrder.id, historyEntry);
 
             // Guardar resultado final
             setFinalResult({
                 isApproved: approved,
-                inspectorName: (data as any).currentUser?.name || 'Inspector de Calidad',
+                inspectorName,
                 inspectionDate: new Date().toLocaleDateString('es-CO')
             });
 
             // Avanzar o retroceder según el resultado
             if (approved) {
                 console.log('🔍 QualityControlView - Aprobando control de calidad, avanzando etapa');
-                console.log('🔍 QualityControlView - Etapa actual:', workOrder.stage);
-                console.log('🔍 QualityControlView - Etapa objetivo: LISTO_ENTREGA');
-                
-                try {
-                    await data.handleAdvanceStage(workOrder.id, workOrder.stage);
-                    console.log('✅ QualityControlView - handleAdvanceStage completado exitosamente');
-                    
-                    // Verificar que la etapa se actualizó correctamente
-                    setTimeout(async () => {
-                        console.log('🔍 QualityControlView - Verificando actualización después de 1 segundo...');
-                        await data.refreshWorkOrders();
-                        console.log('✅ QualityControlView - refreshWorkOrders completado');
-                    }, 1000);
-                    
-                } catch (error) {
-                    console.error('❌ QualityControlView - Error en handleAdvanceStage:', error);
-                    throw error;
-                }
-                
+                await data.handleAdvanceStage(workOrder.id, workOrder.stage);
                 (ui as any).showNotification?.('success', 'Control de Calidad aprobado. Orden lista para entrega');
             } else {
                 console.log('🔍 QualityControlView - Rechazando control de calidad, retrocediendo etapa');
@@ -266,236 +243,244 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
         }
     };
 
-    const categories = ['safety', 'functionality', 'appearance', 'documentation'];
+    const overallProgress = getOverallProgress();
 
     return (
-        <div className="bg-dark-light rounded-xl p-6">
-            <div className="flex items-center justify-between mb-6">
-                <div>
-                    <h2 className="text-2xl font-bold text-white mb-2">Control de Calidad</h2>
-                    <p className="text-gray-300">
-                        Orden: {workOrder.id} | Cliente: {client?.name || 'N/A'} | Vehículo: {vehicle?.make} {vehicle?.model}
-                    </p>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-dark-light rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="sticky top-0 bg-dark-light border-b border-gray-700 p-6 rounded-t-xl">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white">Control de Calidad para OT #{workOrder.id}</h2>
+                            <p className="text-gray-300 mt-1">
+                                Realice la inspección final para garantizar la calidad del trabajo antes de la entrega al cliente.
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => {
+                                // Mostrar mensaje de confirmación antes de salir
+                                if (confirm('¿Está seguro de que desea salir del control de calidad? Los cambios no guardados se perderán.')) {
+                                    onBack();
+                                }
+                            }}
+                            className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                        >
+                            <Icon name="x" className="w-6 h-6" />
+                        </button>
+                    </div>
                 </div>
-                <button
-                    onClick={onBack}
-                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                >
-                    <Icon name="arrow-left" className="w-4 h-4 mr-2" />
-                    Volver
-                </button>
-            </div>
 
-            {/* Progreso general */}
-            <div className="bg-gray-800 rounded-lg p-4 mb-6">
-                <div className="flex items-center justify-between mb-2">
-                    <span className="text-white font-semibold">Progreso de Verificación</span>
-                    <span className="text-gray-300">{completedChecks}/{totalChecks} completadas</span>
-                </div>
-                <div className="w-full bg-gray-700 rounded-full h-3">
-                    <div 
-                        className="bg-green-500 h-3 rounded-full transition-all duration-300"
-                        style={{ width: `${completionPercentage}%` }}
-                    />
-                </div>
-                <p className="text-sm text-gray-400 mt-2">
-                    {completionPercentage.toFixed(0)}% completado
-                </p>
-            </div>
+                <div className="p-6 space-y-6">
+                    {/* Inspector Selection */}
+                    <div>
+                        <label className="block text-sm font-medium text-white mb-2">
+                            Inspector de Calidad
+                        </label>
+                        <select
+                            value={selectedInspector}
+                            onChange={(e) => setSelectedInspector(e.target.value)}
+                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        >
+                            {staffMembers.map(member => (
+                                <option key={member.id} value={member.id}>
+                                    {member.name} - {member.role}
+                                </option>
+                            ))}
+                        </select>
+                    </div>
 
-            {/* Lista de verificaciones por categoría */}
-            <div className="space-y-6">
-                {categories.map(category => {
-                    const categoryItems = qualityChecks.filter(item => item.category === category);
-                    const completedInCategory = categoryItems.filter(item => item.isChecked).length;
-                    
-                    return (
-                        <div key={category} className="bg-gray-800 rounded-lg p-4">
-                            <div className="flex items-center mb-4">
-                                <Icon 
-                                    name={getCategoryIcon(category)} 
-                                    className={`w-6 h-6 mr-3 ${getCategoryColor(category)}`}
-                                />
-                                <h3 className="text-lg font-semibold text-white">
-                                    {getCategoryTitle(category)}
-                                </h3>
-                                <span className="ml-auto text-sm text-gray-400">
-                                    {completedInCategory}/{categoryItems.length}
-                                </span>
-                            </div>
+                    {/* Progress Overview */}
+                    <div className="bg-gray-800 rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                            <span className="text-white font-semibold">Progreso General</span>
+                            <span className="text-gray-300">{overallProgress.completed}/{overallProgress.total} verificaciones</span>
+                        </div>
+                        <div className="w-full bg-gray-700 rounded-full h-2">
+                            <div 
+                                className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                                style={{ width: `${(overallProgress.completed / overallProgress.total) * 100}%` }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Categories */}
+                    <div className="space-y-6">
+                        {QUALITY_CATEGORIES.map(category => {
+                            const categoryItems = qualityChecks.filter(item => item.category === category.id);
+                            const progress = getCategoryProgress(category.id);
                             
-                            <div className="space-y-3">
-                                {categoryItems.map(item => (
-                                    <div key={item.id} className="flex items-start space-x-3 p-3 bg-gray-700 rounded-lg">
-                                        <input
-                                            type="checkbox"
-                                            checked={item.isChecked}
-                                            onChange={(e) => handleCheckItem(item.id, e.target.checked)}
-                                            className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-600 rounded"
-                                        />
-                                        <div className="flex-1">
-                                            <label className="text-white text-sm font-medium">
-                                                {item.description}
-                                            </label>
-                                            <textarea
-                                                placeholder="Notas adicionales (opcional)"
-                                                value={item.notes || ''}
-                                                onChange={(e) => handleItemNotes(item.id, e.target.value)}
-                                                className="mt-2 w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg text-white text-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                                                rows={2}
-                                            />
-                                        </div>
+                            return (
+                                <div key={category.id} className="bg-gray-800 rounded-lg p-4">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                            <Icon name={category.icon as any} className="w-5 h-5" />
+                                            {category.title}
+                                        </h3>
+                                        <span className="text-sm text-gray-400">
+                                            {progress.completed}/{progress.total} completadas
+                                        </span>
                                     </div>
-                                ))}
+                                    
+                                    <div className="space-y-3">
+                                        {categoryItems.map(item => (
+                                            <div key={item.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                                                <span className="text-white text-sm font-medium flex-1">
+                                                    {item.description}
+                                                </span>
+                                                <div className="flex gap-2 ml-4">
+                                                    <button
+                                                        onClick={() => handleStatusChange(item.id, 'ok')}
+                                                        className={getStatusButtonClass(item.id, 'ok')}
+                                                    >
+                                                        OK
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleStatusChange(item.id, 'no-ok')}
+                                                        className={getStatusButtonClass(item.id, 'no-ok')}
+                                                    >
+                                                        NO OK
+                                                    </button>
+                                                    <button
+                                                        onClick={() => handleStatusChange(item.id, 'na')}
+                                                        className={getStatusButtonClass(item.id, 'na')}
+                                                    >
+                                                        N/A
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+
+                    {/* Final Observations */}
+                    <div className="bg-gray-800 rounded-lg p-4">
+                        <h3 className="text-lg font-semibold text-white mb-3">Observaciones Finales</h3>
+                        <div className="relative">
+                            <textarea
+                                value={finalNotes}
+                                onChange={(e) => setFinalNotes(e.target.value)}
+                                placeholder="Añadir comentarios sobre los puntos 'NO OK' o cualquier otra observación relevante..."
+                                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                                rows={4}
+                            />
+                            <button
+                                onClick={() => {
+                                    // Aquí podrías agregar lógica adicional para guardar las observaciones
+                                    console.log('Guardando observaciones:', finalNotes);
+                                }}
+                                className="absolute bottom-3 right-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                title="Guardar observaciones"
+                            >
+                                <Icon name="check-circle" className="w-4 h-4" />
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex justify-center space-x-4 pt-4">
+                        <button
+                            onClick={() => handleSubmit(false)}
+                            disabled={isSubmitting}
+                            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                        >
+                            <Icon name="x" className="w-5 h-5 mr-2" />
+                            {isSubmitting ? 'Procesando...' : 'Rechazar'}
+                        </button>
+                        
+                        <button
+                            onClick={() => handleSubmit(true)}
+                            disabled={!canApprove() || isSubmitting}
+                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                        >
+                            <Icon name="check-circle" className="w-5 h-5 mr-2" />
+                            {isSubmitting ? 'Procesando...' : 'Aprobar'}
+                        </button>
+                    </div>
+
+                    {!canApprove() && (
+                        <div className="text-center">
+                            <p className="text-yellow-400 text-sm">
+                                Para aprobar, debes completar todas las verificaciones, seleccionar inspector y agregar observaciones.
+                            </p>
+                        </div>
+                    )}
+                </div>
+
+                {/* Modal de Reporte Imprimible */}
+                {showPrintableReport && finalResult && (
+                    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                        <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                            <div className="flex justify-between items-center p-4 border-b">
+                                <h3 className="text-lg font-semibold">Reporte de Control de Calidad</h3>
+                                <div className="flex gap-2">
+                                    <button
+                                        onClick={() => {
+                                            const printWindow = window.open('', '_blank');
+                                            if (printWindow) {
+                                                printWindow.document.write(`
+                                                    <!DOCTYPE html>
+                                                    <html lang="es">
+                                                    <head>
+                                                        <meta charset="UTF-8" />
+                                                        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                                                        <title>Reporte de Control de Calidad - ${workOrder.id}</title>
+                                                        <script src="https://cdn.tailwindcss.com"></script>
+                                                    </head>
+                                                    <body>
+                                                        ${document.querySelector('.printable-quality-report')?.outerHTML || ''}
+                                                    </body>
+                                                    </html>
+                                                `);
+                                                printWindow.document.close();
+                                                printWindow.print();
+                                            }
+                                        }}
+                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                    >
+                                        <Icon name="printer" className="w-4 h-4 mr-2" />
+                                        Imprimir
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            setShowPrintableReport(false);
+                                            onBack();
+                                        }}
+                                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                    >
+                                        Cerrar
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="p-4">
+                                <div className="printable-quality-report">
+                                    <PrintableQualityControlReport
+                                        workOrder={workOrder}
+                                        client={client || {} as Client}
+                                        vehicle={vehicle || {} as Vehicle}
+                                        companyInfo={data.appSettings?.companyInfo || null}
+                                        qualityChecks={qualityChecks.map(item => ({
+                                            id: item.id,
+                                            description: item.description,
+                                            category: item.category,
+                                            isChecked: item.status === 'ok',
+                                            notes: item.status === 'no-ok' ? `NO OK: ${item.notes || ''}` : item.notes,
+                                            status: item.status
+                                        }))}
+                                        overallNotes={finalNotes}
+                                        isApproved={finalResult.isApproved}
+                                        inspectorName={finalResult.inspectorName}
+                                        inspectionDate={finalResult.inspectionDate}
+                                    />
+                                </div>
                             </div>
                         </div>
-                    );
-                })}
-            </div>
-
-            {/* Notas generales */}
-            <div className="mt-6 bg-gray-800 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-3">Notas Generales del Control de Calidad</h3>
-                <textarea
-                    value={overallNotes}
-                    onChange={(e) => setOverallNotes(e.target.value)}
-                    placeholder="Describe el estado general del vehículo después de la reparación..."
-                    className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500"
-                    rows={4}
-                />
-            </div>
-
-            {/* Subida de imágenes */}
-            <div className="mt-6 bg-gray-800 rounded-lg p-4">
-                <h3 className="text-lg font-semibold text-white mb-3">Evidencia Fotográfica</h3>
-                <input
-                    type="file"
-                    multiple
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    className="mb-4 text-white file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-green-600 file:text-white hover:file:bg-green-700"
-                />
-                
-                {imagePreviews.length > 0 && (
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                        {imagePreviews.map((preview, index) => (
-                            <div key={index} className="relative">
-                                <img
-                                    src={preview}
-                                    alt={`Preview ${index + 1}`}
-                                    className="w-full h-24 object-cover rounded-lg"
-                                />
-                                <button
-                                    onClick={() => removeImage(index)}
-                                    className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-700"
-                                >
-                                    ×
-                                </button>
-                            </div>
-                        ))}
                     </div>
                 )}
             </div>
-
-            {/* Botones de acción */}
-            <div className="mt-8 flex justify-center space-x-4">
-                <button
-                    onClick={() => handleSubmit(false)}
-                    disabled={isSubmitting}
-                    className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
-                >
-                    <Icon name="x" className="w-5 h-5 mr-2" />
-                    {isSubmitting ? 'Procesando...' : 'Rechazar'}
-                </button>
-                
-                <button
-                    onClick={() => handleSubmit(true)}
-                    disabled={!canApprove || isSubmitting}
-                    className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
-                >
-                    <Icon name="check-circle" className="w-5 h-5 mr-2" />
-                    {isSubmitting ? 'Procesando...' : 'Aprobar'}
-                </button>
-            </div>
-
-            {!canApprove && (
-                <div className="text-center mt-4">
-                    <p className="text-yellow-400 text-sm mb-2">
-                        Para aprobar, debes completar:
-                    </p>
-                    <div className="flex flex-wrap justify-center gap-2 text-xs">
-                        {!allSafetyCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Seguridad</span>}
-                        {!allFunctionalityCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Funcionalidad</span>}
-                        {!allAppearanceCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Apariencia</span>}
-                        {!allDocumentationCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Documentación</span>}
-                        {overallNotes.trim().length === 0 && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Notas Generales</span>}
-                    </div>
-                </div>
-            )}
-
-            {/* Modal de Reporte Imprimible */}
-            {showPrintableReport && finalResult && (
-                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                        <div className="flex justify-between items-center p-4 border-b">
-                            <h3 className="text-lg font-semibold">Reporte de Control de Calidad</h3>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => {
-                                        const printWindow = window.open('', '_blank');
-                                        if (printWindow) {
-                                            printWindow.document.write(`
-                                                <!DOCTYPE html>
-                                                <html lang="es">
-                                                <head>
-                                                    <meta charset="UTF-8" />
-                                                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                                                    <title>Reporte de Control de Calidad - ${workOrder.id}</title>
-                                                    <script src="https://cdn.tailwindcss.com"></script>
-                                                </head>
-                                                <body>
-                                                    ${document.querySelector('.printable-quality-report')?.outerHTML || ''}
-                                                </body>
-                                                </html>
-                                            `);
-                                            printWindow.document.close();
-                                            printWindow.print();
-                                        }
-                                    }}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    <Icon name="printer" className="w-4 h-4 mr-2" />
-                                    Imprimir
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        setShowPrintableReport(false);
-                                        onBack();
-                                    }}
-                                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                                >
-                                    Cerrar
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-4">
-                            <div className="printable-quality-report">
-                                <PrintableQualityControlReport
-                                    workOrder={workOrder}
-                                    client={client || {} as Client}
-                                    vehicle={vehicle || {} as Vehicle}
-                                    companyInfo={data.appSettings?.companyInfo || null}
-                                    qualityChecks={qualityChecks}
-                                    overallNotes={overallNotes}
-                                    isApproved={finalResult.isApproved}
-                                    inspectorName={finalResult.inspectorName}
-                                    inspectionDate={finalResult.inspectionDate}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

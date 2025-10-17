@@ -971,9 +971,120 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                             client={client} 
                             vehicle={vehicle} 
                             hasPermission={hasPermission} 
-                            onBack={onBack} 
+                            onBack={onBack}
+                            staffMembers={staffMembers}
                         />
                     )}
+
+                    {/* Mostrar resultado del Control de Calidad cuando esté completado */}
+                    {(workOrder.stage === KanbanStage.LISTO_ENTREGA || workOrder.stage === KanbanStage.ENTREGADO) && quotes.length > 0 && (() => {
+                        // Debug: verificar el historial
+                        console.log('🔍 WorkOrderDetailView - Verificando control de calidad:', {
+                            workOrderStage: workOrder.stage,
+                            historyLength: workOrder.history?.length || 0,
+                            historyEntries: workOrder.history?.map(h => ({
+                                stage: h.stage,
+                                notes: h.notes,
+                                user: h.user,
+                                date: h.date
+                            })) || []
+                        });
+                        
+                        // Buscar la entrada de historial del control de calidad
+                        const qualityControlEntry = workOrder.history?.find(entry => 
+                            entry.notes?.includes('Control de Calidad APROBADO') || 
+                            entry.notes?.includes('Control de Calidad RECHAZADO')
+                        );
+                        
+                        console.log('🔍 WorkOrderDetailView - qualityControlEntry encontrada:', qualityControlEntry);
+                        
+                        if (qualityControlEntry) {
+                            const isApproved = qualityControlEntry.notes?.includes('APROBADO');
+                            return (
+                                <div className="bg-dark-light rounded-xl p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <Icon name="check-circle" className="w-6 h-6" />
+                                            Control de Calidad Completado
+                                        </h2>
+                                        <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
+                                            isApproved 
+                                                ? 'bg-green-600 text-white' 
+                                                : 'bg-red-600 text-white'
+                                        }`}>
+                                            {isApproved ? '✅ APROBADO' : '❌ RECHAZADO'}
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-gray-800 rounded-lg p-4 space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <Icon name="user" className="w-5 h-5 text-gray-400" />
+                                            <span className="text-gray-300">
+                                                <strong className="text-white">Inspector:</strong> {
+                                                    qualityControlEntry.user || 'N/A'
+                                                }
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="flex items-center gap-3">
+                                            <Icon name="calendar" className="w-5 h-5 text-gray-400" />
+                                            <span className="text-gray-300">
+                                                <strong className="text-white">Fecha:</strong> {
+                                                    new Date(qualityControlEntry.date).toLocaleDateString('es-CO')
+                                                }
+                                            </span>
+                                        </div>
+                                        
+                                        <div className="flex items-start gap-3">
+                                            <Icon name="document-text" className="w-5 h-5 text-gray-400 mt-0.5" />
+                                            <div className="text-gray-300">
+                                                <strong className="text-white">Observaciones:</strong>
+                                                <p className="mt-1">{qualityControlEntry.notes}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        } else {
+                            // Fallback: mostrar sección incluso si no encuentra la entrada específica
+                            return (
+                                <div className="bg-dark-light rounded-xl p-6">
+                                    <div className="flex items-center justify-between mb-4">
+                                        <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                                            <Icon name="check-circle" className="w-6 h-6" />
+                                            Control de Calidad
+                                        </h2>
+                                        <div className="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-600 text-white">
+                                            🔍 DEBUGGING
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-gray-800 rounded-lg p-4 space-y-3">
+                                        <div className="text-gray-300">
+                                            <strong className="text-white">Estado:</strong> La orden está en etapa "{workOrder.stage}" pero no se encontró entrada específica de control de calidad en el historial.
+                                        </div>
+                                        
+                                        <div className="text-gray-300">
+                                            <strong className="text-white">Historial disponible:</strong> {workOrder.history?.length || 0} entradas
+                                        </div>
+                                        
+                                        {workOrder.history && workOrder.history.length > 0 && (
+                                            <div className="text-gray-300">
+                                                <strong className="text-white">Últimas entradas:</strong>
+                                                <ul className="mt-2 space-y-1">
+                                                    {workOrder.history.slice(-3).map((entry, index) => (
+                                                        <li key={index} className="text-xs">
+                                                            • {entry.stage}: {entry.notes?.substring(0, 50)}...
+                                                        </li>
+                                                    ))}
+                                                </ul>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        }
+                    })()}
                     
                     {galleryImages.length > 0 && <ImageGallery images={galleryImages} />}
 
@@ -1010,14 +1121,14 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                 <div>
                                     <h3 className="font-semibold text-white mb-2">Checklist de Inventario</h3>
                                     <div className="grid grid-cols-2 gap-1 text-gray-300">
-                                        <CheckItem label="Llanta repuesto" checked={(workOrder.inventoryChecklist as any)?.spare_tire} />
-                                        <CheckItem label="Kit de carretera" checked={(workOrder.inventoryChecklist as any)?.jack_kit} />
-                                        <CheckItem label="Herramientas" checked={(workOrder.inventoryChecklist as any)?.tools} />
-                                        <CheckItem label="Extintor" checked={(workOrder.inventoryChecklist as any)?.fire_extinguisher} />
-                                        <CheckItem label="Botiquín" checked={(workOrder.inventoryChecklist as any)?.first_aid_kit} />
-                                        <CheckItem label="Otros" checked={(workOrder.inventoryChecklist as any)?.other} />
+                                        <CheckItem label="Llanta repuesto" checked={workOrder.inventoryChecklist?.spareTire} />
+                                        <CheckItem label="Kit de carretera" checked={workOrder.inventoryChecklist?.jackKit} />
+                                        <CheckItem label="Herramientas" checked={workOrder.inventoryChecklist?.tools} />
+                                        <CheckItem label="Extintor" checked={workOrder.inventoryChecklist?.fireExtinguisher} />
+                                        <CheckItem label="Botiquín" checked={workOrder.inventoryChecklist?.firstAidKit} />
+                                        <CheckItem label="Otros" checked={workOrder.inventoryChecklist?.other} />
                                     </div>
-                                    {(workOrder.inventoryChecklist as any)?.other && workOrder.inventoryOtherText && (
+                                    {workOrder.inventoryChecklist?.other && workOrder.inventoryOtherText && (
                                         <div className="mt-2 p-2 bg-gray-800/50 rounded-lg">
                                             <p className="text-sm text-gray-300">
                                                 <strong className="text-gray-400">Especificación:</strong> {workOrder.inventoryOtherText}

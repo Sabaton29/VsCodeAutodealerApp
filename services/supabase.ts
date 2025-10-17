@@ -24,6 +24,11 @@ const toSnakeCase = (str: string): string => {
     if (str === 'idNumber') return 'id_number';
     if (str === 'commissionRate') return 'commission_rate';
     if (str === 'paymentTerms') return 'payment_terms';
+    // Inventory checklist special cases
+    if (str === 'spareTire') return 'spare_tire';
+    if (str === 'jackKit') return 'jack_kit';
+    if (str === 'fireExtinguisher') return 'fire_extinguisher';
+    if (str === 'firstAidKit') return 'first_aid_kit';
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 };
 
@@ -39,6 +44,11 @@ const toCamelCase = (str: string): string => {
     if (str === 'id_number') return 'idNumber';
     if (str === 'commission_rate') return 'commissionRate';
     if (str === 'payment_terms') return 'paymentTerms';
+    // Inventory checklist special cases
+    if (str === 'spare_tire') return 'spareTire';
+    if (str === 'jack_kit') return 'jackKit';
+    if (str === 'fire_extinguisher') return 'fireExtinguisher';
+    if (str === 'first_aid_kit') return 'firstAidKit';
     return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 };
 

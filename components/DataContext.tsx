@@ -2766,7 +2766,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
         handleCreateWorkOrderFromAppointment: async (appointmentId: string) => {
             try {
-                console.log(`🔍 handleCreateWorkOrderFromAppointment - Creating work order from appointment:`, appointmentId);
+                console.log(`🔍 handleCreateWorkOrderFromAppointment - Preparing to open work order form for appointment:`, appointmentId);
                 
                 // Buscar la cita
                 const appointment = appointments.find(a => a.id === appointmentId);
@@ -2774,49 +2774,24 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     throw new Error('Cita no encontrada');
                 }
                 
-                // Buscar el cliente y vehículo
-                const client = clients.find(c => c.id === appointment.clientId);
-                const vehicle = vehicles.find(v => v.id === appointment.vehicleId);
+                console.log('🔍 Found appointment:', appointment);
                 
-                if (!client || !vehicle) {
-                    throw new Error('Cliente o vehículo no encontrado');
-                }
-                
-                // Crear los datos de la orden de trabajo usando solo campos básicos que sabemos que existen
-                const workOrderData: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'> = {
-                    client: { id: client.id, name: client.name },
-                    vehicle: { id: vehicle.id, make: vehicle.make, model: vehicle.model, plate: vehicle.plate },
-                    status: WorkOrderStatus.EN_PROCESO,
-                    stage: KanbanStage.RECEPCION,
-                    total: 0,
-                    locationId: appointment.locationId || '550e8400-e29b-41d4-a716-446655440001',
+                // Preparar datos iniciales para el formulario
+                const initialData = {
+                    clientId: appointment.clientId,
+                    vehicleId: appointment.vehicleId,
                     serviceRequested: appointment.serviceRequested,
                     advisorId: appointment.advisorId,
-                    timeInStage: '0d 0h 0m',
-                    services: [],
-                    linkedQuoteIds: [],
                 };
                 
-                // Crear la orden de trabajo
-                const newWorkOrder = await handleCreateWorkOrder(workOrderData);
+                console.log('🔍 Initial data for work order form:', initialData);
                 
-                // Actualizar la cita para vincularla con la orden de trabajo
-                await supabaseService.update('appointments', appointmentId, {
-                    linkedWorkOrderId: newWorkOrder.id,
-                    status: AppointmentStatus.COMPLETADA
-                });
-                
-                // Actualizar el estado local de las citas
-                setAppointments(prev => prev.map(a => 
-                    a.id === appointmentId 
-                        ? { ...a, linkedWorkOrderId: newWorkOrder.id, status: AppointmentStatus.COMPLETADA }
-                        : a
-                ));
-                
-                console.log(`🔍 handleCreateWorkOrderFromAppointment - Work order created successfully:`, newWorkOrder.id);
+                // Esta función ahora solo prepara los datos, el modal se abrirá desde el componente padre
+                // que llamará a openModal con estos datos
+                return initialData;
                 
             } catch (error) {
-                console.error('Error creating work order from appointment:', error);
+                console.error('Error preparing work order from appointment:', error);
                 throw error;
             }
         },

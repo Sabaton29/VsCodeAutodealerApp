@@ -199,8 +199,17 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                     }}
                     onCreateWorkOrder={async(id) => { 
                         if (handleCreateWorkOrderFromAppointment) {
-                            await handleCreateWorkOrderFromAppointment(id); 
-                            setSelectedAppointment(null);
+                            try {
+                                const initialData = await handleCreateWorkOrderFromAppointment(id);
+                                console.log('🔍 AppointmentsView - Opening work order modal with initial data:', initialData);
+                                openModal('CREATE_WORK_ORDER', { 
+                                    initialData,
+                                    appointmentId: id // Pasar el ID de la cita para vincular después
+                                });
+                                setSelectedAppointment(null);
+                            } catch (error) {
+                                console.error('Error preparing work order from appointment:', error);
+                            }
                         }
                     }}
                     onEdit={(app) => { setSelectedAppointment(null); openModal('EDIT_APPOINTMENT', app); }}

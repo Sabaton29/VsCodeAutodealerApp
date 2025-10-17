@@ -15,6 +15,12 @@ interface CreateWorkOrderFormProps {
     locations: Location[];
     onAddNewClient: () => void;
     onAddNewVehicle: (clientId: string) => void;
+    initialData?: {
+        clientId?: string;
+        vehicleId?: string;
+        serviceRequested?: string;
+        advisorId?: string;
+    };
 }
 
 const inputBaseClasses = "w-full text-sm px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50 focus:outline-none focus:ring-2 focus:ring-brand-red text-light-text dark:text-dark-text";
@@ -23,23 +29,23 @@ const checkboxInputClasses = "h-4 w-4 rounded border-gray-300 dark:border-gray-6
 const plusButtonClasses = "p-2 bg-brand-red rounded-lg text-white hover:bg-red-700 transition-colors";
 const actionButtonClasses = "cursor-pointer flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white rounded-lg shadow-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-brand-red";
 
-const getInitialFormState = () => ({
+const getInitialFormState = (initialData?: { clientId?: string; vehicleId?: string; serviceRequested?: string; advisorId?: string; }) => ({
     serviceTypeAdvanced: false,
     isWarranty: false,
     roadTestAuthorized: true,
     requiresInitialDiagnosis: true,
     diagnosticType: 'Básico' as DiagnosticType,
-    clientId: '',
-    vehicleId: '',
-    serviceRequested: '',
+    clientId: initialData?.clientId || '',
+    vehicleId: initialData?.vehicleId || '',
+    serviceRequested: initialData?.serviceRequested || '',
     serviceDateTime: '',
-    advisorId: '',
+    advisorId: initialData?.advisorId || '',
     mileage: '',
     fuelLevel: '1/2' as 'Vacío' | '1/4' | '1/2' | '3/4' | 'Lleno' | 'N/A',
     reportedValuables: '',
     inventoryChecklist: {
-        spare_tire: true, jack_kit: true, tools: true,
-        fire_extinguisher: true, first_aid_kit: true, other: false,
+        spareTire: true, jackKit: true, tools: true,
+        fireExtinguisher: true, firstAidKit: true, other: false,
     },
     inventoryOtherText: '',
     documents: '',
@@ -53,8 +59,8 @@ const getInitialFormState = () => ({
 });
 
 const inventoryChecklistLabels: Record<string, string> = {
-    spare_tire: 'Llanta Repuesto', jack_kit: 'Kit Gato', tools: 'Herramientas',
-    fire_extinguisher: 'Extintor', first_aid_kit: 'Botiquín',
+    spareTire: 'Llanta Repuesto', jackKit: 'Kit Gato', tools: 'Herramientas',
+    fireExtinguisher: 'Extintor', firstAidKit: 'Botiquín',
 };
 
 const damageLabels: Record<keyof ReturnType<typeof getInitialFormState>['damages'], string> = {
@@ -74,14 +80,29 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
     staffMembers,
     onAddNewClient,
     onAddNewVehicle,
+    initialData,
 }) => {
-    console.log('🔄 CreateWorkOrderForm - Component rendered with clients:', clients.length);
-    const [formState, setFormState] = useState(getInitialFormState());
+    console.log('🔄 CreateWorkOrderForm - Component rendered with clients:', clients.length, 'initialData:', initialData);
+    const [formState, setFormState] = useState(getInitialFormState(initialData));
     
     // Forzar re-render cuando cambien los datos
     useEffect(() => {
         console.log('🔄 CreateWorkOrderForm - Data changed, forcing re-render');
     }, [clients.length, vehicles.length]);
+
+    // Actualizar formulario cuando cambien los datos iniciales
+    useEffect(() => {
+        if (initialData) {
+            console.log('🔄 CreateWorkOrderForm - Initial data changed, updating form:', initialData);
+            setFormState(prev => ({
+                ...prev,
+                clientId: initialData.clientId || prev.clientId,
+                vehicleId: initialData.vehicleId || prev.vehicleId,
+                serviceRequested: initialData.serviceRequested || prev.serviceRequested,
+                advisorId: initialData.advisorId || prev.advisorId,
+            }));
+        }
+    }, [initialData]);
 
     const clientsInLocation = useMemo(() => {
         console.log('🔍 CreateWorkOrderForm - All clients:', clients);

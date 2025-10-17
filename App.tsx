@@ -1018,7 +1018,23 @@ const ModalManager: React.FC = () => {
                 <CreateWorkOrderForm 
                     key={modalData?.refreshKey || 'default'} // Fuerza re-montaje cuando se actualiza
                     onSave={async(d) => {
-                        await data.handleCreateWorkOrder(d);
+                        const newWorkOrder = await data.handleCreateWorkOrder(d);
+                        
+                        // Si se creó desde una cita, vincular la cita con la orden de trabajo
+                        if (modalData?.appointmentId) {
+                            try {
+                                console.log('🔍 Linking appointment to work order:', modalData.appointmentId, newWorkOrder.id);
+                                await data.handleSaveAppointment({
+                                    ...data.appointments.find(a => a.id === modalData.appointmentId),
+                                    linkedWorkOrderId: newWorkOrder.id,
+                                    status: 'Completada'
+                                } as any);
+                                console.log('🔍 Appointment linked successfully');
+                            } catch (error) {
+                                console.error('Error linking appointment to work order:', error);
+                            }
+                        }
+                        
                         closeModal();
                     }}
                     onCancel={closeModal}
@@ -1028,6 +1044,7 @@ const ModalManager: React.FC = () => {
                     staffMembers={data.staffMembers}
                     services={data.services}
                     locations={data.locations}
+                    initialData={modalData?.initialData}
                     onAddNewClient={() => {
                         // Store current modal context
                         const currentModalType = type;

@@ -162,10 +162,15 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
     // Obtener todas las cotizaciones aprobadas
     const approvedQuotes = quotes.filter(q => q.status === QuoteStatus.APROBADO);
     
-    // Combinar todos los items de todas las cotizaciones aprobadas
+    // Combinar todos los items de todas las cotizaciones aprobadas, evitando duplicados
     const allApprovedItems = approvedQuotes.reduce((acc, q) => {
-        return [...acc, ...(q.items || [])];
-    }, [] as QuoteItem[]);
+        const items = (q.items || []).map(item => ({
+            ...item,
+            // Crear un ID único combinando el ID del item con el ID de la cotización
+            uniqueId: `${q.id}-${item.id}`
+        }));
+        return [...acc, ...items];
+    }, [] as (QuoteItem & { uniqueId: string })[]);
     
     // Calcular totales de todas las cotizaciones aprobadas
     const totalSubtotal = approvedQuotes.reduce((sum, q) => sum + (q.subtotal || 0), 0);
@@ -437,7 +442,7 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                 <h3 className="font-bold text-white mb-2">Tareas Pendientes</h3>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                     {allApprovedItems.map(item => (
-                        <div key={item.id} className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${item.isCompleted ? 'bg-green-900/20 border-green-700' : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800/70'} ${hasPermission('toggle:task_completed') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
+                        <div key={item.uniqueId} className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${item.isCompleted ? 'bg-green-900/20 border-green-700' : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800/70'} ${hasPermission('toggle:task_completed') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
                             {/* Checkbox */}
                             <div className="flex-shrink-0 pt-0.5">
                                 <input
@@ -445,7 +450,7 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                     checked={!!item.isCompleted}
                                     onChange={async (e) => {
                                         const files = itemPhotos[item.id] || [];
-                                        console.log('🔍 Checkbox onChange - itemId:', item.id, 'isCompleted:', e.target.checked, 'files to upload:', files.length);
+                                        console.log('🔍 Checkbox onChange - itemId:', item.id, 'uniqueId:', item.uniqueId, 'isCompleted:', e.target.checked, 'files to upload:', files.length);
                                         console.log('🔍 Checkbox onChange - files details:', files.map(f => ({ name: f.name, size: f.size, type: f.type })));
                                         
                                         // Subir fotos ANTES de marcar como completada

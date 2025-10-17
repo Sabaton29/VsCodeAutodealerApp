@@ -123,14 +123,14 @@ const PrintableReceptionReport: React.FC<PrintableReceptionReportProps> = ({ wor
                             <div>
                                 <h4 className="font-semibold mb-2">Inventario de Ingreso</h4>
                                 <div className="space-y-1 text-sm">
-                                    <CheckItem label="Llanta de repuesto" checked={(workOrder.inventoryChecklist as any)?.spare_tire} />
-                                    <CheckItem label="Kit de carretera" checked={(workOrder.inventoryChecklist as any)?.jack_kit} />
-                                    <CheckItem label="Herramientas" checked={(workOrder.inventoryChecklist as any)?.tools} />
-                                    <CheckItem label="Extintor" checked={(workOrder.inventoryChecklist as any)?.fire_extinguisher} />
-                                    <CheckItem label="Botiquín" checked={(workOrder.inventoryChecklist as any)?.first_aid_kit} />
+                                    <CheckItem label="Llanta de repuesto" checked={workOrder.inventoryChecklist?.spareTire} />
+                                    <CheckItem label="Kit de carretera" checked={workOrder.inventoryChecklist?.jackKit} />
+                                    <CheckItem label="Herramientas" checked={workOrder.inventoryChecklist?.tools} />
+                                    <CheckItem label="Extintor" checked={workOrder.inventoryChecklist?.fireExtinguisher} />
+                                    <CheckItem label="Botiquín" checked={workOrder.inventoryChecklist?.firstAidKit} />
                                     <div>
-                                        <CheckItem label="Otros" checked={(workOrder.inventoryChecklist as any)?.other} />
-                                        {(workOrder.inventoryChecklist as any)?.other && workOrder.inventoryOtherText && (
+                                        <CheckItem label="Otros" checked={workOrder.inventoryChecklist?.other} />
+                                        {workOrder.inventoryChecklist?.other && workOrder.inventoryOtherText && (
                                             <div className="ml-5 mt-1 text-xs text-gray-600">
                                                 <strong>Especificación:</strong> {workOrder.inventoryOtherText}
                                             </div>

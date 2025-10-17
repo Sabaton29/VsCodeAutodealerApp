@@ -94,7 +94,7 @@ const ImageGallery: React.FC<ImageGalleryProps> = ({ images }) => {
     
     return (
         <div className="bg-dark-light rounded-xl p-5">
-            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-4"><Icon name="camera" className="w-6 h-6 text-brand-red"/> Imprevisto</h2>
+            <h2 className="text-xl font-bold text-white flex items-center gap-3 mb-4"><Icon name="camera" className="w-6 h-6 text-brand-red"/> Galería de Fotos</h2>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3">
                 {images.map((image, index) => (
                     <div key={index} className="relative group cursor-pointer" onClick={() => !imageErrors.has(index) && setSelectedImageIndex(index)}>
