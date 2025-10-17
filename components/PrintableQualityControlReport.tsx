@@ -147,36 +147,117 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
             <h3 className="text-lg font-bold text-gray-800 mb-4 border-b border-gray-400 pb-2">
               CRITERIOS DE CALIDAD EVALUADOS
             </h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-700 mb-3 text-sm">EXTERIOR DEL VEHÍCULO</h4>
-                <CheckItem label="No hay manchas de grasa en tapicería o latonería" checked={isApproved} />
-                <CheckItem label="Se retiraron plásticos protectores de asientos/volante" checked={isApproved} />
-                <CheckItem label="Los elementos personales del cliente están en su lugar" checked={isApproved} />
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-700 mb-3 text-sm">FUNCIONAMIENTO Y PRUEBAS</h4>
-                <CheckItem label="El vehículo enciende correctamente" checked={isApproved} />
-                <CheckItem label="No hay luces de advertencia en el tablero" checked={isApproved} />
-                <CheckItem label="El motor funciona sin ruidos anormales" checked={isApproved} />
-                <CheckItem label="Se realizó prueba de ruta y el manejo es correcto" checked={isApproved} />
-                <CheckItem label="El sistema de A/C y calefacción funciona" checked={isApproved} />
-                <CheckItem label="Los frenos responden adecuadamente" checked={isApproved} />
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-700 mb-3 text-sm">VERIFICACIÓN DE TAREAS</h4>
-                <CheckItem label="Se completaron todos los trabajos aprobados en la cotización" checked={isApproved} />
-                <CheckItem label="Los repuestos reemplazados están guardados para el cliente (si aplica)" checked={isApproved} />
-                <CheckItem label="Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)" checked={isApproved} />
-                <CheckItem label="Se ajustó la presión de los neumáticos" checked={isApproved} />
-              </div>
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-semibold text-gray-700 mb-3 text-sm">DOCUMENTACIÓN Y ENTREGA</h4>
-                <CheckItem label="La factura corresponde con los trabajos realizados" checked={isApproved} />
-                <CheckItem label="La orden de trabajo está completamente documentada" checked={isApproved} />
-                <CheckItem label="Se ha preparado la recomendación de próximo mantenimiento" checked={isApproved} />
-              </div>
-            </div>
+            {(() => {
+              // Extraer datos del checklist de las notas si están disponibles
+              const checklistSummary = notes.match(/checklistSummary: (.+?)(?:\s|$)/)?.[1];
+              let qualityChecksData: Array<{
+                id: string;
+                description: string;
+                category: string;
+                status: string;
+                notes?: string;
+              }> = [];
+              
+              if (checklistSummary) {
+                // Parsear el summary del checklist
+                qualityChecksData = checklistSummary.split('|').map(item => {
+                  const [id, status, notes] = item.split(':');
+                  return { id, status, description: '', category: '', notes };
+                });
+              }
+              
+              // Categorías del control de calidad
+              const categories = [
+                {
+                  id: 'exterior',
+                  title: 'EXTERIOR DEL VEHÍCULO',
+                  items: [
+                    { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería' },
+                    { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante' },
+                    { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar' }
+                  ]
+                },
+                {
+                  id: 'funcionalidad',
+                  title: 'FUNCIONAMIENTO Y PRUEBAS',
+                  items: [
+                    { id: 'func-1', description: 'El vehículo enciende correctamente' },
+                    { id: 'func-2', description: 'No hay luces de advertencia en el tablero' },
+                    { id: 'func-3', description: 'El motor funciona sin ruidos anormales' },
+                    { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto' },
+                    { id: 'func-5', description: 'El sistema de A/C y calefacción funciona' },
+                    { id: 'func-6', description: 'Los frenos responden adecuadamente' }
+                  ]
+                },
+                {
+                  id: 'verificacion',
+                  title: 'VERIFICACIÓN DE TAREAS',
+                  items: [
+                    { id: 'verif-1', description: 'Se completaron todos los trabajos aprobados en la cotización' },
+                    { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)' },
+                    { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)' },
+                    { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos' }
+                  ]
+                },
+                {
+                  id: 'documentacion',
+                  title: 'DOCUMENTACIÓN Y ENTREGA',
+                  items: [
+                    { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados' },
+                    { id: 'doc-2', description: 'La orden de trabajo está completamente documentada' },
+                    { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento' }
+                  ]
+                }
+              ];
+              
+              // Función para obtener el estado de un elemento
+              const getItemStatus = (itemId: string) => {
+                const itemData = qualityChecksData.find(item => item.id === itemId);
+                return itemData ? itemData.status : 'ok'; // Default a 'ok' si no hay datos
+              };
+              
+              // Función para obtener el ícono según el estado
+              const getStatusIcon = (status: string) => {
+                switch (status) {
+                  case 'ok': return '✅';
+                  case 'no-ok': return '❌';
+                  case 'na': return '➖';
+                  default: return '✅';
+                }
+              };
+              
+              return (
+                <div className="grid grid-cols-2 gap-4">
+                  {categories.map(category => (
+                    <div key={category.id} className="bg-gray-50 p-4 rounded-lg">
+                      <h4 className="font-semibold text-gray-700 mb-3 text-sm">{category.title}</h4>
+                      {category.items.map(item => {
+                        const status = getItemStatus(item.id);
+                        const icon = getStatusIcon(status);
+                        const itemData = qualityChecksData.find(data => data.id === item.id);
+                        
+                        return (
+                          <div key={item.id} className="flex items-center justify-between mb-1">
+                            <span className="text-xs flex-1">{item.description}</span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-sm">{icon}</span>
+                              <span className="text-xs font-semibold">
+                                {status === 'ok' ? 'OK' : status === 'no-ok' ? 'NO OK' : status === 'na' ? 'N/A' : 'OK'}
+                              </span>
+                              {itemData?.notes && (
+                                <span className="text-xs text-yellow-600" title={itemData.notes}>
+                                  📝
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
 
           {/* Firmas */}

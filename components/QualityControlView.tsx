@@ -190,15 +190,31 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
             const inspector = staffMembers.find(member => member.id === selectedInspector);
             const inspectorName = inspector?.name || 'Inspector de Calidad';
 
-            // Crear entrada de historial
+            // Crear entrada de historial con información detallada del checklist
+            const qualityChecksData = qualityChecks.map(item => ({
+                id: item.id,
+                description: item.description,
+                category: item.category,
+                status: item.status,
+                notes: item.notes
+            }));
+            
+            const checklistSummary = qualityChecksData.map(item => 
+                `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
+            ).join('|');
+            
             const historyEntry = {
                 stage: approved ? KanbanStage.LISTO_ENTREGA : KanbanStage.EN_REPARACION,
-                timestamp: new Date().toISOString(),
+                date: new Date().toISOString(),
+                user: inspectorName,
                 notes: approved 
                     ? `Control de Calidad APROBADO por ${inspectorName}. Verificaciones completadas: ${getOverallProgress().completed}/${getOverallProgress().total}. Observaciones: ${finalNotes}`
                     : `Control de Calidad RECHAZADO por ${inspectorName}. Observaciones: ${finalNotes}`,
                 imageUrls: [],
                 staffMemberId: selectedInspector,
+                // Guardar información detallada del checklist
+                qualityChecksData: qualityChecksData,
+                checklistSummary: checklistSummary
             };
 
             // Actualizar historial
@@ -461,19 +477,13 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                                         workOrder={workOrder}
                                         client={client || {} as Client}
                                         vehicle={vehicle || {} as Vehicle}
-                                        companyInfo={data.appSettings?.companyInfo || null}
-                                        qualityChecks={qualityChecks.map(item => ({
-                                            id: item.id,
-                                            description: item.description,
-                                            category: item.category,
-                                            isChecked: item.status === 'ok',
-                                            notes: item.status === 'no-ok' ? `NO OK: ${item.notes || ''}` : item.notes,
-                                            status: item.status
-                                        }))}
-                                        overallNotes={finalNotes}
+                                        inspector={finalResult.inspectorName}
+                                        inspectionDate={new Date().toISOString()}
                                         isApproved={finalResult.isApproved}
-                                        inspectorName={finalResult.inspectorName}
-                                        inspectionDate={finalResult.inspectionDate}
+                                        notes={`${finalNotes} checklistSummary: ${qualityChecks.map(item => 
+                                            `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
+                                        ).join('|')}`}
+                                        companyInfo={data.appSettings?.companyInfo || undefined}
                                     />
                                 </div>
                             </div>

@@ -1080,16 +1080,19 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                     const completedItems = checklistInfo ? parseInt(checklistInfo[1]) : 0;
                                                     const totalItems = checklistInfo ? parseInt(checklistInfo[2]) : 0;
                                                     
-                                                    // Categorías del control de calidad
+                                                    // Obtener datos detallados del checklist si están disponibles
+                                                    const qualityChecksData = qualityControlEntry.qualityChecksData || [];
+                                                    
+                                                    // Categorías del control de calidad con sus elementos
                                                     const categories = [
                                                         {
                                                             id: 'exterior',
                                                             title: 'Exterior del vehículo limpio',
                                                             icon: 'car',
                                                             items: [
-                                                                'No hay manchas de grasa en tapicería o latonería',
-                                                                'Se retiraron plásticos protectores de asientos/volante',
-                                                                'Los elementos personales del cliente están en su lugar'
+                                                                { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería' },
+                                                                { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante' },
+                                                                { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar' }
                                                             ]
                                                         },
                                                         {
@@ -1097,12 +1100,12 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             title: 'Funcionamiento y Pruebas',
                                                             icon: 'cog',
                                                             items: [
-                                                                'El vehículo enciende correctamente',
-                                                                'No hay luces de advertencia en el tablero',
-                                                                'El motor funciona sin ruidos anormales',
-                                                                'Se realizó prueba de ruta y el manejo es correcto',
-                                                                'El sistema de A/C y calefacción funciona',
-                                                                'Los frenos responden adecuadamente'
+                                                                { id: 'func-1', description: 'El vehículo enciende correctamente' },
+                                                                { id: 'func-2', description: 'No hay luces de advertencia en el tablero' },
+                                                                { id: 'func-3', description: 'El motor funciona sin ruidos anormales' },
+                                                                { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto' },
+                                                                { id: 'func-5', description: 'El sistema de A/C y calefacción funciona' },
+                                                                { id: 'func-6', description: 'Los frenos responden adecuadamente' }
                                                             ]
                                                         },
                                                         {
@@ -1110,10 +1113,10 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             title: 'Verificación de Tareas',
                                                             icon: 'check-circle',
                                                             items: [
-                                                                'Se completaron todos los trabajos aprobados en la cotización',
-                                                                'Los repuestos reemplazados están guardados para el cliente (si aplica)',
-                                                                'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)',
-                                                                'Se ajustó la presión de los neumáticos'
+                                                                { id: 'verif-1', description: 'Se completaron todos los trabajos aprobados en la cotización' },
+                                                                { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)' },
+                                                                { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)' },
+                                                                { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos' }
                                                             ]
                                                         },
                                                         {
@@ -1121,12 +1124,32 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             title: 'Documentación y Entrega',
                                                             icon: 'document-text',
                                                             items: [
-                                                                'La factura corresponde con los trabajos realizados',
-                                                                'La orden de trabajo está completamente documentada',
-                                                                'Se ha preparado la recomendación de próximo mantenimiento'
+                                                                { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados' },
+                                                                { id: 'doc-2', description: 'La orden de trabajo está completamente documentada' },
+                                                                { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento' }
                                                             ]
                                                         }
                                                     ];
+                                                    
+                                                    // Función para obtener el estado de un elemento
+                                                    const getItemStatus = (itemId: string) => {
+                                                        const itemData = qualityChecksData.find(item => item.id === itemId);
+                                                        return itemData ? itemData.status : 'unset';
+                                                    };
+                                                    
+                                                    // Función para obtener el ícono y color según el estado
+                                                    const getStatusDisplay = (status: string) => {
+                                                        switch (status) {
+                                                            case 'ok':
+                                                                return { icon: '✅', color: 'bg-green-500', text: 'OK', textColor: 'text-green-400' };
+                                                            case 'no-ok':
+                                                                return { icon: '❌', color: 'bg-red-500', text: 'NO OK', textColor: 'text-red-400' };
+                                                            case 'na':
+                                                                return { icon: '➖', color: 'bg-gray-500', text: 'N/A', textColor: 'text-gray-400' };
+                                                            default:
+                                                                return { icon: '❓', color: 'bg-gray-600', text: 'Sin evaluar', textColor: 'text-gray-500' };
+                                                        }
+                                                    };
                                                     
                                                     return (
                                                         <div className="space-y-4">
@@ -1146,22 +1169,50 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             
                                                             {/* Categorías detalladas */}
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                                {categories.map(category => (
-                                                                    <div key={category.id} className="bg-gray-700 rounded-lg p-4">
-                                                                        <div className="flex items-center gap-2 mb-3">
-                                                                            <Icon name={category.icon as any} className="w-5 h-5 text-blue-400" />
-                                                                            <h5 className="font-semibold text-white text-sm">{category.title}</h5>
-                                                                        </div>
-                                                                        <div className="space-y-2">
-                                                                            {category.items.map((item, index) => (
-                                                                                <div key={index} className="flex items-center gap-2">
-                                                                                    <div className={`w-3 h-3 rounded-full ${isApproved ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                                                                    <span className="text-gray-300 text-xs">{item}</span>
+                                                                {categories.map(category => {
+                                                                    const categoryItems = qualityChecksData.filter(item => item.category === category.id);
+                                                                    const categoryProgress = categoryItems.length > 0 ? categoryItems.filter(item => item.status !== 'unset').length : 0;
+                                                                    const categoryTotal = categoryItems.length;
+                                                                    
+                                                                    return (
+                                                                        <div key={category.id} className="bg-gray-700 rounded-lg p-4">
+                                                                            <div className="flex items-center justify-between mb-3">
+                                                                                <div className="flex items-center gap-2">
+                                                                                    <Icon name={category.icon as any} className="w-5 h-5 text-blue-400" />
+                                                                                    <h5 className="font-semibold text-white text-sm">{category.title}</h5>
                                                                                 </div>
-                                                                            ))}
+                                                                                <span className="text-xs text-gray-400">{categoryProgress}/{categoryTotal}</span>
+                                                                            </div>
+                                                                            <div className="space-y-2">
+                                                                                {category.items.map((item) => {
+                                                                                    const status = getItemStatus(item.id);
+                                                                                    const statusDisplay = getStatusDisplay(status);
+                                                                                    const itemData = qualityChecksData.find(data => data.id === item.id);
+                                                                                    
+                                                                                    return (
+                                                                                        <div key={item.id} className="flex items-center justify-between">
+                                                                                            <div className="flex items-center gap-2 flex-1">
+                                                                                                <div className={`w-3 h-3 rounded-full ${statusDisplay.color}`}></div>
+                                                                                                <span className="text-gray-300 text-xs flex-1">{item.description}</span>
+                                                                                            </div>
+                                                                                            <div className="flex items-center gap-1">
+                                                                                                <span className="text-lg">{statusDisplay.icon}</span>
+                                                                                                <span className={`text-xs font-semibold ${statusDisplay.textColor}`}>
+                                                                                                    {statusDisplay.text}
+                                                                                                </span>
+                                                                                            </div>
+                                                                                            {itemData?.notes && (
+                                                                                                <div className="text-xs text-yellow-400 ml-2" title={itemData.notes}>
+                                                                                                    📝
+                                                                                                </div>
+                                                            )}
+                                                                                        </div>
+                                                                                    );
+                                                                                })}
+                                                                            </div>
                                                                         </div>
-                                                                    </div>
-                                                                ))}
+                                                                    );
+                                                                })}
                                                             </div>
                                                             
                                                             {/* Estado final */}

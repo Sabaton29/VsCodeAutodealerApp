@@ -289,6 +289,17 @@ export interface WorkOrderHistoryEntry {
     date: string;
     user: string;
     notes?: string;
+    imageUrls?: string[];
+    staffMemberId?: string;
+    // Información del control de calidad
+    qualityChecksData?: Array<{
+        id: string;
+        description: string;
+        category: 'exterior' | 'funcionalidad' | 'verificacion' | 'documentacion';
+        status: 'ok' | 'no-ok' | 'na' | 'unset';
+        notes?: string;
+    }>;
+    checklistSummary?: string;
 }
 
 export type DiagnosticType = 'Básico' | 'Intermedio' | 'Avanzado';
