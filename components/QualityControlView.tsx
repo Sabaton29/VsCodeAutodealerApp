@@ -115,11 +115,14 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
     }, [staffMembers, selectedInspector]);
 
     const handleStatusChange = (itemId: string, status: 'ok' | 'no-ok' | 'na') => {
-        setQualityChecks(prev => 
-            prev.map(item => 
+        console.log('🔍 QualityControlView - handleStatusChange:', { itemId, status });
+        setQualityChecks(prev => {
+            const updated = prev.map(item => 
                 item.id === itemId ? { ...item, status } : item
-            )
-        );
+            );
+            console.log('🔍 QualityControlView - qualityChecks updated:', updated.find(item => item.id === itemId));
+            return updated;
+        });
     };
 
     const getStatusButtonClass = (itemId: string, status: 'ok' | 'no-ok' | 'na') => {
@@ -199,9 +202,13 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                 notes: item.notes
             }));
             
+            console.log('🔍 QualityControlView - qualityChecksData before saving:', qualityChecksData);
+            
             const checklistSummary = qualityChecksData.map(item => 
                 `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
             ).join('|');
+            
+            console.log('🔍 QualityControlView - checklistSummary before saving:', checklistSummary);
             
             const historyEntry = {
                 stage: approved ? KanbanStage.LISTO_ENTREGA : KanbanStage.EN_REPARACION,

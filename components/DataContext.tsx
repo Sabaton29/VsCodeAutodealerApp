@@ -12,7 +12,11 @@ import {
     STAFF_DATA, SERVICES_DATA, INVENTORY_DATA, SUPPLIERS_DATA, PETTY_CASH_DATA,
     INVOICES_DATA, QUOTES_DATA, PURCHASE_ORDERS_DATA, OPERATING_EXPENSES_DATA, FINANCIAL_ACCOUNTS_DATA, DEFAULT_SERVICE_CATEGORIES, DEFAULT_INVENTORY_CATEGORIES, TIME_CLOCK_DATA, LOANS_DATA, LOAN_PAYMENTS_DATA, NOTIFICATIONS_DATA,
 } from '../constants';
-import { APPOINTMENTS_DATA } from '../appointmentConstants.js';
+// Datos de citas - DEFINIDOS INLINE
+const APPOINTMENTS_DATA: Appointment[] = [
+    { id: 'APP-1', clientId: 'C1', clientName: 'Juan Pérez', vehicleId: 'V1', vehicleSummary: 'Chevrolet Spark GT (ABC-123)', serviceRequested: 'Revisión de frenos', appointmentDateTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), status: AppointmentStatus.PROGRAMADA, locationId: '550e8400-e29b-41d4-a716-446655440001', advisorId: 'S2' },
+    { id: 'APP-2', clientId: 'C2', clientName: 'Ana Gómez', vehicleId: 'V2', vehicleSummary: 'Renault Duster (DEF-456)', serviceRequested: 'Cambio de aceite', appointmentDateTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(), status: AppointmentStatus.CONFIRMADA, locationId: '550e8400-e29b-41d4-a716-446655440002' },
+];
 import { UIContext } from './UIContext';
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
