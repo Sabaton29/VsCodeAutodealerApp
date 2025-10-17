@@ -301,6 +301,8 @@ const CostManagementSection: React.FC<{
 
 const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, quotes, onBack, client, vehicle, stageConfig, hasPermission, onCreateQuote, onShareWithClient, onCreateInvoiceFromWorkOrder, onViewQuote, onEditQuote, onRegisterCosts, suppliers, appSettings, onReportUnforeseenIssue, staffMembers, onUpdateDiagnosticType, onStartDiagnostic }) => {
     
+    const [showQualityControlModal, setShowQualityControlModal] = useState(false);
+    
     const galleryImages = useMemo(() => {
         const allImages: { src: string; type: 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico'; timestamp: string; notes?: string; }[] = [];
 
@@ -824,6 +826,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
 
 
     return (
+        <>
         <div className="space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
@@ -1063,26 +1066,130 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                 </div>
                                             </div>
                                             
-                                            {/* Aquí irían los detalles del checklist si los tuviéramos */}
+                                            {/* Checklist detallado del control de calidad */}
                                             <div className="border-t border-gray-700 pt-4">
                                                 <h4 className="text-lg font-semibold text-white mb-3 flex items-center gap-2">
-                                                    <Icon name="clipboard-check" className="w-5 h-5" />
-                                                    Detalles del Control
+                                                    <Icon name="clipboard" className="w-5 h-5" />
+                                                    Detalles del Control de Calidad
                                                 </h4>
-                                                <div className="text-gray-300 text-sm">
-                                                    <p>• <strong>Estado:</strong> {isApproved ? 'Aprobado' : 'Rechazado'}</p>
-                                                    <p>• <strong>Resultado:</strong> {isApproved ? 'El vehículo cumple con todos los estándares de calidad' : 'El vehículo requiere correcciones adicionales'}</p>
-                                                    <p>• <strong>Proceso:</strong> Control de calidad completado exitosamente</p>
-                                                </div>
+                                                
+                                                {/* Mostrar el checklist completo */}
+                                                {(() => {
+                                                    // Extraer información del checklist del historial
+                                                    const checklistInfo = qualityControlEntry.notes?.match(/Verificaciones completadas: (\d+)\/(\d+)/);
+                                                    const completedItems = checklistInfo ? parseInt(checklistInfo[1]) : 0;
+                                                    const totalItems = checklistInfo ? parseInt(checklistInfo[2]) : 0;
+                                                    
+                                                    // Categorías del control de calidad
+                                                    const categories = [
+                                                        {
+                                                            id: 'exterior',
+                                                            title: 'Exterior del vehículo limpio',
+                                                            icon: 'car',
+                                                            items: [
+                                                                'No hay manchas de grasa en tapicería o latonería',
+                                                                'Se retiraron plásticos protectores de asientos/volante',
+                                                                'Los elementos personales del cliente están en su lugar'
+                                                            ]
+                                                        },
+                                                        {
+                                                            id: 'funcionalidad',
+                                                            title: 'Funcionamiento y Pruebas',
+                                                            icon: 'cog',
+                                                            items: [
+                                                                'El vehículo enciende correctamente',
+                                                                'No hay luces de advertencia en el tablero',
+                                                                'El motor funciona sin ruidos anormales',
+                                                                'Se realizó prueba de ruta y el manejo es correcto',
+                                                                'El sistema de A/C y calefacción funciona',
+                                                                'Los frenos responden adecuadamente'
+                                                            ]
+                                                        },
+                                                        {
+                                                            id: 'verificacion',
+                                                            title: 'Verificación de Tareas',
+                                                            icon: 'check-circle',
+                                                            items: [
+                                                                'Se completaron todos los trabajos aprobados en la cotización',
+                                                                'Los repuestos reemplazados están guardados para el cliente (si aplica)',
+                                                                'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)',
+                                                                'Se ajustó la presión de los neumáticos'
+                                                            ]
+                                                        },
+                                                        {
+                                                            id: 'documentacion',
+                                                            title: 'Documentación y Entrega',
+                                                            icon: 'document-text',
+                                                            items: [
+                                                                'La factura corresponde con los trabajos realizados',
+                                                                'La orden de trabajo está completamente documentada',
+                                                                'Se ha preparado la recomendación de próximo mantenimiento'
+                                                            ]
+                                                        }
+                                                    ];
+                                                    
+                                                    return (
+                                                        <div className="space-y-4">
+                                                            {/* Resumen general */}
+                                                            <div className="bg-gray-700 rounded-lg p-3">
+                                                                <div className="flex items-center justify-between mb-2">
+                                                                    <span className="text-white font-semibold">Progreso General</span>
+                                                                    <span className="text-blue-400 font-mono">{completedItems}/{totalItems}</span>
+                                                                </div>
+                                                                <div className="w-full bg-gray-600 rounded-full h-2">
+                                                                    <div 
+                                                                        className={`h-2 rounded-full transition-all duration-300 ${isApproved ? 'bg-green-500' : 'bg-red-500'}`}
+                                                                        style={{ width: `${totalItems > 0 ? (completedItems / totalItems) * 100 : 0}%` }}
+                                                                    ></div>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            {/* Categorías detalladas */}
+                                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                                {categories.map(category => (
+                                                                    <div key={category.id} className="bg-gray-700 rounded-lg p-4">
+                                                                        <div className="flex items-center gap-2 mb-3">
+                                                                            <Icon name={category.icon as any} className="w-5 h-5 text-blue-400" />
+                                                                            <h5 className="font-semibold text-white text-sm">{category.title}</h5>
+                                                                        </div>
+                                                                        <div className="space-y-2">
+                                                                            {category.items.map((item, index) => (
+                                                                                <div key={index} className="flex items-center gap-2">
+                                                                                    <div className={`w-3 h-3 rounded-full ${isApproved ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                                                    <span className="text-gray-300 text-xs">{item}</span>
+                                                                                </div>
+                                                                            ))}
+                                                                        </div>
+                                                                    </div>
+                                                                ))}
+                                                            </div>
+                                                            
+                                                            {/* Estado final */}
+                                                            <div className="bg-gray-700 rounded-lg p-3">
+                                                                <div className="flex items-center gap-3">
+                                                                    <div className={`w-4 h-4 rounded-full ${isApproved ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                                    <div>
+                                                                        <p className="text-white font-semibold">
+                                                                            {isApproved ? '✅ Control de Calidad APROBADO' : '❌ Control de Calidad RECHAZADO'}
+                                                                        </p>
+                                                                        <p className="text-gray-300 text-sm">
+                                                                            {isApproved 
+                                                                                ? 'El vehículo cumple con todos los estándares de calidad'
+                                                                                : 'El vehículo requiere correcciones adicionales'
+                                                                            }
+                                                                        </p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })()}
                                             </div>
                                             
                                             {/* Botón para versión imprimible */}
                                             <div className="flex justify-end pt-4 border-t border-gray-700">
                                                 <button
-                                                    onClick={() => {
-                                                        // Aquí abriríamos el modal de versión imprimible
-                                                        console.log('🔍 Abrir versión imprimible del control de calidad');
-                                                    }}
+                                                    onClick={() => setShowQualityControlModal(true)}
                                                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                                                 >
                                                     <Icon name="printer" className="w-4 h-4" />
@@ -1346,6 +1453,61 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                 </div>
             </div>
         </div>
+        
+        {/* Modal para versión imprimible del Control de Calidad */}
+        {showQualityControlModal && (() => {
+            const qualityControlEntry = workOrder.history?.find(entry => 
+                entry.notes?.includes('Control de Calidad APROBADO') || 
+                entry.notes?.includes('Control de Calidad RECHAZADO') ||
+                entry.stage === 'Control de Calidad' ||
+                entry.notes?.includes('Control de Calidad')
+            );
+            
+            if (!qualityControlEntry) return null;
+            
+            const isApproved = qualityControlEntry.notes?.includes('APROBADO') || 
+                             qualityControlEntry.notes?.includes('Listo para Entrega') ||
+                             workOrder.stage === 'Listo para Entrega';
+            
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-auto">
+                        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
+                            <h2 className="text-xl font-bold text-gray-800">Reporte de Control de Calidad</h2>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => window.print()}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    <Icon name="printer" className="w-4 h-4 inline mr-2" />
+                                    Imprimir
+                                </button>
+                                <button
+                                    onClick={() => setShowQualityControlModal(false)}
+                                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+                                >
+                                    <Icon name="x" className="w-4 h-4 inline mr-2" />
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-0">
+                            <PrintableQualityControlReport
+                                workOrder={workOrder}
+                                client={client}
+                                vehicle={vehicle}
+                                inspector={qualityControlEntry.user || 'Sistema'}
+                                inspectionDate={qualityControlEntry.date}
+                                isApproved={isApproved}
+                                notes={qualityControlEntry.notes || ''}
+                                companyInfo={appSettings?.companyInfo}
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        })()}
+        </>
     );
 };
 
