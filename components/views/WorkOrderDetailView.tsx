@@ -1215,23 +1215,28 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                 })}
                                                             </div>
                                                             
-                                                            {/* Estado final */}
-                                                            <div className="bg-gray-700 rounded-lg p-3">
-                                                                <div className="flex items-center gap-3">
-                                                                    <div className={`w-4 h-4 rounded-full ${isApproved ? 'bg-green-500' : 'bg-red-500'}`}></div>
-                                                                    <div>
-                                                                        <p className="text-white font-semibold">
-                                                                            {isApproved ? '✅ Control de Calidad APROBADO' : '❌ Control de Calidad RECHAZADO'}
-                                                                        </p>
-                                                                        <p className="text-gray-300 text-sm">
-                                                                            {isApproved 
-                                                                                ? 'El vehículo cumple con todos los estándares de calidad'
-                                                                                : 'El vehículo requiere correcciones adicionales'
-                                                                            }
-                                                                        </p>
-                                                                    </div>
-                                                                </div>
-                                                            </div>
+                                            {/* Estado final */}
+                                            <div className="bg-gray-700 rounded-lg p-3">
+                                                <div className="flex items-center gap-3">
+                                                    <div className={`w-4 h-4 rounded-full ${isApproved ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                                                    <div>
+                                                        <p className="text-white font-semibold">
+                                                            {isApproved ? '✅ Control de Calidad APROBADO' : '❌ Control de Calidad RECHAZADO'}
+                                                        </p>
+                                                        <p className="text-gray-300 text-sm">
+                                                            {isApproved 
+                                                                ? 'El vehículo cumple con todos los estándares de calidad'
+                                                                : 'El vehículo requiere correcciones adicionales'
+                                                            }
+                                                        </p>
+                                                        {qualityControlEntry.notes?.includes('avanzada manualmente sin completar checklist detallado') && (
+                                                            <p className="text-yellow-400 text-xs mt-1">
+                                                                ⚠️ Este control fue avanzado manualmente. Los elementos se muestran como "OK" por defecto.
+                                                            </p>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
                                                         </div>
                                                     );
                                                 })()}

@@ -485,8 +485,10 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                         )}
                                         {/* Etiqueta de Imprevisto si el item está relacionado con imprevistos */}
                                         {workOrder.unforeseenIssues && workOrder.unforeseenIssues.some(issue => 
-                                            issue.description.toLowerCase().includes(item.description.toLowerCase()) ||
-                                            item.description.toLowerCase().includes(issue.description.toLowerCase())
+                                            (issue.description && item.description && 
+                                             issue.description.toLowerCase().includes(item.description.toLowerCase())) ||
+                                            (issue.description && item.description && 
+                                             item.description.toLowerCase().includes(issue.description.toLowerCase()))
                                         ) && (
                                             <span className="text-xs font-semibold bg-orange-800/50 text-orange-200 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1">
                                                 <Icon name="exclamation-triangle" className="w-3 h-3"/>

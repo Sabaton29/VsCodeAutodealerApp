@@ -795,7 +795,6 @@ export interface DataContextType {
     handleReceivePurchaseOrder: (poId: string) => Promise<void>;
     handleRegisterItemCosts: (workOrderId: string, costs: { itemId: string; costPrice: number; supplierId: string }[]) => Promise<void>;
     fixLinkedQuoteIds: (workOrderId: string) => Promise<string[]>;
-    handleRegisterDelivery: (workOrderId: string, deliveryData: { deliveryEvidenceFiles: File[]; nextMaintenanceDate: string; nextMaintenanceMileage: string; nextMaintenanceNotes: string; customerConfirmed: boolean; }) => Promise<void>;
     handleFactorInvoice: (invoiceId: string, factoringData: Omit<Invoice['factoringInfo'], 'retentionReleased'>) => Promise<void>;
     handleReleaseRetention: (invoiceId: string, releaseData: { date: string; accountId: string; }) => Promise<void>;
     handleToggleInvoiceVat: (invoiceId: string) => Promise<void>;
