@@ -685,11 +685,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleCreateQuote = async(quoteData: Omit<Quote, 'id'>): Promise<Quote | null> => {
         try {
-            console.log('🔍 DataContext - handleCreateQuote - quoteData:', quoteData);
             const result = await supabaseService.insert('quotes', quoteData);
-            console.log('🔍 DataContext - handleCreateQuote - result:', result);
-            console.log('🔍 DataContext - handleCreateQuote - result type:', typeof result);
-            console.log('🔍 DataContext - handleCreateQuote - result is array:', Array.isArray(result));
             
             if (result && quoteData.workOrderId) {
                 // Supabase insert devuelve un objeto, no un array
@@ -776,36 +772,26 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleAdvanceStage = async(workOrderId: string, currentStage: KanbanStage): Promise<void> => {
         try {
-            console.log(`🚨 DataContext - handleAdvanceStage - INICIO - workOrderId: ${workOrderId}, currentStage: ${currentStage}`);
             
             const currentIndex = KANBAN_STAGES_ORDER.indexOf(currentStage);
             if (currentIndex < KANBAN_STAGES_ORDER.length - 1) {
                 const nextStage = KANBAN_STAGES_ORDER[currentIndex + 1];
                 
-                console.log(`🚨 DataContext - handleAdvanceStage - Advancing from ${currentStage} to ${nextStage}`);
                 
                 const updateData = {
                     stage: nextStage,
                     updatedAt: new Date(),
                 };
                 
-                console.log(`🚨 DataContext - handleAdvanceStage - updateData:`, updateData);
-                console.log(`🚨 DataContext - handleAdvanceStage - Llamando a supabaseService.updateWorkOrder...`);
                 
                 const result = await supabaseService.updateWorkOrder(workOrderId, updateData);
-                console.log(`🚨 DataContext - handleAdvanceStage - Resultado de updateWorkOrder:`, result);
-                
                 if (result) {
-                    console.log(`🚨 DataContext - handleAdvanceStage - updateWorkOrder exitoso, actualizando estado local...`);
-                    
                     // Update local work orders state
                     setWorkOrders(prev => prev.map(wo => 
                         wo.id === workOrderId ? { ...wo, stage: nextStage } : wo,
                     ));
-                    
-                    console.log(`🚨 DataContext - handleAdvanceStage - Estado local actualizado a ${nextStage}`);
                 } else {
-                    console.error(`❌ DataContext - handleAdvanceStage - updateWorkOrder falló, result es null/undefined`);
+                    console.error('Error al actualizar etapa de la orden de trabajo');
                 }
                 
                 // Add history entry
@@ -816,18 +802,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     notes: `Etapa avanzada manualmente de ${currentStage} a ${nextStage}`,
                 };
                 
-                console.log(`🚨 DataContext - handleAdvanceStage - ANTES de handleUpdateWorkOrderHistory - stage actual: ${nextStage}`);
                 await handleUpdateWorkOrderHistory(workOrderId, historyEntry);
-                console.log(`🚨 DataContext - handleAdvanceStage - DESPUÉS de handleUpdateWorkOrderHistory - stage debería seguir siendo: ${nextStage}`);
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleAdvanceStage: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleAdvanceStage: Refrescando órdenes de trabajo después de avanzar etapa...');
                 await refreshWorkOrders();
-                console.log(`🚨 DataContext - handleAdvanceStage - FIN - refreshWorkOrders completado`);
                 
             }
         } catch (error) {
@@ -1626,14 +1607,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const handleApproveQuote = async(quoteId: string): Promise<void> => {
-        console.log('🚨 handleApproveQuote INICIADO para quoteId:', quoteId);
         try {
-            console.log('🚨 handleApproveQuote: Llamando a supabaseService.updateQuote...');
             const result = await supabaseService.updateQuote(quoteId, {
                 status: QuoteStatus.APROBADO,
                 updatedAt: new Date().toISOString(),
             });
-            console.log('🚨 handleApproveQuote: Resultado de updateQuote:', result);
             
             if (result && result.workOrderId) {
                 setQuotes(prev => prev.map(q => 
@@ -2140,7 +2118,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const fixLinkedQuoteIds = async(workOrderId: string): Promise<string[]> => {
         try {
-            console.log('🔧 DataContext - fixLinkedQuoteIds called for workOrderId:', workOrderId);
             
             const workOrder = workOrders.find(wo => wo.id === workOrderId);
             if (!workOrder) {
@@ -2150,7 +2127,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             // Find all quotes for this work order
             const quotesForWorkOrder = quotes.filter(q => q.workOrderId === workOrderId);
-            console.log('🔧 DataContext - Found quotes for work order:', quotesForWorkOrder.map(q => q.id));
 
             if (quotesForWorkOrder.length > 0) {
                 const newLinkedQuoteIds = quotesForWorkOrder.map(q => q.id);
@@ -2160,7 +2136,6 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     updatedAt: new Date(),
                 };
 
-                console.log('🔧 DataContext - Updating linkedQuoteIds:', newLinkedQuoteIds, 'preserving stage:', workOrder.stage);
                 const updatedWorkOrder = await supabaseService.updateWorkOrder(workOrderId, updateData);
                 
                 // Update local state with the returned data
@@ -2421,42 +2396,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Función optimizada para recargar solo órdenes de trabajo
     const refreshWorkOrders = async() => {
         try {
-            console.log('🚨 refreshWorkOrders - INICIO - Obteniendo datos de Supabase...');
-            
             const workOrdersData = await supabaseService.getWorkOrders();
             
             if (workOrdersData) {
-                console.log('🚨 refreshWorkOrders - Datos obtenidos de Supabase:', workOrdersData.length, 'órdenes');
-                
-                // Buscar la orden específica que estamos actualizando
-                const targetOrderFromSupabase = workOrdersData.find(wo => wo.id === '0104');
-                if (targetOrderFromSupabase) {
-                    console.log('🚨 refreshWorkOrders - Orden 0104 encontrada en Supabase:', {
-                        id: targetOrderFromSupabase.id,
-                        stage: targetOrderFromSupabase.stage,
-                        status: targetOrderFromSupabase.status
-                    });
-                } else {
-                    console.log('🚨 refreshWorkOrders - Orden 0104 NO encontrada en Supabase');
-                }
-                
                 const updatedWorkOrders = workOrdersData.map(wo => ({
                     ...wo,
                     status: wo.status as WorkOrderStatus,
                 }));
                 
-                // Verificar la orden específica antes de actualizar
-                const targetOrderForLocal = updatedWorkOrders.find(wo => wo.id === '0104');
-                if (targetOrderForLocal) {
-                    console.log(`🚨🚨🚨 SETWORKORDERS - Orden 0104 ANTES de actualizar estado local:`, {
-                        id: targetOrderForLocal.id,
-                        stage: targetOrderForLocal.stage,
-                        status: targetOrderForLocal.status
-                    });
-                }
-                
                 setWorkOrders(updatedWorkOrders);
-                console.log('🚨 refreshWorkOrders - Estado local actualizado con datos de Supabase');
             }
             
         } catch (error) {
@@ -2468,9 +2416,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Función de emergencia para recargar TODO y sincronizar
     const forceFullRefresh = async() => {
         try {
-            console.log('🚨 FORZANDO RECARGA COMPLETA PARA SINCRONIZAR...');
             await loadAllData();
-            console.log('✅ Recarga completa exitosa');
         } catch (error) {
             console.error('❌ Error en recarga completa:', error);
         }
@@ -2631,8 +2577,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     // SISTEMA AUTOMÁTICO FORZADO - DESHABILITADO TEMPORALMENTE
     React.useEffect(() => {
-        console.log('🚫 SISTEMA AUTOMÁTICO DESHABILITADO - No se ejecutará corrección automática');
-        return; // SALIR INMEDIATAMENTE - NO EJECUTAR CORRECCIÓN AUTOMÁTICA
+        return; // Sistema automático deshabilitado
         
         console.log('🚀 SISTEMA AUTOMÁTICO INICIADO - useEffect ejecutado');
         console.log('🚀 SISTEMA AUTOMÁTICO - workOrders.length:', workOrders.length);
