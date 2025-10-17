@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useContext } from 'react';
 import { Appointment, StaffMember, Permission, AppointmentStatus, CalendarView, UserRole } from '../../types';
 import { Icon } from '../Icon';
-import { APPOINTMENT_STATUS_DISPLAY_CONFIG } from '../../constants';
+import { APPOINTMENT_STATUS_DISPLAY_CONFIG } from '../../appointmentConstants';
 import AppointmentDetailSidebar from '../AppointmentDetailSidebar';
 import { UIContext } from '../UIContext';
 
