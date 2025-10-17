@@ -114,7 +114,7 @@ export const insert = async (tableName: string, data: any): Promise<any> => {
         
         const transformedData = transformData(cleanedData);
         console.log(`🔍 Supabase insert - transformed data:`, transformedData);
-        
+            
             const { data: result, error } = await supabase
             .from(tableName)
             .insert(transformedData)
@@ -132,7 +132,7 @@ export const insert = async (tableName: string, data: any): Promise<any> => {
         console.log(`🔍 Supabase insert - final result:`, finalResult);
         
         return finalResult;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, `insert ${tableName}`);
         throw error;
     }
@@ -149,24 +149,24 @@ export const update = async (tableName: string, id: string, data: any): Promise<
                 .select()
                 .single();
             
-        if (error) throw error;
+            if (error) throw error;
         return transformData(result, false);
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, `update ${tableName}`);
                 throw error;
-            }
+        }
 };
 
 export const deleteRecord = async (tableName: string, id: string): Promise<boolean> => {
         try {
             const { error } = await supabase
             .from(tableName)
-            .delete()
+                .delete()
                 .eq('id', id);
             
             if (error) throw error;
             return true;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, `delete ${tableName}`);
             return false;
         }
@@ -194,9 +194,9 @@ export const createLocation = async (locationData: Omit<Location, 'id'>): Promis
         const { data, error } = await supabase
             .from('locations')
             .insert(transformedData)
-            .select()
-            .single();
-        
+                .select()
+                .single();
+            
         if (error) throw error;
         return transformData(data, false) as Location;
     } catch (error) {
@@ -215,23 +215,23 @@ export const updateLocation = async (id: string, locationData: Partial<Location>
                 .select()
                 .single();
             
-        if (error) throw error;
+            if (error) throw error;
         return transformData(data, false) as Location;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'update location');
                 throw error;
-            }
+        }
 };
 
 export const deleteLocation = async (id: string): Promise<void> => {
         try {
             const { error } = await supabase
             .from('locations')
-            .delete()
+                .delete()
                 .eq('id', id);
             
             if (error) throw error;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'delete location');
         throw error;
     }
@@ -240,14 +240,41 @@ export const deleteLocation = async (id: string): Promise<void> => {
 // WORK ORDERS
 export const getWorkOrders = async (): Promise<WorkOrder[]> => {
     try {
+        console.log('🚨🚨🚨 SUPABASE GET - INICIO - Obteniendo órdenes de trabajo...');
         const { data, error } = await supabase
             .from('work_orders')
             .select('*')
             .order('created_at', { ascending: false });
         
-        if (error) throw error;
+        if (error) {
+            console.error('🚨🚨🚨 SUPABASE GET - ERROR - Error fetching work orders:', error);
+            throw error;
+        }
+        
+        console.log(`🚨🚨🚨 SUPABASE GET - RESPUESTA - ${data?.length || 0} órdenes de trabajo obtenidas.`);
+        
+        // Buscar TODOS los registros de la orden 0104 (por si hay duplicados)
+        const allOrders0104 = data?.filter(wo => wo.id === '0104') || [];
+        console.log(`🚨🚨🚨 SUPABASE GET - TODOS los registros de orden 0104 encontrados:`, allOrders0104.length);
+        
+        allOrders0104.forEach((order, index) => {
+            console.log(`🚨🚨🚨 SUPABASE GET - Registro ${index + 1} de orden 0104:`, { 
+                id: order.id, 
+                stage: order.stage, 
+                status: order.status,
+                created_at: order.created_at,
+                updated_at: order.updated_at
+            });
+        });
+        
+        const targetOrder = data?.find(wo => wo.id === '0104');
+        if (targetOrder) {
+            console.log('🚨🚨🚨 SUPABASE GET - Orden 0104 en carga inicial (PRIMER REGISTRO):', { id: targetOrder.id, stage: targetOrder.stage, status: targetOrder.status });
+        }
+        
         return transformData(data, false) as WorkOrder[];
     } catch (error) {
+        console.error('🚨🚨🚨 SUPABASE GET - ERROR en getWorkOrders:', error);
         handleSupabaseError(error, 'get work orders');
         return [];
     }
@@ -282,9 +309,9 @@ export const createWorkOrder = async (workOrderData: Omit<WorkOrder, 'id' | 'cre
         const { data, error } = await supabase
             .from('work_orders')
             .insert(transformedData)
-            .select('*')
-                        .single();
-                    
+                .select('*')
+                .single();
+            
         if (error) throw error;
         return transformData(data, false) as WorkOrder;
     } catch (error) {
@@ -295,6 +322,20 @@ export const createWorkOrder = async (workOrderData: Omit<WorkOrder, 'id' | 'cre
 
 export const updateWorkOrder = async (id: string, workOrderData: Partial<WorkOrder>): Promise<WorkOrder> => {
     try {
+        console.log(`🚨🚨🚨 SUPABASE UPDATE - INICIO - id: ${id}, workOrderData:`, workOrderData);
+        
+        // Verificar si esta actualización incluye el stage
+        if (workOrderData.stage) {
+            console.log(`🚨🚨🚨 SUPABASE UPDATE - ACTUALIZANDO STAGE a: ${workOrderData.stage}`);
+        } else {
+            console.log(`🚨🚨🚨 SUPABASE UPDATE - NO incluye stage - Solo actualizando:`, Object.keys(workOrderData));
+        }
+        
+        // MOSTRAR CALL STACK para identificar qué función está causando la sobrescritura
+        if (workOrderData.stage === 'En Reparación' && workOrderData.LinkedQuoteIds) {
+            console.trace('🚨🚨🚨 SUPABASE UPDATE - CALL STACK - FUNCIÓN QUE SOBRESCRIBE A EN REPARACIÓN');
+        }
+        
         // Limpiar datos antes de enviar - eliminar campos vacíos que causan errores
         const cleanedData = { ...workOrderData };
         
@@ -318,17 +359,40 @@ export const updateWorkOrder = async (id: string, workOrderData: Partial<WorkOrd
             }
         });
         
+        console.log(`🔍 supabase.ts - updateWorkOrder - cleanedData:`, cleanedData);
+        
         const transformedData = transformData(cleanedData);
+        console.log(`🔍 supabase.ts - updateWorkOrder - transformedData:`, transformedData);
+        
         const { data, error } = await supabase
             .from('work_orders')
             .update(transformedData)
             .eq('id', id)
             .select('*')
-                .single();
+                        .single();
+                    
+        console.log(`🚨🚨🚨 SUPABASE UPDATE - RESPUESTA - data:`, data, 'error:', error);
+        
+        // Verificar específicamente si el stage se actualizó correctamente
+        if (data && data.stage) {
+            console.log(`🚨🚨🚨 SUPABASE UPDATE - STAGE EN RESPUESTA:`, data.stage);
+            if (data.stage !== workOrderData.stage) {
+                console.error(`🚨🚨🚨 SUPABASE UPDATE - ERROR: Stage no coincide! Enviado: ${workOrderData.stage}, Recibido: ${data.stage}`);
+            } else {
+                console.log(`🚨🚨🚨 SUPABASE UPDATE - SUCCESS: Stage coincide correctamente`);
+            }
+        }
 
-        if (error) throw error;
-        return transformData(data, false) as WorkOrder;
+        if (error) {
+            console.error(`❌ supabase.ts - updateWorkOrder - Error de Supabase:`, error);
+            throw error;
+        }
+        
+        const result = transformData(data, false) as WorkOrder;
+        console.log(`🚨🚨🚨 SUPABASE UPDATE - RESULTADO FINAL:`, result);
+        return result;
     } catch (error) {
+        console.error(`❌ supabase.ts - updateWorkOrder - Error general:`, error);
         handleSupabaseError(error, 'update work order');
         throw error;
     }
@@ -342,10 +406,10 @@ export const deleteWorkOrder = async (id: string): Promise<void> => {
             .eq('id', id);
         
         if (error) throw error;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'delete work order');
         throw error;
-    }
+        }
 };
 
 // CLIENTS
@@ -384,7 +448,7 @@ export const createClient = async (clientData: Omit<Client, 'id' | 'vehicleCount
 export const updateClient = async (id: string, clientData: Partial<Client>): Promise<Client> => {
     try {
         const transformedData = transformData(clientData);
-        const { data, error } = await supabase
+            const { data, error } = await supabase
             .from('clients')
             .update(transformedData)
             .eq('id', id)
@@ -472,7 +536,7 @@ export const deleteVehicle = async (id: string): Promise<void> => {
             .eq('id', id);
         
         if (error) throw error;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'delete vehicle');
         throw error;
     }

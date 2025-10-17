@@ -1417,11 +1417,36 @@ const ModalManager: React.FC = () => {
                 />}
             </Modal>
             <Modal isOpen={type === 'REGISTER_DELIVERY'} onClose={closeModal} title={`Registrar Entrega de OT #${modalData?.id ?? ''}`} size="4xl">
-                {modalData && <RegisterDeliveryForm
-                    workOrder={modalData}
-                    onSave={async(workOrderId, deliveryData) => { await data.handleRegisterDelivery(workOrderId, deliveryData); closeModal(); }}
-                    onCancel={closeModal}
-                />}
+                {modalData && (() => {
+                    // Debug completo de la estructura de modalData
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - modalData completo:', modalData);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.client:', modalData.client);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.vehicle:', modalData.vehicle);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.client_id:', modalData.client_id);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.vehicle_id:', modalData.vehicle_id);
+                    
+                    // Intentar diferentes formas de acceder a los datos
+                    const clientId = modalData.client_id || modalData.client?.id;
+                    const vehicleId = modalData.vehicle_id || modalData.vehicle?.id;
+                    
+                    const foundClient = data.clients.find(c => c.id === clientId);
+                    const foundVehicle = data.vehicles.find(v => v.id === vehicleId);
+                    
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - clientId final:', clientId);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - vehicleId final:', vehicleId);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - foundClient:', foundClient);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - foundVehicle:', foundVehicle);
+
+                    return (
+                        <RegisterDeliveryForm
+                            workOrder={modalData}
+                            client={foundClient}
+                            vehicle={foundVehicle}
+                            onSave={async(workOrderId, deliveryData) => { await data.handleRegisterDelivery(workOrderId, deliveryData); closeModal(); }}
+                            onCancel={closeModal}
+                        />
+                    );
+                })()}
             </Modal>
             <Modal isOpen={type === 'EDIT_LOCATION'} onClose={closeModal} title={modalData === 'new' ? 'Añadir Nueva Sede' : 'Editar Sede'}>
                 <AddLocationForm

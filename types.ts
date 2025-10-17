@@ -793,6 +793,13 @@ export interface DataContextType {
     handleAddLoanPayment: (paymentData: Omit<LoanPayment, 'id' | 'paymentDate'>) => Promise<void>;
     handlePostProgressUpdate: (workOrderId: string, notes: string, files: File[]) => Promise<void>;
     handleToggleTaskCompleted: (workOrderId: string, quoteItemId: string, isCompleted: boolean, itemImageFiles?: File[]) => Promise<void>;
+    handleRegisterDelivery: (workOrderId: string, deliveryData: {
+        deliveryEvidenceFiles: File[];
+        nextMaintenanceDate: string;
+        nextMaintenanceMileage: string;
+        nextMaintenanceNotes: string;
+        customerConfirmed: boolean;
+    }) => Promise<void>;
     handleReportUnforeseenIssue: (workOrderId: string, issue: UnforeseenIssue) => Promise<void>;
     handleUpdateAllWorkOrderStages: () => Promise<{ updated: number; skipped: number; errors: string[] }>;
     handleRestoreIncorrectlyCompletedOrders: () => Promise<{ restored: number; errors: string[] }>;
