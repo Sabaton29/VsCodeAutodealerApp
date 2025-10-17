@@ -968,15 +968,40 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
 
                     {(showProgressTracker || quotes.length > 0) && <ProgressTracker workOrder={workOrder} quote={quotes.find(q => q.status === QuoteStatus.APROBADO) || quotes[0]} quotes={quotes} client={client} vehicle={vehicle} hasPermission={hasPermission} onReportUnforeseenIssue={onReportUnforeseenIssue} />}
                     
-                    {/* Control de Calidad */}
-                    {workOrder.stage === KanbanStage.CONTROL_CALIDAD && quotes.length > 0 && (
+                    {/* Botón para iniciar Control de Calidad - Solo para usuarios con permisos */}
+                    {workOrder.stage === KanbanStage.CONTROL_CALIDAD && quotes.length > 0 && hasPermission('advance:work_order_stage') && !showQualityControlModal && (
+                        <div className="bg-orange-900/20 border border-orange-700/50 rounded-xl p-5">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <h3 className="font-bold text-orange-200 flex items-center gap-2 mb-2">
+                                        <Icon name="check-circle" className="w-5 h-5"/>
+                                        Control de Calidad Requerido
+                                    </h3>
+                                    <p className="text-orange-100 text-sm">
+                                        El vehículo está listo para la inspección final. Realice el checklist de calidad para aprobar o devolver al técnico.
+                                    </p>
+                                </div>
+                                <button
+                                    onClick={() => setShowQualityControlModal(true)}
+                                    className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors flex items-center gap-2"
+                                >
+                                    <Icon name="check-circle" className="w-4 h-4" />
+                                    Iniciar Control de Calidad
+                                </button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Control de Calidad - Solo mostrar si el usuario tiene permisos y lo solicita manualmente */}
+                    {workOrder.stage === KanbanStage.CONTROL_CALIDAD && quotes.length > 0 && hasPermission('advance:work_order_stage') && showQualityControlModal && (
                         <QualityControlView 
                             workOrder={workOrder} 
                             quote={quotes.find(q => q.status === QuoteStatus.APROBADO)!} 
                             client={client} 
                             vehicle={vehicle} 
                             hasPermission={hasPermission} 
-                            onBack={onBack} 
+                            onBack={() => setShowQualityControlModal(false)} 
+                            onClose={() => setShowQualityControlModal(false)}
                             staffMembers={staffMembers}
                         />
                     )}

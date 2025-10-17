@@ -42,6 +42,7 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     },
 };
 
+// DataContext - CLOUDFLARE PAGES FIX
 export const DataContext = createContext<DataContextType | null>(null);
 
 const calculateDueDate = (issueDate: Date, terms?: PaymentTerms): Date => {

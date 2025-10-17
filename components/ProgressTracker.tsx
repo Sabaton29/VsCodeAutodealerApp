@@ -227,17 +227,17 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
     const allTasksCompleted = allApprovedItems.every(item => item.isCompleted);
     const hasQuote = approvedQuotes.length > 0;
 
-    // Detectar cuando todas las tareas están completas
+    // Detectar cuando todas las tareas están completas - SOLO mostrar notificación, NO abrir modal automáticamente
     useEffect(() => {
-        if (hasQuote && allTasksCompleted && !showQualityControlModal) {
-            // Solo mostrar el modal si no se ha mostrado antes en esta sesión
-            const hasShownModal = sessionStorage.getItem(`quality-control-${workOrder.id}`);
-            if (!hasShownModal) {
-                setShowQualityControlModal(true);
-                sessionStorage.setItem(`quality-control-${workOrder.id}`, 'true');
+        if (hasQuote && allTasksCompleted) {
+            // Solo mostrar notificación, no abrir modal automáticamente
+            const hasShownNotification = sessionStorage.getItem(`quality-control-notification-${workOrder.id}`);
+            if (!hasShownNotification) {
+                console.log('✅ Todas las tareas completadas. El usuario puede iniciar control de calidad manualmente.');
+                sessionStorage.setItem(`quality-control-notification-${workOrder.id}`, 'true');
             }
         }
-    }, [allTasksCompleted, hasQuote, workOrder.id, showQualityControlModal]);
+    }, [allTasksCompleted, hasQuote, workOrder.id]);
 
     const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.files) {
@@ -439,7 +439,18 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
 
             {/* Task Checklist */}
             <div>
-                <h3 className="font-bold text-white mb-2">Tareas Pendientes</h3>
+                <div className="flex items-center justify-between mb-2">
+                    <h3 className="font-bold text-white">Tareas Pendientes</h3>
+                    {hasQuote && allTasksCompleted && (
+                        <button
+                            onClick={() => setShowQualityControlModal(true)}
+                            className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+                        >
+                            <Icon name="check-circle" className="w-3 h-3" />
+                            Control de Calidad
+                        </button>
+                    )}
+                </div>
                 <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
                     {allApprovedItems.map(item => (
                         <div key={item.uniqueId} className={`flex items-start gap-3 p-3 rounded-lg border transition-colors ${item.isCompleted ? 'bg-green-900/20 border-green-700' : 'bg-gray-800/50 border-gray-700 hover:bg-gray-800/70'} ${hasPermission('toggle:task_completed') ? 'cursor-pointer' : 'cursor-not-allowed'}`}>
