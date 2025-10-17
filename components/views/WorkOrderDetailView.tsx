@@ -302,6 +302,7 @@ const CostManagementSection: React.FC<{
 const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, quotes, onBack, client, vehicle, stageConfig, hasPermission, onCreateQuote, onShareWithClient, onCreateInvoiceFromWorkOrder, onViewQuote, onEditQuote, onRegisterCosts, suppliers, appSettings, onReportUnforeseenIssue, staffMembers, onUpdateDiagnosticType, onStartDiagnostic }) => {
     
     const [showQualityControlModal, setShowQualityControlModal] = useState(false);
+    const [isQualityControlExpanded, setIsQualityControlExpanded] = useState(false);
     
     const galleryImages = useMemo(() => {
         const allImages: { src: string; type: 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico'; timestamp: string; notes?: string; }[] = [];
@@ -1010,8 +1011,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                              qualityControlEntry.notes?.includes('Listo para Entrega') ||
                                              workOrder.stage === 'Listo para Entrega';
                             
-                            // Estado para controlar si está expandido
-                            const [isExpanded, setIsExpanded] = React.useState(false);
+                            // Usar el estado global para controlar si está expandido
                             
                             return (
                                 <div className="bg-dark-light rounded-xl p-6">
@@ -1029,16 +1029,16 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                 {isApproved ? '✅ APROBADO' : '❌ RECHAZADO'}
                                             </div>
                                             <button
-                                                onClick={() => setIsExpanded(!isExpanded)}
+                                                onClick={() => setIsQualityControlExpanded(!isQualityControlExpanded)}
                                                 className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
-                                                title={isExpanded ? "Ocultar detalles" : "Ver detalles"}
+                                                title={isQualityControlExpanded ? "Ocultar detalles" : "Ver detalles"}
                                             >
-                                                <Icon name={isExpanded ? "chevron-up" : "chevron-down"} className="w-5 h-5" />
+                                                <Icon name={isQualityControlExpanded ? "chevron-up" : "chevron-down"} className="w-5 h-5" />
                                             </button>
                                         </div>
                                     </div>
                                     
-                                    {isExpanded && (
+                                    {isQualityControlExpanded && (
                                         <div className="bg-gray-800 rounded-lg p-4 space-y-4">
                                             <div className="flex items-center gap-3">
                                                 <Icon name="user" className="w-5 h-5 text-gray-400" />
