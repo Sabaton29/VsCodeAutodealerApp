@@ -83,6 +83,7 @@ const AppointmentsView = lazy(() => import('./components/views/AppointmentsView'
 const WorkOrderDetailView = lazy(() => import('./components/views/WorkOrderDetailView'));
 
 import { STAGE_DISPLAY_CONFIG } from './constants';
+// CLOUDFLARE PAGES FIX - Force new build
 import { QuoteItem, Quote, DiagnosticType, Notification, UnforeseenIssue } from './types';
 
 // Loading spinner component

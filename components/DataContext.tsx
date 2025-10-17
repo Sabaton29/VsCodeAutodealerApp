@@ -944,6 +944,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         ],
                         checklistSummary: 'exterior-1:ok|exterior-2:ok|exterior-3:ok|func-1:ok|func-2:ok|func-3:ok|func-4:ok|func-5:ok|func-6:ok|verif-1:ok|verif-2:ok|verif-3:ok|verif-4:ok|doc-1:ok|doc-2:ok|doc-3:ok'
                     };
+                } else if (nextStage === 'Control de Calidad') {
+                    // Si se avanza a Control de Calidad, crear datos de checklist por defecto
+                    console.log('🔍 DataContext - handleAdvanceStage - Creating quality control entry with default checklist');
+                    historyEntry = {
+                        stage: nextStage,
+                        date: new Date().toISOString(),
+                        user: 'Sistema',
+                        notes: `Etapa avanzada manualmente de ${currentStage} a ${nextStage}. Control de Calidad iniciado.`,
+                        // Crear datos de checklist por defecto (todos OK) para mantener consistencia
+                        qualityChecksData: [
+                            // Exterior
+                            { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería', category: 'exterior', status: 'ok' },
+                            { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante', category: 'exterior', status: 'ok' },
+                            { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar', category: 'exterior', status: 'ok' },
+                            // Funcionalidad
+                            { id: 'func-1', description: 'El vehículo enciende correctamente', category: 'funcionalidad', status: 'ok' },
+                            { id: 'func-2', description: 'No hay luces de advertencia en el tablero', category: 'funcionalidad', status: 'ok' },
+                            { id: 'func-3', description: 'El motor funciona sin ruidos anormales', category: 'funcionalidad', status: 'ok' },
+                            { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto', category: 'funcionalidad', status: 'ok' },
+                            { id: 'func-5', description: 'El sistema de A/C y calefacción funciona', category: 'funcionalidad', status: 'ok' },
+                            { id: 'func-6', description: 'Los frenos responden adecuadamente', category: 'funcionalidad', status: 'ok' },
+                            // Verificación
+                            { id: 'verif-1', description: 'Se completaron todos los trabajos aprobados en la cotización', category: 'verificacion', status: 'ok' },
+                            { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)', category: 'verificacion', status: 'ok' },
+                            { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)', category: 'verificacion', status: 'ok' },
+                            { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos', category: 'verificacion', status: 'ok' },
+                            // Documentación
+                            { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados', category: 'documentacion', status: 'ok' },
+                            { id: 'doc-2', description: 'La orden de trabajo está completamente documentada', category: 'documentacion', status: 'ok' },
+                            { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento', category: 'documentacion', status: 'ok' }
+                        ],
+                        checklistSummary: 'exterior-1:ok|exterior-2:ok|exterior-3:ok|func-1:ok|func-2:ok|func-3:ok|func-4:ok|func-5:ok|func-6:ok|verif-1:ok|verif-2:ok|verif-3:ok|verif-4:ok|doc-1:ok|doc-2:ok|doc-3:ok'
+                    };
                 } else {
                     historyEntry = {
                         stage: nextStage,

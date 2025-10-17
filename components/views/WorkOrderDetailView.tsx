@@ -1083,6 +1083,10 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                     // Obtener datos detallados del checklist si están disponibles
                                                     const qualityChecksData = qualityControlEntry.qualityChecksData || [];
                                                     
+                                                    // Debug: verificar qué datos tenemos
+                                                    console.log('🔍 WorkOrderDetailView - qualityChecksData:', qualityChecksData);
+                                                    console.log('🔍 WorkOrderDetailView - qualityControlEntry:', qualityControlEntry);
+                                                    
                                                     // Categorías del control de calidad con sus elementos
                                                     const categories = [
                                                         {
@@ -1150,6 +1154,40 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                 return { icon: '❓', color: 'bg-gray-600', text: 'Sin evaluar', textColor: 'text-gray-500' };
                                                         }
                                                     };
+                                                    
+                                                    // Si no hay datos de qualityChecksData, mostrar mensaje de error
+                                                    if (!qualityChecksData || qualityChecksData.length === 0) {
+                                                        return (
+                                                            <div className="space-y-4">
+                                                                <div className="bg-yellow-900/20 border border-yellow-600 rounded-lg p-4">
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <Icon name="exclamation-triangle" className="w-5 h-5 text-yellow-400" />
+                                                                        <span className="text-yellow-400 font-semibold">Datos del Control de Calidad No Disponibles</span>
+                                                                    </div>
+                                                                    <p className="text-yellow-200 text-sm">
+                                                                        Los datos detallados del control de calidad no se pudieron recuperar. 
+                                                                        Esto puede ocurrir si el control fue realizado antes de una actualización del sistema.
+                                                                    </p>
+                                                                    <div className="mt-3 text-xs text-gray-400">
+                                                                        <p><strong>Notas del historial:</strong> {qualityControlEntry.notes}</p>
+                                                                        <p><strong>Datos disponibles:</strong> {qualityChecksData ? 'Sí' : 'No'}</p>
+                                                                        <p><strong>Longitud de datos:</strong> {qualityChecksData?.length || 0}</p>
+                                                                    </div>
+                                                                </div>
+                                                                
+                                                                {/* Mostrar información básica del historial */}
+                                                                <div className="bg-gray-700 rounded-lg p-4">
+                                                                    <h5 className="text-white font-semibold mb-2">Información Básica</h5>
+                                                                    <div className="space-y-2 text-sm text-gray-300">
+                                                                        <p><strong>Estado:</strong> {isApproved ? 'Aprobado' : 'Rechazado'}</p>
+                                                                        <p><strong>Inspector:</strong> {qualityControlEntry.user}</p>
+                                                                        <p><strong>Fecha:</strong> {new Date(qualityControlEntry.date).toLocaleDateString('es-CO')}</p>
+                                                                        <p><strong>Observaciones:</strong> {qualityControlEntry.notes}</p>
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    }
                                                     
                                                     return (
                                                         <div className="space-y-4">
