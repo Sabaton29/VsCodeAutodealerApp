@@ -43,24 +43,12 @@ const cleanData = (data: any): any => {
         
         // Skip empty objects that cause errors (including timestamp objects)
         if (typeof value === 'object' && value !== null && Object.keys(value).length === 0) {
-            console.log(`🔍 cleanData - Skipping empty object for key: ${key}`);
             continue;
         }
         
-        // Log items array processing
-        if (key === 'items' && Array.isArray(value)) {
-            console.log(`🔍 cleanData - Processing items array with ${value.length} items`);
-            value.forEach((item, index) => {
-                console.log(`🔍 cleanData - Item ${index}:`, item);
-                if (item.unitPrice !== undefined) {
-                    console.log(`🔍 cleanData - Item ${index} unitPrice:`, item.unitPrice, 'type:', typeof item.unitPrice);
-                }
-            });
-        }
         
         // Skip objects that are just empty braces (common timestamp issue)
         if (typeof value === 'object' && value !== null && JSON.stringify(value) === '{}') {
-            console.log(`🔍 cleanData - Skipping empty braces object for key: ${key}`);
             continue;
         }
         
@@ -95,10 +83,6 @@ const transformData = (data: any, toSnake: boolean = true): any => {
         const newKey = toSnake ? toSnakeCase(key) : toCamelCase(key);
         transformed[newKey] = transformData(value, toSnake);
         
-        // Debug logging for status field
-        if (key === 'status' || newKey === 'status') {
-            console.log(`🔍 transformData - status field - original key: ${key}, new key: ${newKey}, value: ${value}`);
-        }
     }
     return transformed;
 };
@@ -106,14 +90,8 @@ const transformData = (data: any, toSnake: boolean = true): any => {
 // Generic CRUD operations
 export const insert = async (tableName: string, data: any): Promise<any> => {
     try {
-        console.log(`🔍 Supabase insert - tableName: ${tableName}`);
-        console.log(`🔍 Supabase insert - original data:`, data);
-        
         const cleanedData = cleanData(data);
-        console.log(`🔍 Supabase insert - cleaned data:`, cleanedData);
-        
         const transformedData = transformData(cleanedData);
-        console.log(`🔍 Supabase insert - transformed data:`, transformedData);
             
             const { data: result, error } = await supabase
             .from(tableName)
@@ -126,10 +104,7 @@ export const insert = async (tableName: string, data: any): Promise<any> => {
             throw error;
         }
         
-        console.log(`🔍 Supabase insert - result:`, result);
-        
         const finalResult = transformData(result, false);
-        console.log(`🔍 Supabase insert - final result:`, finalResult);
         
         return finalResult;
         } catch (error) {
@@ -324,10 +299,7 @@ export const updateWorkOrder = async (id: string, workOrderData: Partial<WorkOrd
             }
         });
         
-        console.log(`🔍 supabase.ts - updateWorkOrder - cleanedData:`, cleanedData);
-        
         const transformedData = transformData(cleanedData);
-        console.log(`🔍 supabase.ts - updateWorkOrder - transformedData:`, transformedData);
         
         const { data, error } = await supabase
             .from('work_orders')
@@ -773,14 +745,8 @@ export const getQuotes = async (): Promise<Quote[]> => {
 
 export const createQuote = async (quoteData: Omit<Quote, 'id'>): Promise<Quote> => {
     try {
-        console.log('🔍 createQuote - original quoteData:', quoteData);
-        console.log('🔍 createQuote - items in quoteData:', quoteData.items);
-        
         const cleanedData = cleanData(quoteData);
-        console.log('🔍 createQuote - cleaned data:', cleanedData);
-        
         const transformedData = transformData(cleanedData);
-        console.log('🔍 createQuote - transformed data:', transformedData);
         
         const { data, error } = await supabase
             .from('quotes')
@@ -793,10 +759,7 @@ export const createQuote = async (quoteData: Omit<Quote, 'id'>): Promise<Quote> 
             throw error;
         }
         
-        console.log('🔍 createQuote - result from Supabase:', data);
-        
         const finalResult = transformData(data, false) as Quote;
-        console.log('🔍 createQuote - final result:', finalResult);
         
         return finalResult;
     } catch (error) {
@@ -807,13 +770,8 @@ export const createQuote = async (quoteData: Omit<Quote, 'id'>): Promise<Quote> 
 
 export const updateQuote = async (id: string, quoteData: Partial<Quote>): Promise<Quote> => {
     try {
-        console.log('🔍 updateQuote - original quoteData:', quoteData);
-        
         const cleanedData = cleanData(quoteData);
-        console.log('🔍 updateQuote - cleaned data:', cleanedData);
-        
         const transformedData = transformData(cleanedData);
-        console.log('🔍 updateQuote - transformed data:', transformedData);
         
         const { data, error } = await supabase
             .from('quotes')
@@ -864,16 +822,8 @@ export const getQuoteWithItems = async (quoteId: string): Promise<any> => {
         // or return empty array if not available
         const items = quote.items || [];
         
-        console.log('🔍 getQuoteWithItems - quote:', quote);
-        console.log('🔍 getQuoteWithItems - items from quote.items:', items);
-        
-        // NO sanitizar los items - devolverlos tal como están
-        console.log('🔍 getQuoteWithItems - Items originales (sin sanitizar):', items);
-        
         // Solo devolver items si existen y tienen datos válidos
         const finalItems = items && items.length > 0 ? items : [];
-        
-        console.log('🔍 getQuoteWithItems - Final items to return:', finalItems);
         
         return {
             ...quote,
