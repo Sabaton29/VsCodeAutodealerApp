@@ -70,6 +70,8 @@ const MaintenanceReminders: React.FC<MaintenanceRemindersProps> = ({ workOrders,
                         <tbody>
                             {reminders.map(({ workOrder, nextDate }) => {
                                 const isOverdue = new Date() > nextDate;
+                                const client = clientMap.get(workOrder.client?.id || '');
+                                const vehicle = vehicleMap.get(workOrder.vehicle?.id || '');
                                 return (
                                     <tr key={workOrder.id} className="bg-light dark:bg-dark-light border-b dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50">
                                         <td className="px-6 py-4">

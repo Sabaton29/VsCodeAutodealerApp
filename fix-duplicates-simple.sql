@@ -59,3 +59,4 @@ WHERE NOT EXISTS (SELECT 1 FROM app_settings);
 
 -- 6. Verificar el resultado final
 SELECT * FROM app_settings;
+

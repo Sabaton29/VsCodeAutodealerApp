@@ -961,12 +961,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                         </div>
                     )}
 
-                    {(showProgressTracker || quotes.length > 0) && (
-                        <div className="border-2 border-red-500 p-4 bg-red-900/20">
-                            <div className="text-red-400 font-bold mb-2">🔍 DEBUG: ProgressTracker Renderizado</div>
-                            <ProgressTracker workOrder={workOrder} quote={quotes.find(q => q.status === QuoteStatus.APROBADO) || quotes[0]} quotes={quotes} client={client} vehicle={vehicle} hasPermission={hasPermission} onReportUnforeseenIssue={onReportUnforeseenIssue} />
-                        </div>
-                    )}
+                    {(showProgressTracker || quotes.length > 0) && <ProgressTracker workOrder={workOrder} quote={quotes.find(q => q.status === QuoteStatus.APROBADO) || quotes[0]} quotes={quotes} client={client} vehicle={vehicle} hasPermission={hasPermission} onReportUnforeseenIssue={onReportUnforeseenIssue} />}
                     
                     {/* Control de Calidad */}
                     {workOrder.stage === KanbanStage.CONTROL_CALIDAD && quotes.length > 0 && (

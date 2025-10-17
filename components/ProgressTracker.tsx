@@ -24,6 +24,109 @@ const fileToBase64 = (file: File): Promise<string> => {
     });
 };
 
+// Componente para manejar imágenes con fallback a base64
+const ImageWithFallback: React.FC<{ url: string; alt: string; className: string }> = ({ url, alt, className }) => {
+    const [imageSrc, setImageSrc] = useState<string>(url);
+    const [isLoading, setIsLoading] = useState(true);
+    const [hasError, setHasError] = useState(false);
+
+    useEffect(() => {
+        // Intentar cargar la imagen directamente primero
+        const img = new Image();
+        img.onload = () => {
+            setImageSrc(url);
+            setIsLoading(false);
+            setHasError(false);
+        };
+        img.onerror = async () => {
+            console.log('🔄 Imagen falló, verificando URL...');
+            try {
+                // Verificar qué está devolviendo la URL
+                const response = await fetch(url);
+                console.log('🔍 Response status:', response.status);
+                console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()));
+                
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    console.log('🔍 Content-Type:', contentType);
+                    
+                    if (contentType && contentType.startsWith('image/')) {
+                        // Es una imagen válida, convertir a base64
+                        const blob = await response.blob();
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                            setImageSrc(reader.result as string);
+                            setIsLoading(false);
+                            setHasError(false);
+                            console.log('✅ Imagen convertida a base64 exitosamente');
+                        };
+                        reader.onerror = () => {
+                            setHasError(true);
+                            setIsLoading(false);
+                            console.error('❌ Error convirtiendo a base64');
+                        };
+                        reader.readAsDataURL(blob);
+                    } else {
+                        // No es una imagen, mostrar error
+                        setHasError(true);
+                        setIsLoading(false);
+                        console.error('❌ URL no devuelve una imagen, Content-Type:', contentType);
+                        console.error('❌ URL problemática:', url);
+                    }
+                } else {
+                    setHasError(true);
+                    setIsLoading(false);
+                    console.error('❌ Error en fetch:', response.status, response.statusText);
+                    console.error('❌ URL problemática:', url);
+                }
+            } catch (error) {
+                setHasError(true);
+                setIsLoading(false);
+                console.error('❌ Error en verificación:', error);
+                console.error('❌ URL problemática:', url);
+            }
+        };
+        img.src = url;
+    }, [url]);
+
+    if (isLoading) {
+        return (
+            <div className={`${className} bg-gray-700 flex items-center justify-center`}>
+                <span className="text-xs text-gray-400">Cargando...</span>
+            </div>
+        );
+    }
+
+    if (hasError) {
+        return (
+            <div className={`${className} bg-red-900/20 border border-red-600 flex items-center justify-center`}>
+                <span className="text-xs text-red-400">Error</span>
+            </div>
+        );
+    }
+
+    return (
+        <div className="relative">
+            <img 
+                src={imageSrc} 
+                alt={alt} 
+                className={className}
+            />
+            <button
+                onClick={() => {
+                    console.log('🔍 URL original:', url);
+                    console.log('🔍 URL actual:', imageSrc);
+                    window.open(imageSrc, '_blank');
+                }}
+                className="absolute -top-1 -right-1 bg-blue-600 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs hover:bg-blue-700"
+                title="Abrir imagen original"
+            >
+                ?
+            </button>
+        </div>
+    );
+};
+
 const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quotes = [], client, vehicle, hasPermission, onReportUnforeseenIssue }) => {
     const data = useContext(DataContext);
     const ui = useContext(UIContext);
@@ -64,9 +167,56 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
         return [...acc, ...(q.items || [])];
     }, [] as QuoteItem[]);
     
+    // Calcular totales de todas las cotizaciones aprobadas
+    const totalSubtotal = approvedQuotes.reduce((sum, q) => sum + (q.subtotal || 0), 0);
+    const totalTaxAmount = approvedQuotes.reduce((sum, q) => sum + (q.taxAmount || 0), 0);
+    const totalAmount = approvedQuotes.reduce((sum, q) => sum + (q.total || 0), 0);
+    
     // Debug: verificar cotizaciones aprobadas
-    console.log('🔍 ProgressTracker - approvedQuotes:', approvedQuotes.map(q => ({ id: q.id, status: q.status, itemsCount: q.items?.length || 0 })));
+    console.log('🔍 ProgressTracker - approvedQuotes:', approvedQuotes.map(q => ({ id: q.id, status: q.status, itemsCount: q.items?.length || 0, subtotal: q.subtotal, total: q.total })));
     console.log('🔍 ProgressTracker - allApprovedItems:', allApprovedItems.length, 'items total');
+    console.log('🔍 ProgressTracker - totalSubtotal:', totalSubtotal, 'totalTaxAmount:', totalTaxAmount, 'totalAmount:', totalAmount);
+    
+    // Debug: verificar datos de imprevistos y fotos
+    console.log('🔍 ProgressTracker - workOrder.unforeseenIssues:', workOrder.unforeseenIssues);
+    console.log('🔍 ProgressTracker - workOrder.unforeseenIssues length:', workOrder.unforeseenIssues?.length || 0);
+    
+    // Debug: verificar URLs de fotos en imprevistos
+    if (workOrder.unforeseenIssues && workOrder.unforeseenIssues.length > 0) {
+        workOrder.unforeseenIssues.forEach((issue, index) => {
+            console.log(`🔍 ProgressTracker - Imprevisto ${index + 1}:`, issue.description);
+            console.log(`🔍 ProgressTracker - Imprevisto ${index + 1} imageUrls:`, issue.imageUrls);
+            if (issue.imageUrls && issue.imageUrls.length > 0) {
+                issue.imageUrls.forEach((url, urlIndex) => {
+                    console.log(`🔍 ProgressTracker - Imprevisto ${index + 1} URL ${urlIndex + 1}:`, url);
+                    console.log(`🔍 ProgressTracker - Imprevisto ${index + 1} URL ${urlIndex + 1} length:`, url.length);
+                    console.log(`🔍 ProgressTracker - Imprevisto ${index + 1} URL ${urlIndex + 1} starts with https:`, url.startsWith('https://'));
+                });
+            } else {
+                console.log(`🔍 ProgressTracker - Imprevisto ${index + 1} NO TIENE FOTOS`);
+            }
+        });
+    }
+    
+    // Debug: verificar fotos en items
+    const itemsWithPhotos = allApprovedItems.filter(item => item.imageUrls && item.imageUrls.length > 0);
+    console.log('🔍 ProgressTracker - itemsWithPhotos:', itemsWithPhotos.length, 'items with photos');
+    console.log('🔍 ProgressTracker - itemsWithPhotos details:', itemsWithPhotos.map(item => ({ 
+        id: item.id, 
+        description: item.description, 
+        imageUrls: item.imageUrls 
+    })));
+    
+    // Debug: verificar URLs completas
+    itemsWithPhotos.forEach(item => {
+        console.log('🔍 ProgressTracker - Item:', item.description);
+        console.log('🔍 ProgressTracker - imageUrls:', item.imageUrls);
+        item.imageUrls.forEach((url, index) => {
+            console.log(`🔍 ProgressTracker - URL ${index + 1}:`, url);
+            console.log(`🔍 ProgressTracker - URL ${index + 1} length:`, url.length);
+            console.log(`🔍 ProgressTracker - URL ${index + 1} starts with https:`, url.startsWith('https://'));
+        });
+    });
     
     // Verificar si todas las tareas están completas
     const allTasksCompleted = allApprovedItems.every(item => item.isCompleted);
@@ -150,6 +300,9 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
             allFiles.push(...itemFiles);
         });
         
+        console.log('🔍 ProgressTracker - handlePostUpdate - allFiles:', allFiles.length, 'files');
+        console.log('🔍 ProgressTracker - handlePostUpdate - files details:', allFiles.map(f => ({ name: f.name, size: f.size, type: f.type })));
+        
         await handlePostProgressUpdate(workOrder.id, notes, allFiles);
 
         setNotes('');
@@ -171,6 +324,114 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
         <div className="bg-dark-light rounded-xl p-5 space-y-6">
             <h2 className="text-xl font-bold text-white flex items-center gap-3"><Icon name="chart-line" className="w-6 h-6 text-brand-red"/> Progreso de la Reparación</h2>
             
+            {/* Unforeseen Issues Section */}
+            {workOrder.unforeseenIssues && workOrder.unforeseenIssues.length > 0 && (
+                <div className="mb-6">
+                    <h3 className="font-bold text-white mb-3 flex items-center gap-2">
+                        <Icon name="exclamation-triangle" className="w-5 h-5 text-orange-400"/>
+                        Constancia del Imprevisto ({workOrder.unforeseenIssues.length})
+                    </h3>
+                    <div className="space-y-3">
+                        {workOrder.unforeseenIssues.map((issue, index) => (
+                            <div key={index} className="bg-orange-900/20 border border-orange-700 rounded-lg p-4">
+                                <div className="flex items-start justify-between mb-2">
+                                    <h4 className="font-semibold text-orange-300">{issue.description}</h4>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-orange-400 bg-orange-800/30 px-2 py-1 rounded">
+                                            {new Date(issue.timestamp).toLocaleDateString('es-CO')}
+                                        </span>
+                                        <button
+                                            onClick={() => {
+                                                // Crear ventana modal para ver detalles del imprevisto
+                                                const modal = document.createElement('div');
+                                                modal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4';
+                                                modal.innerHTML = `
+                                                    <div class="bg-white dark:bg-gray-800 rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+                                                        <div class="flex justify-between items-center p-4 border-b">
+                                                            <h3 class="text-lg font-bold text-gray-800 dark:text-white">Detalle del Imprevisto</h3>
+                                                            <button onclick="this.closest('.fixed').remove()" class="text-gray-500 hover:text-gray-700">
+                                                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                                </svg>
+                                                            </button>
+                                                        </div>
+                                                        <div class="p-4 space-y-4">
+                                                            <div>
+                                                                <h4 class="font-semibold text-gray-800 dark:text-white mb-2">Descripción</h4>
+                                                                <p class="text-gray-600 dark:text-gray-300">${issue.description}</p>
+                                                            </div>
+                                                            <div class="grid grid-cols-2 gap-4">
+                                                                <div>
+                                                                    <h4 class="font-semibold text-gray-800 dark:text-white mb-1">Reportado por</h4>
+                                                                    <p class="text-gray-600 dark:text-gray-300">${issue.reportedById || 'Sistema'}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 class="font-semibold text-gray-800 dark:text-white mb-1">Fecha</h4>
+                                                                    <p class="text-gray-600 dark:text-gray-300">${new Date(issue.timestamp).toLocaleString('es-CO')}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 class="font-semibold text-gray-800 dark:text-white mb-1">Prioridad</h4>
+                                                                    <p class="text-gray-600 dark:text-gray-300">${issue.priority || 'No especificado'}</p>
+                                                                </div>
+                                                                <div>
+                                                                    <h4 class="font-semibold text-gray-800 dark:text-white mb-1">Estado</h4>
+                                                                    <p class="text-gray-600 dark:text-gray-300">${issue.notes || 'Pendiente'}</p>
+                                                                </div>
+                                                            </div>
+                                                            ${issue.imageUrls && issue.imageUrls.length > 0 ? `
+                                                                <div>
+                                                                    <h4 class="font-semibold text-gray-800 dark:text-white mb-2">Evidencia Fotográfica</h4>
+                                                                    <div class="grid grid-cols-2 gap-2">
+                                                                        ${issue.imageUrls.map((url, imgIndex) => `
+                                                                            <div class="text-center">
+                                                                                <img src="${url}" alt="Evidencia ${imgIndex + 1}" class="w-full h-32 object-cover rounded border border-gray-300" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"/>
+                                                                                <div class="w-full h-32 border border-gray-300 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-500" style="display: none;">
+                                                                                    Error al cargar imagen
+                                                                                </div>
+                                                                                <p class="text-xs mt-1">Evidencia ${imgIndex + 1}</p>
+                                                                                <button onclick="window.open('${url}', '_blank')" class="text-xs text-blue-600 hover:text-blue-800 mt-1">Abrir imagen</button>
+                                                                            </div>
+                                                                        `).join('')}
+                                                                    </div>
+                                                                </div>
+                                                            ` : ''}
+                                                        </div>
+                                                    </div>
+                                                `;
+                                                document.body.appendChild(modal);
+                                            }}
+                                            className="text-xs text-orange-400 hover:text-orange-300 bg-orange-800/30 px-2 py-1 rounded hover:bg-orange-800/50 transition-colors"
+                                        >
+                                            Ver Detalle
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="text-sm text-gray-300 space-y-1">
+                                    <p><strong>Reportado por:</strong> {issue.reportedById || 'Sistema'}</p>
+                                    <p><strong>Prioridad:</strong> {issue.priority || 'No especificado'}</p>
+                                    <p><strong>Estado:</strong> {issue.notes || 'Pendiente'}</p>
+                                </div>
+                                {issue.imageUrls && issue.imageUrls.length > 0 && (
+                                    <div className="mt-3">
+                                        <p className="text-xs text-orange-400 mb-2">Evidencia Fotográfica ({issue.imageUrls.length} foto(s)):</p>
+                                        <div className="flex gap-2">
+                                            {issue.imageUrls.map((url, imgIndex) => (
+                                                <ImageWithFallback 
+                                                    key={imgIndex}
+                                                    url={url}
+                                                    alt={`Evidencia ${imgIndex + 1}`}
+                                                    className="w-16 h-16 object-cover rounded border border-orange-600"
+                                                />
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Task Checklist */}
             <div>
                 <h3 className="font-bold text-white mb-2">Tareas Pendientes</h3>
@@ -208,14 +469,26 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                             <div className="flex-1 min-w-0">
                                 {/* Descripción y badge */}
                                 <div className="flex items-center justify-between mb-2">
-                                    <span className={`text-sm font-medium ${item.isCompleted ? 'line-through text-green-300' : 'text-white'}`}>
-                                        {item.description}
-                                    </span>
-                                    {item.suppliedByClient && (
-                                        <span className="ml-2 text-xs font-semibold bg-blue-800/50 text-blue-200 px-2 py-1 rounded-full flex-shrink-0">
-                                            Cliente Suministra
+                                    <div className="flex items-center gap-2">
+                                        <span className={`text-sm font-medium ${item.isCompleted ? 'line-through text-green-300' : 'text-white'}`}>
+                                            {item.description}
                                         </span>
-                                    )}
+                                        {item.suppliedByClient && (
+                                            <span className="text-xs font-semibold bg-blue-800/50 text-blue-200 px-2 py-1 rounded-full flex-shrink-0">
+                                                Cliente Suministra
+                                            </span>
+                                        )}
+                                        {/* Etiqueta de Imprevisto si el item está relacionado con imprevistos */}
+                                        {workOrder.unforeseenIssues && workOrder.unforeseenIssues.some(issue => 
+                                            issue.description.toLowerCase().includes(item.description.toLowerCase()) ||
+                                            item.description.toLowerCase().includes(issue.description.toLowerCase())
+                                        ) && (
+                                            <span className="text-xs font-semibold bg-orange-800/50 text-orange-200 px-2 py-1 rounded-full flex-shrink-0 flex items-center gap-1">
+                                                <Icon name="exclamation-triangle" className="w-3 h-3"/>
+                                                Imprevisto
+                                            </span>
+                                        )}
+                                    </div>
                                 </div>
                                 
                                 {/* Detalles del item */}
@@ -279,13 +552,12 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                         <div className="flex gap-2 mt-2">
                                             <span className="text-xs text-green-400">✅ Fotos guardadas:</span>
                                             {item.imageUrls.map((url, photoIndex) => (
-                                                <div key={photoIndex} className="relative">
-                                                    <img 
-                                                        src={url} 
-                                                        alt={`Foto guardada ${photoIndex + 1}`} 
-                                                        className="w-12 h-12 object-cover rounded border border-green-600"
-                                                    />
-                                                </div>
+                                                <ImageWithFallback 
+                                                    key={photoIndex}
+                                                    url={url}
+                                                    alt={`Foto guardada ${photoIndex + 1}`}
+                                                    className="w-12 h-12 object-cover rounded border border-green-600"
+                                                />
                                             ))}
                                         </div>
                                     )}
@@ -504,15 +776,15 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                                         <div>
                                                             <div class="flex justify-between mb-1">
                                                                 <span>Subtotal:</span>
-                                                                <span class="font-bold">$${quote?.subtotal?.toLocaleString() || '0'}</span>
+                                                                <span class="font-bold">$${totalSubtotal.toLocaleString()}</span>
                                                             </div>
                                                             <div class="flex justify-between mb-1">
                                                                 <span>IVA:</span>
-                                                                <span class="font-bold">$${quote?.taxAmount?.toLocaleString() || '0'}</span>
+                                                                <span class="font-bold">$${totalTaxAmount.toLocaleString()}</span>
                                                             </div>
                                                             <div class="flex justify-between font-bold text-sm border-t border-gray-300 pt-1">
                                                                 <span>TOTAL:</span>
-                                                                <span style="color: #dc2626;">$${quote?.total?.toLocaleString() || '0'}</span>
+                                                                <span style="color: #dc2626;">$${totalAmount.toLocaleString()}</span>
                                                             </div>
                                                         </div>
                                                         <div>
@@ -523,6 +795,26 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                                         </div>
                                                     </div>
                                                 </div>
+
+                                                ${workOrder.unforeseenIssues && workOrder.unforeseenIssues.length > 0 ? `
+                                                <!-- Constancia del Imprevisto -->
+                                                <div class="mt-6 border border-orange-300 p-3 bg-orange-50">
+                                                    <h3 class="font-bold text-sm mb-3 text-orange-800">CONSTANCIA DEL IMPREVISTO</h3>
+                                                    ${workOrder.unforeseenIssues.map(issue => `
+                                                        <div class="mb-3 p-2 bg-orange-100 rounded border border-orange-200">
+                                                            <div class="text-xs">
+                                                                <div class="font-semibold text-orange-900">${issue.description}</div>
+                                                                <div class="text-orange-700 mt-1">
+                                                                    <strong>Reportado por:</strong> ${issue.reportedById || 'Sistema'}<br>
+                                                                    <strong>Fecha:</strong> ${new Date(issue.timestamp).toLocaleDateString('es-CO')}<br>
+                                                                    <strong>Impacto:</strong> ${issue.priority || 'No especificado'}<br>
+                                                                    <strong>Acción tomada:</strong> ${issue.notes || 'Pendiente'}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    `).join('')}
+                                                </div>
+                                                ` : ''}
 
                                                 ${(() => {
                                                     // Recopilar todas las fotos de las tareas
@@ -546,7 +838,10 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                                                 <div class="grid grid-cols-4 gap-2 mt-1">
                                                                     ${allTaskPhotos.map(photo => `
                                                                         <div class="text-center">
-                                                                            <img src="${photo.url}" alt="${photo.description}" class="w-full h-auto border border-gray-300"/>
+                                                                            <img src="${photo.url}" alt="${photo.description}" class="w-full h-auto border border-gray-300" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"/>
+                                                                            <div class="w-full h-20 border border-gray-300 rounded bg-gray-100 flex items-center justify-center text-xs text-gray-500" style="display: none;">
+                                                                                Error al cargar imagen
+                                                                            </div>
                                                                             <p class="text-xs mt-1">${photo.description}</p>
                                                                             <p class="text-xs ${photo.completed ? 'text-green-600' : 'text-gray-600'}">
                                                                                 ${photo.completed ? '✅ Completada' : '⏳ Pendiente'}
@@ -557,7 +852,7 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                                             </div>
                                                         `;
                                                     }
-                                                    return '';
+                                                    return '<div class="mt-4 border border-gray-300 p-2"><p class="font-bold text-sm text-gray-500">Evidencia Fotográfica: No hay fotos disponibles</p></div>';
                                                 })()}
 
                                                 <!-- Signatures IDÉNTICAS al diagnóstico -->
@@ -619,14 +914,9 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                             setShowQualityControlModal(false);
                                             
                                             // Mostrar notificación de éxito
-                                            if (ui.showNotification) {
-                                                ui.showNotification('success', 'Orden enviada a Control de Calidad');
-                                            }
+                                            console.log('✅ Orden enviada a Control de Calidad exitosamente');
                                         } catch (error) {
                                             console.error('❌ Error enviando a control de calidad:', error);
-                                            if (ui.showNotification) {
-                                                ui.showNotification('error', 'Error al enviar a Control de Calidad');
-                                            }
                                         }
                                     }}
                                     className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"

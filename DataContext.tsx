@@ -370,6 +370,76 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleCreateAppointment = createUpdater(setAppointments, 'appointments');
     const handleSaveAppointment = createSaveHandler(setAppointments, 'appointments');
     const handleDeleteAppointment = createDeleteHandler(setAppointments, 'appointments');
+    
+    const handleConfirmAppointment = async(appointmentId: string): Promise<void> => {
+        console.log('🔍 handleConfirmAppointment called with ID:', appointmentId);
+        
+        try {
+            const appointment = appointments.find(a => a.id === appointmentId);
+            if (!appointment) {
+                console.error('Appointment not found:', appointmentId);
+                return;
+            }
+            
+            console.log('🔍 Found appointment:', appointment);
+            
+            // Actualizar el estado local primero para feedback inmediato
+            const updatedAppointment = { ...appointment, status: AppointmentStatus.CONFIRMADA };
+            setAppointments(prev => prev.map(a => a.id === appointmentId ? updatedAppointment : a));
+            console.log('🔍 Appointment status updated in local state');
+            
+            // Luego actualizar en Supabase
+            try {
+                const result = await supabaseService.update('appointments', appointmentId, { 
+                    status: AppointmentStatus.CONFIRMADA 
+                });
+                console.log('🔍 Supabase update result:', result);
+            } catch (supabaseError) {
+                console.error('Supabase update failed, reverting local state:', supabaseError);
+                // Revertir el estado local si falla la actualización en Supabase
+                setAppointments(prev => prev.map(a => a.id === appointmentId ? appointment : a));
+                throw supabaseError;
+            }
+        } catch (error) {
+            console.error('Error confirming appointment:', error);
+            throw error;
+        }
+    };
+    
+    const handleCancelAppointment = async(appointmentId: string): Promise<void> => {
+        console.log('🔍 handleCancelAppointment called with ID:', appointmentId);
+        
+        try {
+            const appointment = appointments.find(a => a.id === appointmentId);
+            if (!appointment) {
+                console.error('Appointment not found for cancellation:', appointmentId);
+                return;
+            }
+            
+            console.log('🔍 Found appointment for cancellation:', appointment);
+            
+            // Actualizar el estado local primero para feedback inmediato
+            const updatedAppointment = { ...appointment, status: AppointmentStatus.CANCELADA };
+            setAppointments(prev => prev.map(a => a.id === appointmentId ? updatedAppointment : a));
+            console.log('🔍 Appointment cancelled in local state');
+            
+            // Luego actualizar en Supabase
+            try {
+                const result = await supabaseService.update('appointments', appointmentId, { 
+                    status: AppointmentStatus.CANCELADA 
+                });
+                console.log('🔍 Supabase cancel result:', result);
+            } catch (supabaseError) {
+                console.error('Supabase cancel failed, reverting local state:', supabaseError);
+                // Revertir el estado local si falla la actualización en Supabase
+                setAppointments(prev => prev.map(a => a.id === appointmentId ? appointment : a));
+                throw supabaseError;
+            }
+        } catch (error) {
+            console.error('Error cancelling appointment:', error);
+            throw error;
+        }
+    };
 
     // Complex operations
     const handleAssignTechnician = async(workOrderId: string, technicianId: string): Promise<void> => {
@@ -1015,6 +1085,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateAppointment,
         handleSaveAppointment,
         handleDeleteAppointment,
+        handleConfirmAppointment,
+        handleCancelAppointment,
 
         // Complex operations
         handleAssignTechnician,

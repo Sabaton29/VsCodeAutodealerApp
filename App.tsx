@@ -103,6 +103,15 @@ const viewComponents: { [key: string]: React.FC<any> } = {
 const AppContent: React.FC = () => {
     const data = useContext(DataContext);
     const ui = useContext(UIContext);
+    
+    if (!data) {
+        return <div className="flex items-center justify-center min-h-screen">
+            <div className="text-center">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-brand-red mx-auto"></div>
+                <p className="mt-4 text-gray-600 dark:text-gray-400">Cargando datos...</p>
+            </div>
+        </div>;
+    }
 
     // --- Client Portal Routing ---
     const path = window.location.pathname;
@@ -767,11 +776,22 @@ const AppContent: React.FC = () => {
                 onViewDetails={(id) => setView('workOrder', id)}
                 onEditWorkOrder={(wo) => openModal('EDIT_WORK_ORDER', wo)}
                 hasPermission={hasPermission}
-                onRegisterDelivery={(workOrderId) => openModal('REGISTER_DELIVERY', workOrders.find(wo => wo.id === workOrderId))}
+                onRegisterDelivery={(workOrderId) => {
+                    const workOrder = workOrders.find(wo => wo.id === workOrderId);
+                    if (workOrder) {
+                        openModal('REGISTER_DELIVERY', workOrder);
+                    } else {
+                        console.error('Work order not found:', workOrderId);
+                    }
+                }}
                 currentUser={ui.currentUser}
              /></Suspense>;
             case 'Órdenes de Trabajo': return <Suspense fallback={<LoadingSpinner />}><WorkOrdersView selectedLocationId={ui.selectedLocationId} workOrders={filteredWorkOrders} quotes={filteredQuotes} staffMembers={staffMembers} handleAssignTechnician={data.handleAssignTechnician} handleAdvanceStage={data.handleAdvanceStage} handleCancelOrder={data.handleCancelOrder} onStartDiagnostic={handleStartDiagnostic} onViewDetails={(id) => setView('workOrder', id)} onEditWorkOrder={(wo) => openModal('EDIT_WORK_ORDER', wo)} currentUser={ui.currentUser} hasPermission={hasPermission} onRegisterDelivery={(workOrderId) => openModal('REGISTER_DELIVERY', workOrders.find(wo => wo.id === workOrderId))} /></Suspense>;
-            case 'Citas': return <Suspense fallback={<LoadingSpinner />}><AppointmentsView appointments={appointments} staffMembers={staffMembers} openModal={openModal} hasPermission={hasPermission} handleConfirmAppointment={data.handleConfirmAppointment} handleCancelAppointment={data.handleCancelAppointment} handleCreateWorkOrderFromAppointment={data.handleCreateWorkOrderFromAppointment} handleRescheduleAppointment={data.handleRescheduleAppointment} /></Suspense>;
+            case 'Citas': 
+                console.log('🔍 App.tsx - Rendering AppointmentsView with data:', data);
+                console.log('🔍 App.tsx - handleConfirmAppointment type:', typeof data?.handleConfirmAppointment);
+                console.log('🔍 App.tsx - handleCancelAppointment type:', typeof data?.handleCancelAppointment);
+                return <Suspense fallback={<LoadingSpinner />}><AppointmentsView appointments={appointments} staffMembers={staffMembers} openModal={openModal} hasPermission={hasPermission} handleConfirmAppointment={data?.handleConfirmAppointment} handleCancelAppointment={data?.handleCancelAppointment} handleCreateWorkOrderFromAppointment={data?.handleCreateWorkOrderFromAppointment} handleRescheduleAppointment={data?.handleRescheduleAppointment} /></Suspense>;
             case 'Clientes': return <Suspense fallback={<LoadingSpinner />}><ClientsView selectedLocationId={ui.selectedLocationId} clients={filteredClients} setEditingClient={(client) => openModal('EDIT_CLIENT', client)} onViewClientDetails={(clientId) => setView('client', clientId)} hasPermission={hasPermission} /></Suspense>;
             case 'Vehículos': return <Suspense fallback={<LoadingSpinner />}><VehiclesView selectedLocationId={ui.selectedLocationId} vehicles={filteredVehicles} clients={clients} setEditingVehicle={(vehicle) => openModal('EDIT_VEHICLE', { vehicle: vehicle, clientId: vehicle !== 'new' ? vehicle.clientId : null })} onViewVehicleDetails={(vehicleId) => setView('vehicle', vehicleId)} hasPermission={hasPermission} /></Suspense>;
             case 'Inventario': return <Suspense fallback={<LoadingSpinner />}><InventoryView selectedLocationId={ui.selectedLocationId} inventoryItems={filteredInventoryItems} suppliers={suppliers} setEditingInventoryItem={(item) => openModal('EDIT_INVENTORY_ITEM', item)} onDeleteInventoryItem={data.handleDeleteInventoryItem} hasPermission={hasPermission} /></Suspense>;
@@ -890,8 +910,16 @@ const AppContent: React.FC = () => {
                 onViewDetails={(id) => setView('workOrder', id)}
                 onEditWorkOrder={(wo) => openModal('EDIT_WORK_ORDER', wo)}
                 hasPermission={hasPermission}
-                onRegisterDelivery={(workOrderId) => openModal('REGISTER_DELIVERY', workOrders.find(wo => wo.id === workOrderId))}
+                onRegisterDelivery={(workOrderId) => {
+                    const workOrder = workOrders.find(wo => wo.id === workOrderId);
+                    if (workOrder) {
+                        openModal('REGISTER_DELIVERY', workOrder);
+                    } else {
+                        console.error('Work order not found:', workOrderId);
+                    }
+                }}
                 currentUser={ui.currentUser}
+                migrateClientsRegistrationDate={data.migrateClientsRegistrationDate}
              /></Suspense>;
         }
     };
@@ -917,6 +945,7 @@ const AppContent: React.FC = () => {
                 setIsCollapsed={ui.setIsSidebarCollapsed}
                 isMobileOpen={ui.isMobileSidebarOpen}
                 setIsMobileOpen={ui.setIsMobileSidebarOpen}
+                appSettings={data.appSettings}
             />
             <div className="flex-1 flex flex-col overflow-hidden">
                 <Header 
@@ -1029,7 +1058,7 @@ const ModalManager: React.FC = () => {
             <Modal isOpen={type === 'EDIT_CLIENT_FROM_QUOTE'} onClose={closeModal} title="Crear Nuevo Cliente">
                 <AddClientForm 
                     onSave={async(d) => { 
-                        await data.handleCreateClient(d); 
+                        await data.handleSaveClient(d); 
                         // Recargar todos los datos para asegurar sincronización
                         await data.loadAllData();
                         // Volver al modal de crear cotización con timestamp para forzar re-render
@@ -1077,7 +1106,7 @@ const ModalManager: React.FC = () => {
             <Modal isOpen={type === 'EDIT_CLIENT_FROM_WORK_ORDER'} onClose={closeModal} title="Crear Nuevo Cliente">
                 <AddClientForm 
                     onSave={async(d) => { 
-                        await data.handleCreateClient(d); 
+                        await data.handleSaveClient(d); 
                         // Recargar todos los datos para asegurar sincronización
                         await data.loadAllData();
                         // Volver al modal de crear orden de trabajo con timestamp para forzar re-render
@@ -1136,7 +1165,7 @@ const ModalManager: React.FC = () => {
                 <AddClientForm 
                     onSave={async(d) => { 
                         if (modalData === 'new') {
-                            await data.handleCreateClient(d); 
+                            await data.handleSaveClient(d); 
                         } else {
                             await data.handleSaveClient(d); 
                         }
@@ -1418,22 +1447,23 @@ const ModalManager: React.FC = () => {
             </Modal>
             <Modal isOpen={type === 'REGISTER_DELIVERY'} onClose={closeModal} title={`Registrar Entrega de OT #${modalData?.id ?? ''}`} size="4xl">
                 {modalData && (() => {
-                    // Debug completo de la estructura de modalData
                     console.log('🔍 App.tsx - RegisterDeliveryForm - modalData completo:', modalData);
                     console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.client:', modalData.client);
                     console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.vehicle:', modalData.vehicle);
-                    console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.client_id:', modalData.client_id);
-                    console.log('🔍 App.tsx - RegisterDeliveryForm - modalData.vehicle_id:', modalData.vehicle_id);
                     
-                    // Intentar diferentes formas de acceder a los datos
-                    const clientId = modalData.client_id || modalData.client?.id;
-                    const vehicleId = modalData.vehicle_id || modalData.vehicle?.id;
+                    // Extraer los IDs del cliente y vehículo desde la estructura de WorkOrder
+                    const clientId = modalData.clientId || modalData.client?.id;
+                    const vehicleId = modalData.vehicleId || modalData.vehicle?.id;
                     
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - clientId extraído:', clientId);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - vehicleId extraído:', vehicleId);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - Total clients:', data.clients.length);
+                    console.log('🔍 App.tsx - RegisterDeliveryForm - Total vehicles:', data.vehicles.length);
+                    
+                    // Buscar los datos completos del cliente y vehículo
                     const foundClient = data.clients.find(c => c.id === clientId);
                     const foundVehicle = data.vehicles.find(v => v.id === vehicleId);
                     
-                    console.log('🔍 App.tsx - RegisterDeliveryForm - clientId final:', clientId);
-                    console.log('🔍 App.tsx - RegisterDeliveryForm - vehicleId final:', vehicleId);
                     console.log('🔍 App.tsx - RegisterDeliveryForm - foundClient:', foundClient);
                     console.log('🔍 App.tsx - RegisterDeliveryForm - foundVehicle:', foundVehicle);
 

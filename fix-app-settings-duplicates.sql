@@ -59,3 +59,4 @@ INSERT INTO app_settings (
 
 -- Verificar el resultado final
 SELECT * FROM app_settings;
+

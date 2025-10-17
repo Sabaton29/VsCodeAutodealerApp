@@ -164,3 +164,7 @@ handleAdvanceStage()          // → Siguiente etapa en secuencia
 
 
 
+
+
+
+

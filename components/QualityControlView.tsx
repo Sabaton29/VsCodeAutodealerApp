@@ -108,7 +108,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
 
     const getCategoryIcon = (category: string) => {
         switch (category) {
-            case 'safety': return 'shield-check';
+            case 'safety': return 'check-circle';
             case 'functionality': return 'cog';
             case 'appearance': return 'eye';
             case 'documentation': return 'document-text';
@@ -140,23 +140,68 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
     const totalChecks = qualityChecks.length;
     const completionPercentage = (completedChecks / totalChecks) * 100;
 
-    const canApprove = completedChecks === totalChecks && overallNotes.trim().length > 0;
+    // Validaciones más estrictas para aprobar
+    const safetyChecks = qualityChecks.filter(item => item.category === 'safety');
+    const functionalityChecks = qualityChecks.filter(item => item.category === 'functionality');
+    const appearanceChecks = qualityChecks.filter(item => item.category === 'appearance');
+    const documentationChecks = qualityChecks.filter(item => item.category === 'documentation');
+    
+    const allSafetyCompleted = safetyChecks.every(item => item.isChecked);
+    const allFunctionalityCompleted = functionalityChecks.every(item => item.isChecked);
+    const allAppearanceCompleted = appearanceChecks.every(item => item.isChecked);
+    const allDocumentationCompleted = documentationChecks.every(item => item.isChecked);
+    
+    const canApprove = completedChecks === totalChecks && 
+                      allSafetyCompleted && 
+                      allFunctionalityCompleted && 
+                      allAppearanceCompleted && 
+                      allDocumentationCompleted &&
+                      overallNotes.trim().length > 0;
 
     const handleSubmit = async (approved: boolean) => {
         if (!canApprove && approved) {
-            ui.showNotification?.('warning', 'Debes completar todas las verificaciones y agregar notas para aprobar');
+            let missingItems = [];
+            if (!allSafetyCompleted) missingItems.push('Seguridad');
+            if (!allFunctionalityCompleted) missingItems.push('Funcionalidad');
+            if (!allAppearanceCompleted) missingItems.push('Apariencia');
+            if (!allDocumentationCompleted) missingItems.push('Documentación');
+            if (overallNotes.trim().length === 0) missingItems.push('Notas Generales');
+            
+            (ui as any).showNotification?.('warning', `Debes completar: ${missingItems.join(', ')}`);
             return;
         }
 
         setIsSubmitting(true);
         try {
+            console.log('🔍 QualityControlView - Iniciando control de calidad:', {
+                workOrderId: workOrder.id,
+                approved,
+                completedChecks,
+                totalChecks,
+                allSafetyCompleted,
+                allFunctionalityCompleted,
+                allAppearanceCompleted,
+                allDocumentationCompleted,
+                hasNotes: overallNotes.trim().length > 0
+            });
+            
+            // Debug: Verificar qué funciones están disponibles en data
+            console.log('🔍 QualityControlView - Funciones disponibles en data:', {
+                hasHandleAdvanceStage: typeof data.handleAdvanceStage === 'function',
+                hasHandleRetreatStage: typeof data.handleRetreatStage === 'function',
+                hasHandleUpdateWorkOrderHistory: typeof data.handleUpdateWorkOrderHistory === 'function',
+                dataKeys: Object.keys(data).filter(key => key.includes('handle'))
+            });
+            
             // Subir imágenes si las hay
             let uploadedImageUrls: string[] = [];
             if (selectedImages.length > 0) {
                 const uploadPromises = selectedImages.map(async (file, index) => {
                     const fileName = `quality_control_${workOrder.id}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
                     const path = `quality-control/${workOrder.id}/${fileName}`;
-                    return await data.supabaseService.uploadFileToStorage(file, 'progress-updates', path);
+                    // Importar directamente el servicio de Supabase
+                    const { uploadFileToStorage } = await import('../services/supabase');
+                    return await uploadFileToStorage(file, 'progress-updates', path);
                 });
                 uploadedImageUrls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
             }
@@ -169,33 +214,53 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                     ? `Control de Calidad APROBADO. Verificaciones completadas: ${completedChecks}/${totalChecks}. Notas: ${overallNotes}`
                     : `Control de Calidad RECHAZADO. Verificaciones completadas: ${completedChecks}/${totalChecks}. Notas: ${overallNotes}`,
                 imageUrls: uploadedImageUrls,
-                staffMemberId: data.currentUser?.id || 'system',
+                staffMemberId: (data as any).currentUser?.id || 'system',
             };
 
             // Actualizar historial
-            await data.handleUpdateWorkOrderHistory(workOrder.id, historyEntry);
+            await (data as any).handleUpdateWorkOrderHistory(workOrder.id, historyEntry);
 
             // Guardar resultado final
             setFinalResult({
                 isApproved: approved,
-                inspectorName: data.currentUser?.name || 'Inspector de Calidad',
+                inspectorName: (data as any).currentUser?.name || 'Inspector de Calidad',
                 inspectionDate: new Date().toLocaleDateString('es-CO')
             });
 
             // Avanzar o retroceder según el resultado
             if (approved) {
-                await data.handleAdvanceStage(workOrder.id, workOrder.stage);
-                ui.showNotification?.('success', 'Control de Calidad aprobado. Orden lista para entrega');
+                console.log('🔍 QualityControlView - Aprobando control de calidad, avanzando etapa');
+                console.log('🔍 QualityControlView - Etapa actual:', workOrder.stage);
+                console.log('🔍 QualityControlView - Etapa objetivo: LISTO_ENTREGA');
+                
+                try {
+                    await data.handleAdvanceStage(workOrder.id, workOrder.stage);
+                    console.log('✅ QualityControlView - handleAdvanceStage completado exitosamente');
+                    
+                    // Verificar que la etapa se actualizó correctamente
+                    setTimeout(async () => {
+                        console.log('🔍 QualityControlView - Verificando actualización después de 1 segundo...');
+                        await data.refreshWorkOrders();
+                        console.log('✅ QualityControlView - refreshWorkOrders completado');
+                    }, 1000);
+                    
+                } catch (error) {
+                    console.error('❌ QualityControlView - Error en handleAdvanceStage:', error);
+                    throw error;
+                }
+                
+                (ui as any).showNotification?.('success', 'Control de Calidad aprobado. Orden lista para entrega');
             } else {
+                console.log('🔍 QualityControlView - Rechazando control de calidad, retrocediendo etapa');
                 await data.handleRetreatStage(workOrder.id, workOrder.stage);
-                ui.showNotification?.('info', 'Control de Calidad rechazado. Orden regresada a reparación');
+                (ui as any).showNotification?.('info', 'Control de Calidad rechazado. Orden regresada a reparación');
             }
 
             // Mostrar reporte imprimible
             setShowPrintableReport(true);
         } catch (error) {
             console.error('Error en control de calidad:', error);
-            ui.showNotification?.('error', 'Error al procesar control de calidad');
+            (ui as any).showNotification?.('error', 'Error al procesar control de calidad');
         } finally {
             setIsSubmitting(false);
         }
@@ -339,7 +404,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                     disabled={isSubmitting}
                     className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
                 >
-                    <Icon name="x-mark" className="w-5 h-5 mr-2" />
+                    <Icon name="x" className="w-5 h-5 mr-2" />
                     {isSubmitting ? 'Procesando...' : 'Rechazar'}
                 </button>
                 
@@ -354,9 +419,18 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
             </div>
 
             {!canApprove && (
-                <p className="text-center text-yellow-400 text-sm mt-4">
-                    Completa todas las verificaciones y agrega notas para poder aprobar
-                </p>
+                <div className="text-center mt-4">
+                    <p className="text-yellow-400 text-sm mb-2">
+                        Para aprobar, debes completar:
+                    </p>
+                    <div className="flex flex-wrap justify-center gap-2 text-xs">
+                        {!allSafetyCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Seguridad</span>}
+                        {!allFunctionalityCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Funcionalidad</span>}
+                        {!allAppearanceCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Apariencia</span>}
+                        {!allDocumentationCompleted && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Documentación</span>}
+                        {overallNotes.trim().length === 0 && <span className="bg-red-100 text-red-800 px-2 py-1 rounded">Notas Generales</span>}
+                    </div>
+                </div>
             )}
 
             {/* Modal de Reporte Imprimible */}

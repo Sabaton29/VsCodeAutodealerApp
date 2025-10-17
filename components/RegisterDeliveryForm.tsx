@@ -1,9 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { WorkOrder } from '../types';
+import { WorkOrder, Client, Vehicle } from '../types';
 import { Icon } from './Icon';
 
 interface RegisterDeliveryFormProps {
     workOrder: WorkOrder;
+    client?: Client;
+    vehicle?: Vehicle;
     onSave: (workOrderId: string, deliveryData: {
         deliveryEvidenceFiles: File[];
         nextMaintenanceDate: string;
@@ -14,12 +16,12 @@ interface RegisterDeliveryFormProps {
     onCancel: () => void;
 }
 
-const inputClasses = "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50 focus:outline-none focus:ring-2 focus:ring-brand-red text-light-text dark:text-dark-text";
-const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
+const inputClasses = "w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-brand-red text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 [&::-webkit-input-placeholder]:!text-gray-400 [&::-moz-placeholder]:!text-gray-400 [&:-ms-input-placeholder]:!text-gray-400 [&::placeholder]:!text-gray-400";
+const labelClasses = "block text-sm font-medium text-gray-300 mb-1";
 const actionButtonClasses = "cursor-pointer flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-red rounded-lg shadow-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500";
 
 
-const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, onSave, onCancel }) => {
+const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, client, vehicle, onSave, onCancel }) => {
     const [formData, setFormData] = useState({
         nextMaintenanceDate: '',
         nextMaintenanceMileage: '',
@@ -75,14 +77,25 @@ const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, 
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="bg-black dark:bg-gray-900/20 p-4 rounded-lg">
-                <p className="text-sm">Cliente: <span className="font-semibold">{client?.name || 'Cliente no encontrado'}</span></p>
-                <p className="text-sm">Vehículo: <span className="font-semibold">{`${vehicle?.make || 'N/A'} ${vehicle?.model || 'N/A'} (${vehicle?.plate || 'N/A'})`}</span></p>
+        <>
+            <style>{`
+                .delivery-form input,
+                .delivery-form textarea {
+                    color: white !important;
+                }
+                .delivery-form input::placeholder,
+                .delivery-form textarea::placeholder {
+                    color: #9CA3AF !important;
+                }
+            `}</style>
+            <form onSubmit={handleSubmit} className="space-y-6 delivery-form" style={{color: 'white'}}>
+            <div className="bg-blue-900/30 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-700/50">
+                <p className="text-sm text-gray-300 dark:text-gray-300 font-medium">Cliente: <span className="font-bold text-white">{client?.name || 'Cliente no encontrado'}</span></p>
+                <p className="text-sm text-gray-300 dark:text-gray-300 font-medium">Vehículo: <span className="font-bold text-white">{`${vehicle?.make || 'N/A'} ${vehicle?.model || 'N/A'} (${vehicle?.plate || 'N/A'})`}</span></p>
             </div>
 
             <div>
-                <h3 className="text-lg font-semibold mb-2">Evidencia Fotográfica de Salida</h3>
+                <h3 className="text-lg font-semibold mb-2 text-white">Evidencia Fotográfica de Salida</h3>
                 <div className="flex items-center gap-4">
                     <label htmlFor="delivery-evidence-upload" className={`${actionButtonClasses} bg-gray-600 hover:bg-gray-700`}>
                         <Icon name="upload" className="w-5 h-5"/>
@@ -110,25 +123,25 @@ const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, 
             </div>
 
             <div>
-                <h3 className="text-lg font-semibold mb-2">Próximo Mantenimiento Sugerido</h3>
+                <h3 className="text-lg font-semibold mb-2 text-white">Próximo Mantenimiento Sugerido</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div>
                         <label htmlFor="nextMaintenanceDate" className={labelClasses}>Fecha Sugerida</label>
-                        <input type="date" id="nextMaintenanceDate" name="nextMaintenanceDate" value={formData.nextMaintenanceDate} onChange={handleChange} className={inputClasses} />
+                        <input type="date" id="nextMaintenanceDate" name="nextMaintenanceDate" value={formData.nextMaintenanceDate} onChange={handleChange} className={inputClasses} style={{color: 'white'}} />
                     </div>
                     <div>
                         <label htmlFor="nextMaintenanceMileage" className={labelClasses}>Kilometraje Sugerido</label>
-                        <input type="text" id="nextMaintenanceMileage" name="nextMaintenanceMileage" value={formData.nextMaintenanceMileage} onChange={handleChange} className={inputClasses} placeholder="Ej: 95.000 km"/>
+                        <input type="text" id="nextMaintenanceMileage" name="nextMaintenanceMileage" value={formData.nextMaintenanceMileage} onChange={handleChange} className={inputClasses} placeholder="Ej: 95.000 km" style={{color: 'white'}} />
                     </div>
                     <div className="md:col-span-2">
                         <label htmlFor="nextMaintenanceNotes" className={labelClasses}>Notas / Servicios Sugeridos</label>
-                        <textarea id="nextMaintenanceNotes" name="nextMaintenanceNotes" value={formData.nextMaintenanceNotes} onChange={handleChange} rows={2} className={inputClasses} placeholder="Ej: Próximo cambio de aceite y filtro. Revisar pastillas de freno."></textarea>
+                        <textarea id="nextMaintenanceNotes" name="nextMaintenanceNotes" value={formData.nextMaintenanceNotes} onChange={handleChange} rows={2} className={inputClasses} placeholder="Ej: Próximo cambio de aceite y filtro. Revisar pastillas de freno." style={{color: 'white'}}></textarea>
                     </div>
                 </div>
             </div>
             
             <div>
-                 <label className="flex items-center text-sm font-medium text-gray-300">
+                 <label className="flex items-center text-sm font-medium text-white">
                     <input
                         type="checkbox"
                         checked={formData.customerConfirmed}
@@ -150,6 +163,7 @@ const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, 
                 </button>
             </div>
         </form>
+        </>
     );
 };
 

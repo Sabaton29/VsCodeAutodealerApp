@@ -16,6 +16,7 @@ interface AddAppointmentFormProps {
 }
 
 const inputBaseClasses = "w-full text-sm px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50 focus:outline-none focus:ring-2 focus:ring-brand-red text-light-text dark:text-dark-text";
+const labelClasses = "block text-sm font-medium mb-1 text-gray-300";
 const plusButtonClasses = "p-2 bg-brand-red rounded-lg text-white hover:bg-red-700 transition-colors";
 
 const AddAppointmentForm: React.FC<AddAppointmentFormProps> = (props) => {
@@ -98,7 +99,7 @@ const AddAppointmentForm: React.FC<AddAppointmentFormProps> = (props) => {
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <div>
-                    <label className="block text-sm font-medium mb-1">Cliente</label>
+                    <label className={labelClasses}>Cliente</label>
                     <div className="flex gap-2">
                         <select name="clientId" value={formData.clientId} onChange={(e) => { setFormData(p => ({ ...p, clientId: e.target.value, vehicleId: '' }));}} className={inputBaseClasses} required>
                             <option value="">-- Seleccionar --</option>
@@ -108,7 +109,7 @@ const AddAppointmentForm: React.FC<AddAppointmentFormProps> = (props) => {
                     </div>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium mb-1">Vehículo</label>
+                    <label className={labelClasses}>Vehículo</label>
                     <div className="flex gap-2">
                         <select name="vehicleId" value={formData.vehicleId} onChange={handleChange} className={inputBaseClasses} disabled={!formData.clientId} required>
                             <option value="">-- Seleccionar --</option>
@@ -118,26 +119,26 @@ const AddAppointmentForm: React.FC<AddAppointmentFormProps> = (props) => {
                     </div>
                 </div>
                  <div>
-                    <label className="block text-sm font-medium mb-1">Fecha</label>
+                    <label className={labelClasses}>Fecha</label>
                     <input type="date" name="date" value={formData.date} onChange={handleChange} className={inputBaseClasses} required />
                 </div>
                  <div>
-                    <label className="block text-sm font-medium mb-1">Hora</label>
+                    <label className={labelClasses}>Hora</label>
                     <input type="time" name="time" value={formData.time} onChange={handleChange} className={inputBaseClasses} required />
                 </div>
                 <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Servicio Solicitado</label>
+                    <label className={labelClasses}>Servicio Solicitado</label>
                     <textarea name="serviceRequested" value={formData.serviceRequested} onChange={handleChange} rows={3} className={inputBaseClasses} required></textarea>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium mb-1">Asesor</label>
+                    <label className={labelClasses}>Asesor</label>
                     <select name="advisorId" value={formData.advisorId} onChange={handleChange} className={inputBaseClasses}>
                         <option value="">-- Opcional --</option>
                         {serviceAdvisors.map(sa => <option key={sa.id} value={sa.id}>{sa.name}</option>)}
                     </select>
                 </div>
                  <div className="md:col-span-2">
-                    <label className="block text-sm font-medium mb-1">Notas Adicionales</label>
+                    <label className={labelClasses}>Notas Adicionales</label>
                     <textarea name="notes" value={formData.notes} onChange={handleChange} rows={2} className={inputBaseClasses}></textarea>
                 </div>
             </div>

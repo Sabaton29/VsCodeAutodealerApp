@@ -249,25 +249,17 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
                 try {
                     console.log('🔍 EnhancedReportUnforeseenIssueModal - Subiendo imágenes:', selectedImages.length);
                     
-                    // Usar handlePostProgressUpdate para subir las imágenes
-                    for (let i = 0; i < selectedImages.length; i++) {
-                        const file = selectedImages[i];
-                        const fileName = `unforeseen_${workOrder.id}_${Date.now()}_${i}.${file.name.split('.').pop()}`;
-                        
-                        try {
-                            // Subir usando handlePostProgressUpdate
-                            await data.handlePostProgressUpdate(workOrder.id, `Imagen ${i + 1} del imprevisto`, [file]);
-                            
-                            // Generar URL correcta para Supabase Storage
-                            const tempUrl = `https://xoakbkmfnoiwmjtrnscy.supabase.co/storage/v1/object/public/progress-updates/progress/${workOrder.id}/${fileName}`;
-                            uploadedImageUrls.push(tempUrl);
-                            
-                            console.log('✅ Imagen subida:', fileName, 'URL:', tempUrl);
-                        } catch (uploadError) {
-                            console.error('❌ Error subiendo imagen individual:', uploadError);
-                        }
-                    }
+                    // Subir imágenes directamente usando uploadFileToStorage con el mismo path que las tareas
+                    const uploadPromises = selectedImages.map(async (file, index) => {
+                        const fileName = `unforeseen_${workOrder.id}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
+                        const path = `progress/${workOrder.id}/${fileName}`;
+                        console.log('🔍 EnhancedReportUnforeseenIssueModal - Subiendo archivo:', fileName, 'path:', path);
+                        // Importar directamente el servicio de Supabase
+                        const { uploadFileToStorage } = await import('../services/supabase');
+                        return await uploadFileToStorage(file, 'progress-updates', path);
+                    });
                     
+                    uploadedImageUrls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
                     console.log('🔍 EnhancedReportUnforeseenIssueModal - URLs subidas:', uploadedImageUrls);
                 } catch (uploadError) {
                     console.warn('Error subiendo imágenes, continuando sin ellas:', uploadError);

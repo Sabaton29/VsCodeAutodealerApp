@@ -28,16 +28,34 @@ interface DashboardProps {
     hasPermission: (permission: Permission) => boolean;
     currentUser: StaffMember | null;
     onEditWorkOrder: (workOrder: WorkOrder) => void;
+    migrateClientsRegistrationDate?: () => Promise<void>;
 }
 
 const UpcomingAppointments: React.FC<{ appointments: Appointment[] }> = ({ appointments }) => {
     const upcoming = useMemo(() => {
+        console.log('🔍 Dashboard - Total appointments:', appointments.length);
+        console.log('🔍 Dashboard - Appointments data:', appointments);
+        
         const now = new Date();
-        return appointments
-            .filter(a => a.status === AppointmentStatus.PROGRAMADA || a.status === AppointmentStatus.CONFIRMADA)
-            .filter(a => new Date(a.appointmentDateTime) >= now)
+        now.setHours(0, 0, 0, 0); // Reset to start of day
+        
+        const filtered = appointments
+            .filter(a => {
+                console.log('🔍 Checking appointment:', a.id, 'Status:', a.status, 'Date:', a.appointmentDateTime);
+                return a.status === AppointmentStatus.PROGRAMADA || a.status === AppointmentStatus.CONFIRMADA;
+            })
+            .filter(a => {
+                const appointmentDate = new Date(a.appointmentDateTime);
+                appointmentDate.setHours(0, 0, 0, 0);
+                const isUpcoming = appointmentDate >= now;
+                console.log('🔍 Date comparison:', appointmentDate, '>=', now, '=', isUpcoming);
+                return isUpcoming;
+            })
             .sort((a, b) => new Date(a.appointmentDateTime).getTime() - new Date(b.appointmentDateTime).getTime())
             .slice(0, 5);
+            
+        console.log('🔍 Dashboard - Filtered upcoming appointments:', filtered);
+        return filtered;
     }, [appointments]);
 
     return (
@@ -66,7 +84,7 @@ const UpcomingAppointments: React.FC<{ appointments: Appointment[] }> = ({ appoi
 const Dashboard: React.FC<DashboardProps> = ({ 
     selectedLocationId, workOrders, clients, pettyCashTransactions, staffMembers, vehicles, quotes, invoices, appointments,
     handleAssignTechnician, handleAdvanceStage, handleRetreatStage, handleCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, hasPermission,
-    currentUser, onEditWorkOrder,
+    currentUser, onEditWorkOrder, migrateClientsRegistrationDate,
 }) => {
     const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
 
@@ -102,6 +120,9 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         // 4. Clientes Nuevos
         const newClientsThisMonth = clients.filter(c => {
+            if (!c.registrationDate) {
+                return false;
+            }
             const registrationDate = new Date(c.registrationDate);
             return registrationDate.getMonth() === currentMonth &&
                    registrationDate.getFullYear() === currentYear;
@@ -175,6 +196,28 @@ const Dashboard: React.FC<DashboardProps> = ({
                     change="este mes"
                 />
             </div>
+
+            {/* Botón de migración para clientes */}
+            {migrateClientsRegistrationDate && (
+                <div className="bg-yellow-100 dark:bg-yellow-900/20 border border-yellow-300 dark:border-yellow-700 rounded-lg p-4">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <h3 className="text-lg font-semibold text-yellow-800 dark:text-yellow-200">
+                                🔧 Migración de Datos
+                            </h3>
+                            <p className="text-sm text-yellow-700 dark:text-yellow-300">
+                                Los clientes existentes no tienen fecha de registro. Ejecuta la migración para corregir el contador de "Clientes Nuevos".
+                            </p>
+                        </div>
+                        <button
+                            onClick={migrateClientsRegistrationDate}
+                            className="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-medium transition-colors"
+                        >
+                            Migrar Clientes
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Main Content Sections */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

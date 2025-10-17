@@ -1,6 +1,6 @@
 
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import type { CompanyInfo } from '../types';
 import { Icon } from './Icon';
 import { uploadFileToStorage } from '../services/supabase';
@@ -14,32 +14,37 @@ const inputClasses = "w-full px-3 py-2 border border-gray-300 dark:border-gray-7
 const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 
 const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSave }) => {
-    const [formData, setFormData] = useState<CompanyInfo>(settings || {
-        name: '',
-        nit: '',
-        logoUrl: '',
-    });
+    // Estabilizar el objeto inicial para evitar re-renderizados
+    const initialFormData = useMemo(() => ({
+        name: settings?.name || '',
+        nit: settings?.nit || '',
+        logoUrl: settings?.logoUrl || '',
+    }), [settings?.name, settings?.nit, settings?.logoUrl]);
+    
+    const [formData, setFormData] = useState<CompanyInfo>(initialFormData);
+    
+    // Logs de depuración removidos para mejor rendimiento
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
     const [logoFile, setLogoFile] = useState<File | null>(null);
     const [logoPreview, setLogoPreview] = useState<string | null>(null);
 
     useEffect(() => {
         if (settings) {
-            console.log('🔧 GeneralSettings - Received settings:', settings);
-            setFormData({
+            const newFormData = {
                 name: settings.name || '',
                 nit: settings.nit || '',
                 logoUrl: settings.logoUrl || '',
-            });
+            };
+            setFormData(newFormData);
         }
-    }, [settings]);
+    }, []); // SOLO se ejecuta una vez al montar el componente
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-    };
+    }, []);
 
-    const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const handleLogoChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
         if (file) {
             setLogoFile(file);
@@ -49,9 +54,9 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSave }) =
             };
             reader.readAsDataURL(file);
         }
-    };
+    }, []);
 
-    const handleSubmit = async(e: React.FormEvent) => {
+    const handleSubmit = useCallback(async(e: React.FormEvent) => {
         e.preventDefault();
         setSaveStatus('saving');
         
@@ -82,7 +87,7 @@ const GeneralSettings: React.FC<GeneralSettingsProps> = ({ settings, onSave }) =
             console.error('Error saving company info:', error);
             setSaveStatus('idle');
         }
-    };
+    }, [formData, logoFile, onSave]);
 
     return (
         <div className="bg-light dark:bg-dark-light rounded-xl shadow-md p-6">

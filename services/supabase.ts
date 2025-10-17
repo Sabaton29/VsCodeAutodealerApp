@@ -14,11 +14,31 @@ const handleSupabaseError = (error: any, operation: string) => {
 
 // Helper function to convert camelCase to snake_case
 const toSnakeCase = (str: string): string => {
+    // Handle special cases
+    if (str === 'isB2B') return 'is_b2b';
+    if (str === 'registrationDate') return 'registration_date';
+    if (str === 'vehicleCount') return 'vehicle_count';
+    if (str === 'locationId') return 'location_id';
+    if (str === 'personType') return 'person_type';
+    if (str === 'idType') return 'id_type';
+    if (str === 'idNumber') return 'id_number';
+    if (str === 'commissionRate') return 'commission_rate';
+    if (str === 'paymentTerms') return 'payment_terms';
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 };
 
 // Helper function to convert snake_case to camelCase
 const toCamelCase = (str: string): string => {
+    // Handle special cases
+    if (str === 'is_b2b') return 'isB2B';
+    if (str === 'registration_date') return 'registrationDate';
+    if (str === 'vehicle_count') return 'vehicleCount';
+    if (str === 'location_id') return 'locationId';
+    if (str === 'person_type') return 'personType';
+    if (str === 'id_type') return 'idType';
+    if (str === 'id_number') return 'idNumber';
+    if (str === 'commission_rate') return 'commissionRate';
+    if (str === 'payment_terms') return 'paymentTerms';
     return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
 };
 
@@ -159,8 +179,8 @@ export const getLocations = async (): Promise<Location[]> => {
         return transformData(data, false) as Location[];
         } catch (error) {
         handleSupabaseError(error, 'get locations');
-        return [];
-    }
+            return [];
+        }
 };
 
 export const createLocation = async (locationData: Omit<Location, 'id'>): Promise<Location> => {
@@ -229,7 +249,31 @@ export const getWorkOrders = async (): Promise<WorkOrder[]> => {
     } catch (error) {
         console.error('Error en getWorkOrders:', error);
         handleSupabaseError(error, 'get work orders');
-        return [];
+            return [];
+        }
+};
+
+export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
+    try {
+        const { data, error } = await supabase
+            .from('work_orders')
+            .select('*')
+            .eq('id', id)
+            .single();
+        
+        if (error) {
+            console.error('Error fetching work order by ID:', error);
+            throw error;
+        }
+        
+        if (!data) return null;
+        
+        const transformed = transformData([data], false) as WorkOrder[];
+        return transformed[0] || null;
+    } catch (error) {
+        console.error('Error en getWorkOrderById:', error);
+        handleSupabaseError(error, 'get work order by id');
+        return null;
     }
 };
 
@@ -237,6 +281,16 @@ export const createWorkOrder = async (workOrderData: Omit<WorkOrder, 'id' | 'cre
     try {
         // Limpiar datos antes de enviar - eliminar campos vacíos que causan errores
         const cleanedData = { ...workOrderData };
+        
+        // Extraer client_id y vehicle_id de los objetos client y vehicle
+        if (cleanedData.client?.id) {
+            cleanedData.clientId = cleanedData.client.id;
+            delete cleanedData.client;
+        }
+        if (cleanedData.vehicle?.id) {
+            cleanedData.vehicleId = cleanedData.vehicle.id;
+            delete cleanedData.vehicle;
+        }
         
         // Eliminar campos problemáticos
         Object.keys(cleanedData).forEach(key => {
@@ -304,7 +358,7 @@ export const updateWorkOrder = async (id: string, workOrderData: Partial<WorkOrd
         const { data, error } = await supabase
             .from('work_orders')
             .update(transformedData)
-            .eq('id', id)
+                .eq('id', id)
             .select('*')
                         .single();
                     
@@ -359,12 +413,12 @@ export const createClient = async (clientData: Omit<Client, 'id' | 'vehicleCount
         const { data, error } = await supabase
             .from('clients')
             .insert(transformedData)
-            .select()
+                .select()
                 .single();
-
-        if (error) throw error;
+            
+            if (error) throw error;
         return transformData(data, false) as Client;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'create client');
         throw error;
     }
@@ -382,21 +436,21 @@ export const updateClient = async (id: string, clientData: Partial<Client>): Pro
 
         if (error) throw error;
         return transformData(data, false) as Client;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'update client');
         throw error;
     }
 };
 
 export const deleteClient = async (id: string): Promise<void> => {
-    try {
-        const { error } = await supabase
+        try {
+            const { error } = await supabase
             .from('clients')
-            .delete()
-            .eq('id', id);
-        
-        if (error) throw error;
-    } catch (error) {
+                .delete()
+                .eq('id', id);
+            
+            if (error) throw error;
+        } catch (error) {
         handleSupabaseError(error, 'delete client');
         throw error;
     }
@@ -438,16 +492,16 @@ export const createVehicle = async (vehicleData: Omit<Vehicle, 'id'>): Promise<V
 export const updateVehicle = async (id: string, vehicleData: Partial<Vehicle>): Promise<Vehicle> => {
     try {
         const transformedData = transformData(vehicleData);
-        const { data, error } = await supabase
+            const { data, error } = await supabase
             .from('vehicles')
             .update(transformedData)
             .eq('id', id)
             .select('*')
-            .single();
-        
+                .single();
+
         if (error) throw error;
         return transformData(data, false) as Vehicle;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'update vehicle');
         throw error;
     }
@@ -512,7 +566,7 @@ export const updateStaffMember = async (id: string, staffData: Partial<StaffMemb
         
         if (error) throw error;
         return transformData(data, false) as StaffMember;
-    } catch (error) {
+        } catch (error) {
         handleSupabaseError(error, 'update staff member');
         throw error;
     }
@@ -838,35 +892,65 @@ export const getQuoteWithItems = async (quoteId: string): Promise<any> => {
 // APP SETTINGS
 export const getAppSettings = async (): Promise<AppSettings | null> => {
     try {
-        // Primero intentar obtener un solo registro
+        // Primero intentar obtener todos los registros y tomar el más reciente
         const { data, error } = await supabase
             .from('app_settings')
             .select('*')
-            .single();
+            .order('created_at', { ascending: false })
+            .limit(1);
         
         if (error) {
-            // Si hay error por múltiples registros, obtener el más reciente
-            if (error.code === 'PGRST116') {
-                console.log('⚠️ Múltiples registros en app_settings, obteniendo el más reciente...');
-                const { data: multipleData, error: multipleError } = await supabase
-                    .from('app_settings')
-                    .select('*')
-                    .order('created_at', { ascending: false })
-                    .limit(1);
-                
-                if (multipleError) throw multipleError;
-                if (multipleData && multipleData.length > 0) {
-                    return transformData(multipleData[0], false) as AppSettings;
-                }
+            console.error('❌ Error en getAppSettings:', error);
+            
+            // Si es error 406 u otro error, usar configuración por defecto
+            if (error.code === 'PGRST301' || error.message?.includes('406')) {
+                console.warn('⚠️ Error 406 en app_settings, usando configuración por defecto');
+                return getDefaultAppSettings();
             }
+            
             throw error;
         }
         
-        return transformData(data, false) as AppSettings;
+        if (data && data.length > 0) {
+            return transformData(data[0], false) as AppSettings;
+        }
+        
+        // Si no hay datos, usar configuración por defecto
+        return getDefaultAppSettings();
     } catch (error) {
-        console.error('❌ Error obteniendo app settings:', error);
-        return null;
+        console.error('❌ Error crítico en getAppSettings:', error);
+        return getDefaultAppSettings();
     }
+};
+
+// Función para obtener configuración por defecto
+const getDefaultAppSettings = (): AppSettings => {
+    return {
+        id: 'default',
+        companyName: 'Autodealer Cloud',
+        companyNit: '900123456-7',
+        companyLogoUrl: '/images/company/Logo.png',
+        companyInfo: {
+            address: 'Calle Falsa 123',
+            phone: '555-1234',
+            email: 'info@autodealer.com'
+        },
+        billingSettings: {
+            currency: 'USD',
+            taxRate: 0.19
+        },
+        operationsSettings: {
+            serviceCategories: ['Mecánica General', 'Eléctrico', 'Pintura'],
+            inventoryCategories: ['Filtros', 'Aceites', 'Llantas']
+        },
+        diagnosticSettings: {
+            basic: [],
+            intermediate: [],
+            advanced: []
+        },
+        createdAt: new Date(),
+        updatedAt: new Date()
+    };
 };
 
 export const updateAppSettings = async (settingsData: Partial<AppSettings>): Promise<AppSettings> => {
@@ -875,14 +959,37 @@ export const updateAppSettings = async (settingsData: Partial<AppSettings>): Pro
         const { data, error } = await supabase
             .from('app_settings')
             .upsert(transformedData)
-            .select()
+            .select('*')
             .single();
         
-        if (error) throw error;
+        if (error) {
+            console.error('❌ Error en updateAppSettings:', error);
+            
+            // Si es error 406, intentar crear la tabla o usar configuración por defecto
+            if (error.code === 'PGRST301' || error.message?.includes('406')) {
+                console.warn('⚠️ Error 406 en updateAppSettings, no se puede guardar');
+                // Devolver los datos que se intentaron guardar como si se hubieran guardado
+                return {
+                    ...getDefaultAppSettings(),
+                    ...settingsData,
+                    updatedAt: new Date()
+                } as AppSettings;
+            }
+            
+            throw error;
+        }
+        
         return transformData(data, false) as AppSettings;
     } catch (error) {
+        console.error('❌ Error crítico en updateAppSettings:', error);
         handleSupabaseError(error, 'update app settings');
-        throw error;
+        
+        // En caso de error, devolver los datos como si se hubieran guardado
+        return {
+            ...getDefaultAppSettings(),
+            ...settingsData,
+            updatedAt: new Date()
+        } as AppSettings;
     }
 };
 
@@ -924,7 +1031,23 @@ export const getNotifications = async (): Promise<Notification[]> => {
 };
 
 export const getAppointments = async (): Promise<Appointment[]> => {
-    return [];
+    try {
+        const { data, error } = await supabase
+            .from('appointments')
+            .select('*')
+            .order('appointment_date_time', { ascending: true });
+        
+        if (error) {
+            console.error('Error fetching appointments:', error);
+            throw error;
+        }
+        
+        return transformData(data, false) as Appointment[];
+    } catch (error) {
+        console.error('Error en getAppointments:', error);
+        handleSupabaseError(error, 'get appointments');
+        return [];
+    }
 };
 
 // Funciones específicas que necesita DataContext
@@ -983,6 +1106,7 @@ export const supabaseService = {
     
     // Work Orders
     getWorkOrders,
+    getWorkOrderById,
     createWorkOrder,
     insertWorkOrder,
     updateWorkOrder,

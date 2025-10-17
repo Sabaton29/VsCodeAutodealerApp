@@ -160,3 +160,7 @@ return <QuoteDetailView
 
 
 
+
+
+
+

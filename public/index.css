@@ -16,6 +16,13 @@ body {
     background-color: #f9fafb;
 }
 
+/* Tipografía personalizada */
+.font-heading {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
+    font-weight: 600;
+    letter-spacing: -0.025em;
+}
+
 #root {
     min-height: 100vh;
 }

@@ -17,7 +17,7 @@ interface AppointmentDetailSidebarProps {
 const DetailItem: React.FC<{ label: string; value?: string | React.ReactNode }> = ({ label, value }) => (
     <div>
         <p className="text-xs font-semibold text-gray-400 uppercase">{label}</p>
-        <div className="text-sm text-white mt-1">{value || 'N/A'}</div>
+        <div className="text-sm text-white mt-1" style={{color: 'white'}}>{value || 'N/A'}</div>
     </div>
 );
 
@@ -42,6 +42,11 @@ const AppointmentDetailSidebar: React.FC<AppointmentDetailSidebarProps> = ({
     const canCancel = appointment.status === AppointmentStatus.PROGRAMADA || appointment.status === AppointmentStatus.CONFIRMADA;
     const canCreateWorkOrder = appointment.status === AppointmentStatus.CONFIRMADA && !appointment.linkedWorkOrderId;
     const canEdit = appointment.status === AppointmentStatus.PROGRAMADA || appointment.status === AppointmentStatus.CONFIRMADA;
+    
+    console.log('🔍 AppointmentDetailSidebar - Appointment:', appointment);
+    console.log('🔍 AppointmentDetailSidebar - Status:', appointment.status);
+    console.log('🔍 AppointmentDetailSidebar - canConfirm:', canConfirm);
+    console.log('🔍 AppointmentDetailSidebar - onConfirm function:', typeof onConfirm);
     
     return (
         <>
@@ -84,7 +89,10 @@ const AppointmentDetailSidebar: React.FC<AppointmentDetailSidebarProps> = ({
                 {hasPermission('manage:appointments') && (
                     <div className="flex-shrink-0 p-4 border-t border-gray-700 space-y-2">
                         <div className="grid grid-cols-2 gap-2">
-                             <button onClick={() => onConfirm(appointment.id)} className={`${actionButtonClasses} bg-green-600 hover:bg-green-700`} disabled={!canConfirm}>
+                             <button onClick={() => {
+                                console.log('🔍 Confirm button clicked for appointment:', appointment.id);
+                                onConfirm(appointment.id);
+                            }} className={`${actionButtonClasses} bg-green-600 hover:bg-green-700`} disabled={!canConfirm}>
                                 <Icon name="check-circle" className="w-4 h-4" /> Confirmar
                             </button>
                              <button onClick={() => onCreateWorkOrder(appointment.id)} className={`${actionButtonClasses} bg-blue-600 hover:bg-blue-700`} disabled={!canCreateWorkOrder}>

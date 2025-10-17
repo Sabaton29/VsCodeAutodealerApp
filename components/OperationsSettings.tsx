@@ -14,12 +14,6 @@ interface OperationsSettingsProps {
     onEditServiceCategory: (category: ServiceCategory) => void;
     onAddInventoryCategory: () => void;
     onEditInventoryCategory: (category: InventoryCategory) => void;
-    onUpdateAllWorkOrderStages?: () => Promise<{ updated: number; skipped: number; errors: string[] }>;
-    onRestoreIncorrectlyCompletedOrders?: () => Promise<{ restored: number; errors: string[] }>;
-    onFixOrdersWithQuoteStageMismatch?: () => Promise<{ fixed: number; errors: string[] }>;
-    // Datos para diagnóstico
-    workOrders?: any[];
-    quotes?: any[];
 }
 
 const CatalogManager: React.FC<{
@@ -71,17 +65,11 @@ const OperationsSettings: React.FC<OperationsSettingsProps> = ({
     onEditServiceCategory,
     onAddInventoryCategory,
     onEditInventoryCategory,
-    onUpdateAllWorkOrderStages,
-    onRestoreIncorrectlyCompletedOrders,
-    onFixOrdersWithQuoteStageMismatch,
-    workOrders = [],
-    quotes = [],
 }) => {
     const [showServiceForm, setShowServiceForm] = useState(false);
     const [showInventoryForm, setShowInventoryForm] = useState(false);
     const [editingServiceCategory, setEditingServiceCategory] = useState<ServiceCategory | null>(null);
     const [editingInventoryCategory, setEditingInventoryCategory] = useState<InventoryCategory | null>(null);
-    const [isUpdatingStages, setIsUpdatingStages] = useState(false);
 
     const handleSaveServiceCategory = (category: ServiceCategory | Omit<ServiceCategory, 'id'>) => {
         onSaveServiceCategory(category);
@@ -115,124 +103,9 @@ const OperationsSettings: React.FC<OperationsSettingsProps> = ({
         setShowInventoryForm(true);
     };
 
-    const handleUpdateAllWorkOrderStages = async() => {
-        if (!onUpdateAllWorkOrderStages) return;
-        
-        setIsUpdatingStages(true);
-        try {
-            const result = await onUpdateAllWorkOrderStages();
-            alert(`Actualización completada:\n✅ ${result.updated} órdenes actualizadas\n⏭️ ${result.skipped} sin cambios\n❌ ${result.errors.length} errores`);
-        } catch (error) {
-            alert(`Error en la actualización: ${error}`);
-        } finally {
-            setIsUpdatingStages(false);
-        }
-    };
 
-    const handleRestoreIncorrectlyCompletedOrders = async() => {
-        if (!onRestoreIncorrectlyCompletedOrders) return;
-        
-        setIsUpdatingStages(true);
-        try {
-            const result = await onRestoreIncorrectlyCompletedOrders();
-            alert(`Restauración completada:\n🔧 ${result.restored} órdenes restauradas\n❌ ${result.errors.length} errores`);
-        } catch (error) {
-            alert(`Error en la restauración: ${error}`);
-        } finally {
-            setIsUpdatingStages(false);
-        }
-    };
 
-    const handleFixOrdersWithQuoteStageMismatch = async() => {
-        if (!onFixOrdersWithQuoteStageMismatch) return;
-        
-        setIsUpdatingStages(true);
-        try {
-            const result = await onFixOrdersWithQuoteStageMismatch();
-            alert(`Corrección completada:\n🔧 ${result.fixed} órdenes corregidas\n❌ ${result.errors.length} errores`);
-        } catch (error) {
-            alert(`Error en la corrección: ${error}`);
-        } finally {
-            setIsUpdatingStages(false);
-        }
-    };
 
-    const handleDiagnoseDataStructure = () => {
-        console.log('🔍 === DIAGNÓSTICO DE ESTRUCTURA DE DATOS ===');
-        
-        try {
-            console.log(`📊 Total órdenes: ${workOrders.length}, Total cotizaciones: ${quotes.length}`);
-
-            // Verificar órdenes con cotizaciones vinculadas
-            const ordersWithLinkedQuotes = workOrders.filter(wo => wo.linkedQuoteIds && wo.linkedQuoteIds.length > 0);
-            console.log(`🔗 Órdenes con linkedQuoteIds: ${ordersWithLinkedQuotes.length}`);
-
-            // Verificar cotizaciones con workOrderId
-            const quotesWithWorkOrder = quotes.filter(q => q.workOrderId);
-            console.log(`📋 Cotizaciones con workOrderId: ${quotesWithWorkOrder.length}`);
-
-            // Mostrar detalles de la orden 0041
-            const order0041 = workOrders.find(wo => wo.id === '0041');
-            if (order0041) {
-                console.log('🔍 Orden 0041:', {
-                    id: order0041.id,
-                    stage: order0041.stage,
-                    linkedQuoteIds: order0041.linkedQuoteIds,
-                    serviceRequested: order0041.serviceRequested,
-                });
-            } else {
-                console.log('❌ Orden 0041 no encontrada');
-            }
-
-            // Mostrar cotizaciones que deberían estar vinculadas a 0041
-            const quotesFor0041 = quotes.filter(q => q.workOrderId === '0041');
-            console.log('📋 Cotizaciones para 0041:', quotesFor0041.map(q => ({
-                id: q.id,
-                workOrderId: q.workOrderId,
-                status: q.status,
-                total: q.total,
-            })));
-
-            // Mostrar todas las cotizaciones
-            console.log('📋 Todas las cotizaciones:', quotes.map(q => ({
-                id: q.id,
-                workOrderId: q.workOrderId,
-                status: q.status,
-                total: q.total,
-            })));
-
-            // Mostrar todas las órdenes (solo las primeras 5 para no saturar)
-            console.log('🔍 Primeras 5 órdenes:', workOrders.slice(0, 5).map(wo => ({
-                id: wo.id,
-                stage: wo.stage,
-                linkedQuoteIds: wo.linkedQuoteIds,
-                serviceRequested: wo.serviceRequested,
-            })));
-
-            // Crear resumen para el alert
-            const summary = `
-DIAGNÓSTICO COMPLETADO:
-
-📊 Datos encontrados:
-• Órdenes: ${workOrders.length}
-• Cotizaciones: ${quotes.length}
-• Órdenes con vínculos: ${ordersWithLinkedQuotes.length}
-• Cotizaciones con workOrderId: ${quotesWithWorkOrder.length}
-
-🔍 Orden 0041:
-• Encontrada: ${order0041 ? 'Sí' : 'No'}
-• Vínculos: ${order0041?.linkedQuoteIds?.length || 0}
-• Cotizaciones vinculadas: ${quotesFor0041.length}
-
-Revisa la consola (F12) para detalles completos.
-            `;
-
-            alert(summary);
-        } catch (error) {
-            console.error('❌ Error en diagnóstico:', error);
-            alert(`Error en diagnóstico: ${error}. Abre la consola para más detalles.`);
-        }
-    };
 
     return (
         <div className="space-y-6">
@@ -280,97 +153,6 @@ Revisa la consola (F12) para detalles completos.
                 type="inventory"
             />
 
-            {/* Admin Tools Section */}
-            <div className="bg-light dark:bg-dark-light rounded-xl shadow-md border border-red-200 dark:border-red-800">
-                <div className="p-4 border-b border-gray-200 dark:border-gray-800">
-                    <h3 className="text-lg font-bold text-light-text dark:text-dark-text flex items-center gap-2">
-                        <Icon name="tool" className="w-5 h-5 text-orange-500" />
-                        Herramientas de Administración
-                    </h3>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
-                        Herramientas avanzadas para mantenimiento y corrección de datos del sistema.
-                    </p>
-                </div>
-                <div className="p-4">
-                    <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4 mb-4">
-                        <div className="flex items-start gap-3">
-                            <Icon name="warning" className="w-5 h-5 text-yellow-600 dark:text-yellow-400 mt-0.5 flex-shrink-0" />
-                            <div>
-                                <h4 className="font-semibold text-yellow-800 dark:text-yellow-200">Actualización de Etapas de Órdenes de Trabajo</h4>
-                                <p className="text-sm text-yellow-700 dark:text-yellow-300 mt-1">
-                                    Esta herramienta corregirá automáticamente las etapas de todas las órdenes de trabajo 
-                                    según la lógica de negocio del sistema. Solo ejecuta esta función si las etapas están 
-                                    desactualizadas.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div className="flex gap-3 flex-wrap">
-                        <button
-                            onClick={handleUpdateAllWorkOrderStages}
-                            disabled={isUpdatingStages || !onUpdateAllWorkOrderStages}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-orange-600 rounded-lg shadow-md hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {isUpdatingStages ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    Actualizando...
-                                </>
-                            ) : (
-                                <>
-                                    <Icon name="refresh" className="w-4 h-4" />
-                                    Actualizar Todas las Etapas
-                                </>
-                            )}
-                        </button>
-                        
-                        <button
-                            onClick={handleRestoreIncorrectlyCompletedOrders}
-                            disabled={isUpdatingStages || !onRestoreIncorrectlyCompletedOrders}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-red-600 rounded-lg shadow-md hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-                        >
-                            {isUpdatingStages ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    Restaurando...
-                                </>
-                            ) : (
-                                <>
-                                    <Icon name="undo" className="w-4 h-4" />
-                                    Restaurar Órdenes Completadas Incorrectamente
-                                </>
-                            )}
-                        </button>
-                        
-                        <button
-                            onClick={handleFixOrdersWithQuoteStageMismatch}
-                            disabled={isUpdatingStages || !onFixOrdersWithQuoteStageMismatch}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-orange-600 rounded-lg shadow-md hover:bg-orange-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                            {isUpdatingStages ? (
-                                <>
-                                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
-                                    Corrigiendo...
-                                </>
-                            ) : (
-                                <>
-                                    <Icon name="alert-triangle" className="w-4 h-4" />
-                                    Corregir Etapas Incorrectas por Cotizaciones
-                                </>
-                            )}
-                        </button>
-                        
-                        <button
-                            onClick={handleDiagnoseDataStructure}
-                            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg shadow-md hover:bg-blue-700 transition-colors"
-                        >
-                            <Icon name="search" className="w-4 h-4" />
-                            Diagnosticar Estructura de Datos
-                        </button>
-                    </div>
-                </div>
-            </div>
         </div>
     );
 };

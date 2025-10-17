@@ -1,6 +1,6 @@
 
 
-import React, { useState } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import type { AppSettings, Location, StaffMember, UserRole, Permission, ServiceCategory, InventoryCategory, FinancialAccount, DiagnosticSettings } from '../../types';
 import GeneralSettings from '../GeneralSettings';
 import LocationsSettings from '../LocationsSettings';
@@ -62,16 +62,25 @@ const SettingsView: React.FC<SettingsViewProps> = (props) => {
     const [activeTab, setActiveTab] = useState('General');
     const tabs = ['General', 'Sedes', 'Facturación', 'Usuarios', 'Operaciones', 'Diagnósticos', 'Finanzas'];
 
+    // Estabilizar el objeto companyInfo para evitar re-renderizados infinitos
+    const companyInfo = useMemo(() => {
+        return appSettings?.companyInfo || { name: '', nit: '', logoUrl: '' };
+    }, [appSettings?.companyInfo?.name, appSettings?.companyInfo?.nit, appSettings?.companyInfo?.logoUrl]);
+
+    // Estabilizar la función onSave para evitar re-renderizados infinitos
+    const handleSaveAppSettings = useCallback((info: any) => {
+        onSaveAppSettings(info);
+    }, [onSaveAppSettings]);
+
     const renderContent = () => {
         if (!appSettings) {
             return <div>Cargando configuración...</div>;
         }
         switch (activeTab) {
             case 'General':
-                console.log('🔧 SettingsView - Rendering GeneralSettings with appSettings:', appSettings);
                 return <GeneralSettings 
-                            settings={appSettings?.companyInfo || { name: '', nit: '', logoUrl: '' }} 
-                            onSave={(info) => onSaveAppSettings(info)} 
+                            settings={companyInfo} 
+                            onSave={handleSaveAppSettings} 
                         />;
             case 'Sedes':
                 return <LocationsSettings 

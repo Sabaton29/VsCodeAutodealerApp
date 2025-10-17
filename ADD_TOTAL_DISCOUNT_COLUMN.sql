@@ -16,3 +16,4 @@ AND column_name = 'total_discount';
 UPDATE quotes 
 SET total_discount = 0 
 WHERE total_discount IS NULL;
+

@@ -42,3 +42,4 @@ SELECT id, diagnostic_settings FROM app_settings;
 
 
 
+

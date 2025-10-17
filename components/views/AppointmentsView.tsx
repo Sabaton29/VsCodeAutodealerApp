@@ -91,18 +91,18 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-                <h1 className="text-3xl font-bold text-light-text dark:text-dark-text">Agenda de Citas</h1>
+                <h1 className="text-4xl font-heading font-bold text-white tracking-wide">Agenda de Citas</h1>
                 <div className="flex items-center gap-4">
                      <div className="flex items-center gap-2 p-1 bg-dark-light rounded-lg">
-                        <button onClick={() => changeDate(-1)} className="p-2 rounded-md hover:bg-gray-700"><Icon name="chevron-down" className="w-5 h-5 rotate-90" /></button>
-                        <h2 className="text-lg font-bold capitalize text-center w-40 sm:w-64">{headerDateString}</h2>
-                        <button onClick={() => changeDate(1)} className="p-2 rounded-md hover:bg-gray-700"><Icon name="chevron-right" className="w-5 h-5" /></button>
-                        <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-xs font-semibold bg-gray-700 rounded-md hover:bg-gray-600">Hoy</button>
+                        <button onClick={() => changeDate(-1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{color: 'white !important'}}><Icon name="chevron-down" className="w-5 h-5 rotate-90" style={{color: 'white !important'}} /></button>
+                        <h2 className="text-xl font-heading font-semibold capitalize text-center w-40 sm:w-64 text-white" style={{color: 'white !important'}}>{headerDateString}</h2>
+                        <button onClick={() => changeDate(1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{color: 'white !important'}}><Icon name="chevron-right" className="w-5 h-5" style={{color: 'white !important'}} /></button>
+                        <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-sm font-heading font-medium bg-gray-700 text-white rounded-md hover:bg-gray-600">Hoy</button>
                     </div>
 
                     <div className="flex items-center bg-dark-light p-1 rounded-lg">
                         {(['month', 'week', 'day'] as CalendarView[]).map(view => (
-                            <button key={view} onClick={() => setCalendarView(view)} className={`px-3 py-1.5 text-xs font-semibold rounded-md capitalize transition-colors ${calendarView === view ? 'bg-brand-red text-white' : 'hover:bg-gray-700'}`}>
+                            <button key={view} onClick={() => setCalendarView(view)} className={`px-3 py-1.5 text-sm font-heading font-medium rounded-md capitalize transition-colors ${calendarView === view ? 'bg-brand-red text-white' : 'text-white hover:bg-gray-700'}`}>
                                 {view === 'month' ? 'Mes' : view === 'week' ? 'Semana' : 'Día'}
                             </button>
                         ))}
@@ -119,7 +119,7 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
             <div className="bg-dark-light rounded-xl shadow-md">
                  <div className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4 border-b border-gray-700">
                     <div className="flex items-center gap-2">
-                        <span className="text-sm font-semibold mr-2">Estado:</span>
+                        <span className="text-sm font-heading font-semibold mr-2 text-white">Estado:</span>
                         {Object.values(AppointmentStatus).map(status => {
                             const config = APPOINTMENT_STATUS_DISPLAY_CONFIG[status];
                             const isActive = statusFilters.has(status);
@@ -127,7 +127,7 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                                 <button
                                     key={status}
                                     onClick={() => toggleStatusFilter(status)}
-                                    className={`flex items-center gap-2 px-2.5 py-1 text-xs rounded-full transition-all ${
+                                    className={`flex items-center gap-2 px-2.5 py-1 text-sm font-heading font-medium rounded-full transition-all ${
                                         isActive ? `${config.bg} ${config.text} font-bold` : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                                     }`}
                                 >
@@ -138,16 +138,16 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                         })}
                     </div>
                     <div className="flex items-center gap-2">
-                        <label htmlFor="advisor-filter" className="text-sm font-semibold">Asesor:</label>
+                        <label htmlFor="advisor-filter" className="text-sm font-heading font-semibold text-white">Asesor:</label>
                         <select
                             id="advisor-filter"
                             value={advisorFilter}
                             onChange={e => setAdvisorFilter(e.target.value)}
-                            className="bg-gray-900/50 border border-gray-700 rounded-md px-2 py-1 text-sm focus:ring-brand-red focus:border-brand-red"
+                            className="bg-gray-900/50 border border-gray-700 rounded-md px-2 py-1 text-sm text-white focus:ring-brand-red focus:border-brand-red"
                         >
-                            <option value="all">Todos los Asesores</option>
+                            <option value="all" className="text-white bg-gray-800">Todos los Asesores</option>
                             {serviceAdvisors.map(advisor => (
-                                <option key={advisor.id} value={advisor.id}>{advisor.name}</option>
+                                <option key={advisor.id} value={advisor.id} className="text-white bg-gray-800">{advisor.name}</option>
                             ))}
                         </select>
                     </div>
@@ -163,9 +163,46 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                     appointment={selectedAppointment}
                     onClose={() => setSelectedAppointment(null)}
                     staffMembers={staffMembers}
-                    onConfirm={async(id) => { await handleConfirmAppointment(id); setSelectedAppointment(prev => prev ? { ...prev, status: AppointmentStatus.CONFIRMADA } : null); }}
-                    onCancel={async(id) => { await handleCancelAppointment(id); setSelectedAppointment(null); }}
-                    onCreateWorkOrder={async(id) => { await handleCreateWorkOrderFromAppointment(id); setSelectedAppointment(null); }}
+                    onConfirm={async(id) => { 
+                        console.log('🔍 AppointmentsView - onConfirm called with ID:', id);
+                        console.log('🔍 AppointmentsView - handleConfirmAppointment type:', typeof handleConfirmAppointment);
+                        if (handleConfirmAppointment) {
+                            console.log('🔍 AppointmentsView - Calling handleConfirmAppointment...');
+                            try {
+                                await handleConfirmAppointment(id); 
+                                console.log('🔍 AppointmentsView - handleConfirmAppointment completed successfully');
+                                setSelectedAppointment(prev => prev ? { ...prev, status: AppointmentStatus.CONFIRMADA } : null);
+                                console.log('🔍 AppointmentsView - Selected appointment updated');
+                            } catch (error) {
+                                console.error('🔍 AppointmentsView - Error in handleConfirmAppointment:', error);
+                            }
+                        } else {
+                            console.error('🔍 AppointmentsView - handleConfirmAppointment is not available');
+                        }
+                    }}
+                    onCancel={async(id) => { 
+                        console.log('🔍 AppointmentsView - onCancel called with ID:', id);
+                        console.log('🔍 AppointmentsView - handleCancelAppointment type:', typeof handleCancelAppointment);
+                        if (handleCancelAppointment) {
+                            console.log('🔍 AppointmentsView - Calling handleCancelAppointment...');
+                            try {
+                                await handleCancelAppointment(id); 
+                                console.log('🔍 AppointmentsView - handleCancelAppointment completed successfully');
+                                setSelectedAppointment(null);
+                                console.log('🔍 AppointmentsView - Selected appointment cleared');
+                            } catch (error) {
+                                console.error('🔍 AppointmentsView - Error in handleCancelAppointment:', error);
+                            }
+                        } else {
+                            console.error('🔍 AppointmentsView - handleCancelAppointment is not available');
+                        }
+                    }}
+                    onCreateWorkOrder={async(id) => { 
+                        if (handleCreateWorkOrderFromAppointment) {
+                            await handleCreateWorkOrderFromAppointment(id); 
+                            setSelectedAppointment(null);
+                        }
+                    }}
                     onEdit={(app) => { setSelectedAppointment(null); openModal('EDIT_APPOINTMENT', app); }}
                     hasPermission={hasPermission}
                 />
@@ -236,14 +273,14 @@ const MonthCalendar: React.FC<any> = ({ appointments, currentDate, onAppointment
                     onDragEnter={onDragEnter} onDragLeave={onDragLeave}
                 >
                     {dayData && <>
-                        <div className="text-sm font-semibold">{dayData.day}</div>
+                        <div className="text-sm font-semibold text-white" style={{color: 'white !important'}}>{dayData.day}</div>
                         <div className="space-y-1 mt-1">
                             {dayData.appointments.slice(0, 3).map((app: Appointment) => {
                                 const statusConfig = APPOINTMENT_STATUS_DISPLAY_CONFIG[app.status];
                                 return (
                                 <div key={app.id} onClick={() => onAppointmentClick(app)} draggable onDragStart={(e) => onDragStart(e, app)} onDragEnd={onDragEnd} className={`p-1.5 rounded-md bg-black dark:bg-gray-900/30 border-l-4 ${statusConfig.borderColor} cursor-grab hover:bg-black dark:bg-gray-900/50`}>
-                                    <p className="text-xs font-bold truncate">{app.clientName}</p>
-                                    <p className="text-[10px] text-gray-400 truncate">{app.serviceRequested}</p>
+                                    <p className="text-xs font-bold truncate text-white" style={{color: 'white !important'}}>{app.clientName}</p>
+                                    <p className="text-[10px] text-gray-300 truncate" style={{color: '#D1D5DB !important'}}>{app.serviceRequested}</p>
                                 </div>
                             );})}
                             {dayData.appointments.length > 3 && <div className="text-xs text-center text-gray-400">...y {dayData.appointments.length - 3} más</div>}
@@ -291,7 +328,7 @@ const WeekCalendar: React.FC<any> = ({ appointments, currentDate, onAppointmentC
         <div className="grid grid-cols-7 gap-px bg-gray-700 border border-gray-700">
             {weekDays.map(day => (
                 <div key={day.toISOString()} className="text-center font-bold text-xs py-2 bg-black dark:bg-gray-900/20 text-gray-400">
-                    {WEEK_DAYS[day.getDay()]} <span className="block font-normal text-lg">{day.getDate()}</span>
+                    {WEEK_DAYS[day.getDay()]} <span className="block font-normal text-lg text-white">{day.getDate()}</span>
                 </div>
             ))}
             {weekDays.map(day => {

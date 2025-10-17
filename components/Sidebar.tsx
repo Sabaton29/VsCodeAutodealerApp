@@ -1,7 +1,7 @@
 import React from 'react';
 import { Icon, IconName } from './Icon';
 import { SIDEBAR_LINKS } from '../constants';
-import type { Permission } from '../types';
+import type { Permission, AppSettings } from '../types';
 
 interface SidebarProps {
     activeView: string;
@@ -11,11 +11,13 @@ interface SidebarProps {
     setIsCollapsed: (collapsed: boolean) => void;
     isMobileOpen: boolean;
     setIsMobileOpen: (open: boolean) => void;
+    appSettings?: AppSettings;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({ 
     activeView, setActiveView, hasPermission,
     isCollapsed, setIsCollapsed, isMobileOpen, setIsMobileOpen,
+    appSettings,
 }) => {
     return (
         <>
@@ -37,8 +39,28 @@ const Sidebar: React.FC<SidebarProps> = ({
                 `}
             >
                 <div className={`flex flex-col items-center justify-center h-28 border-b border-gray-800 transition-all duration-300 ${isCollapsed ? 'px-2' : 'px-4'}`}>
-                    <Icon name="logo-car" className="w-16 h-auto text-white" />
-                    {!isCollapsed && (
+                    {/* Logo de la empresa */}
+                    {appSettings?.companyInfo?.logoUrl ? (
+                        <img 
+                            src={appSettings.companyInfo.logoUrl} 
+                            alt={`${appSettings.companyInfo.name || 'Autodealer'} Logo`}
+                            className={`${isCollapsed ? 'w-28 h-28' : 'w-56 h-56'} object-contain`}
+                            onError={(e) => {
+                                // Fallback al ícono si la imagen no carga
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                            }}
+                        />
+                    ) : null}
+                    
+                    {/* Fallback al ícono si no hay logo o falla la carga */}
+                    <Icon 
+                        name="logo-car" 
+                        className={`${isCollapsed ? 'w-28 h-28' : 'w-56 h-56'} text-white ${appSettings?.companyInfo?.logoUrl ? 'hidden' : ''}`} 
+                    />
+                    
+                    {/* Solo mostrar texto si no hay logo configurado */}
+                    {!isCollapsed && !appSettings?.companyInfo?.logoUrl && (
                         <h1 className="text-3xl font-heading tracking-wider mt-2">
                             <span className="text-brand-red">AUTO</span>
                             <span className="text-white">DEALER</span>

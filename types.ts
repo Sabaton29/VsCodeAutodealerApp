@@ -756,6 +756,7 @@ export interface DataContextType {
     handleCreateWorkOrderFromAppointment: (appointmentId: string) => Promise<void>;
     handleUpdateWorkOrderDiagnosticType: (workOrderId: string, newType: DiagnosticType) => Promise<void>;
     handleSaveClient: (clientData: Client | Omit<Client, 'id' | 'vehicleCount' | 'registrationDate'>) => Promise<void>;
+    migrateClientsRegistrationDate: () => Promise<void>;
     handleSaveVehicle: (vehicleData: Vehicle | Omit<Vehicle, 'id'>) => Promise<void>;
     handleSaveStaffMember: (staffData: StaffMember | Omit<StaffMember, 'id' | 'avatarUrl'>) => Promise<void>;
     handleDeleteStaffMember: (staffId: string) => Promise<void>;
