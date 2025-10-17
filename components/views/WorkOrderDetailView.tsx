@@ -993,13 +993,18 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                         // Buscar la entrada de historial del control de calidad
                         const qualityControlEntry = workOrder.history?.find(entry => 
                             entry.notes?.includes('Control de Calidad APROBADO') || 
-                            entry.notes?.includes('Control de Calidad RECHAZADO')
+                            entry.notes?.includes('Control de Calidad RECHAZADO') ||
+                            entry.stage === 'Control de Calidad' ||
+                            entry.notes?.includes('Control de Calidad')
                         );
                         
                         console.log('🔍 WorkOrderDetailView - qualityControlEntry encontrada:', qualityControlEntry);
                         
                         if (qualityControlEntry) {
-                            const isApproved = qualityControlEntry.notes?.includes('APROBADO');
+                            // Determinar si fue aprobado basándose en la etapa actual y el texto
+                            const isApproved = qualityControlEntry.notes?.includes('APROBADO') || 
+                                             qualityControlEntry.notes?.includes('Listo para Entrega') ||
+                                             workOrder.stage === 'Listo para Entrega';
                             return (
                                 <div className="bg-dark-light rounded-xl p-6">
                                     <div className="flex items-center justify-between mb-4">
