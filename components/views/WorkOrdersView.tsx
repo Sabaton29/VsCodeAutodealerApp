@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, memo } from 'react';
-import { KanbanStage, UserRole, type WorkOrder, type StaffMember, Quote } from '../../types';
+import { KanbanStage, UserRole, type WorkOrder, type StaffMember, Quote, type Invoice } from '../../types';
 import { KANBAN_STAGES_ORDER } from '../../constants';
 import OperationsMetricCard from '../OperationsMetricCard';
 import ActiveWorkOrdersTable from '../ActiveWorkOrdersTable';
@@ -11,6 +11,7 @@ interface WorkOrdersViewProps {
   selectedLocationId: string;
   workOrders: WorkOrder[];
   quotes: Quote[];
+  invoices: Invoice[];
   staffMembers: StaffMember[];
   handleAssignTechnician: (workOrderId: string, staffMemberId: string) => void;
   handleAdvanceStage: (workOrderId: string, currentStage: KanbanStage) => void;
@@ -27,6 +28,7 @@ const WorkOrdersView: React.FC<WorkOrdersViewProps> = memo(({
   selectedLocationId, 
   workOrders, 
   quotes,
+  invoices,
   staffMembers,
   handleAssignTechnician,
   handleAdvanceStage,
@@ -211,6 +213,7 @@ const WorkOrdersView: React.FC<WorkOrdersViewProps> = memo(({
         workOrders={sortedAndFilteredOrders} 
         activeFilter={activeFilter}
         quotes={quotes}
+        invoices={invoices}
         staffMembers={staffMembers.filter(t => selectedLocationId === 'ALL_LOCATIONS' || t.locationId === selectedLocationId)}
         onAssignTechnician={handleAssignTechnician}
         onAdvanceStage={handleAdvanceStage}

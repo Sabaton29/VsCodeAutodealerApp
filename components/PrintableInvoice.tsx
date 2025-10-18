@@ -1,6 +1,7 @@
 import React from 'react';
 import { Icon } from './Icon';
 import { Invoice, Client, Vehicle, WorkOrder, AppSettings } from '../types';
+import { getInvoiceDisplayId } from '../utils/invoiceId';
 
 interface PrintableInvoiceProps {
     invoice: Invoice;
@@ -45,7 +46,7 @@ const PrintableInvoice: React.FC<PrintableInvoiceProps> = ({ invoice, client, ve
                 {/* Sección derecha: Título y detalles */}
                 <div style={{ flex: 1, textAlign: 'right', maxWidth: '50%' }}>
                     <h1 style={{ margin: '0', fontSize: '20px', fontWeight: 'bold', color: '#dc2626' }}>FACTURA DE VENTA</h1>
-                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', fontWeight: 'bold' }}>{invoice.id}</p>
+                    <p style={{ margin: '5px 0 0 0', fontSize: '14px', fontWeight: 'bold' }}>{getInvoiceDisplayId(invoice.id, invoice.issueDate, true, invoice.sequentialId)}</p>
                     {workOrder && <p style={{ margin: '0', fontSize: '14px' }}>OT Asociada: {workOrder.id}</p>}
                 </div>
             </div>
@@ -73,34 +74,73 @@ const PrintableInvoice: React.FC<PrintableInvoiceProps> = ({ invoice, client, ve
 
             {/* Items Table */}
             <div className="mt-6">
-                 <table className="w-full text-sm">
-                    <thead className="bg-gray-200">
-                        <tr>
-                            <th className="px-2 py-2 text-left font-bold w-[40%]">Descripción</th>
-                            <th className="px-2 py-2 text-center font-bold">Cant.</th>
-                            <th className="px-2 py-2 text-right font-bold">Vlr. Unitario</th>
-                            <th className="px-2 py-2 text-right font-bold">Descuento</th>
-                            <th className="px-2 py-2 text-right font-bold">Total</th>
-                        </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-200">
-                        {invoice.items.map(item => (
-                            <tr key={item.id}>
-                                <td className="px-2 py-2 align-top">
-                                    <p className="font-semibold">{item.description}</p>
-                                    <p className="text-xs text-gray-600">{item.type === 'service' ? 'Servicio' : 'Repuesto'}</p>
-                                    {item.suppliedByClient && (
-                                        <p className="text-xs text-blue-600 font-bold italic">(Suministrado por el Cliente)</p>
-                                    )}
-                                </td>
-                                <td className="px-2 py-2 text-center align-top">{item.quantity}</td>
-                                <td className="px-2 py-2 text-right align-top">{formatCurrency(item.suppliedByClient ? 0 : item.unitPrice)}</td>
-                                <td className="px-2 py-2 text-right align-top text-red-600">{formatCurrency(item.discount || 0)}</td>
-                                <td className="px-2 py-2 text-right align-top">{formatCurrency((item.quantity * item.unitPrice) - (item.discount || 0))}</td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+                {/* Servicios */}
+                {invoice.items?.filter(item => item.type === 'service').length > 0 && (
+                    <div className="mb-6">
+                        <h4 className="text-sm font-bold text-blue-600 mb-2">Servicios Requeridos</h4>
+                        <table className="w-full text-sm">
+                            <thead className="bg-blue-100">
+                                <tr>
+                                    <th className="px-2 py-2 text-left font-bold w-[40%]">Servicio</th>
+                                    <th className="px-2 py-2 text-center font-bold">Cant.</th>
+                                    <th className="px-2 py-2 text-right font-bold">Vlr. Unitario</th>
+                                    <th className="px-2 py-2 text-right font-bold">Descuento</th>
+                                    <th className="px-2 py-2 text-right font-bold">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-blue-200">
+                                {invoice.items.filter(item => item.type === 'service').map(item => (
+                                    <tr key={item.id}>
+                                        <td className="px-2 py-2 align-top">
+                                            <p className="font-semibold">{item.description}</p>
+                                            {item.suppliedByClient && (
+                                                <p className="text-xs text-blue-600 font-bold italic">(Suministrado por el Cliente)</p>
+                                            )}
+                                        </td>
+                                        <td className="px-2 py-2 text-center align-top">{item.quantity}</td>
+                                        <td className="px-2 py-2 text-right align-top">{formatCurrency(item.suppliedByClient ? 0 : item.unitPrice)}</td>
+                                        <td className="px-2 py-2 text-right align-top text-red-600">{formatCurrency(item.discount || 0)}</td>
+                                        <td className="px-2 py-2 text-right align-top">{formatCurrency((item.quantity * item.unitPrice) - (item.discount || 0))}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
+
+                {/* Repuestos */}
+                {invoice.items?.filter(item => item.type === 'inventory').length > 0 && (
+                    <div className="mb-6">
+                        <h4 className="text-sm font-bold text-green-600 mb-2">Repuestos Requeridos</h4>
+                        <table className="w-full text-sm">
+                            <thead className="bg-green-100">
+                                <tr>
+                                    <th className="px-2 py-2 text-left font-bold w-[40%]">Repuesto</th>
+                                    <th className="px-2 py-2 text-center font-bold">Cant.</th>
+                                    <th className="px-2 py-2 text-right font-bold">Vlr. Unitario</th>
+                                    <th className="px-2 py-2 text-right font-bold">Descuento</th>
+                                    <th className="px-2 py-2 text-right font-bold">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-green-200">
+                                {invoice.items.filter(item => item.type === 'inventory').map(item => (
+                                    <tr key={item.id}>
+                                        <td className="px-2 py-2 align-top">
+                                            <p className="font-semibold">{item.description}</p>
+                                            {item.suppliedByClient && (
+                                                <p className="text-xs text-green-600 font-bold italic">(Suministrado por el Cliente)</p>
+                                            )}
+                                        </td>
+                                        <td className="px-2 py-2 text-center align-top">{item.quantity}</td>
+                                        <td className="px-2 py-2 text-right align-top">{formatCurrency(item.suppliedByClient ? 0 : item.unitPrice)}</td>
+                                        <td className="px-2 py-2 text-right align-top text-red-600">{formatCurrency(item.discount || 0)}</td>
+                                        <td className="px-2 py-2 text-right align-top">{formatCurrency((item.quantity * item.unitPrice) - (item.discount || 0))}</td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </div>
             
             {/* Totals & Notes */}

@@ -31,6 +31,7 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
     const [originalPrices, setOriginalPrices] = useState<Record<string, number>>({});
     const [approvedItemIds, setApprovedItemIds] = useState<Set<string>>(new Set((quote.items || []).map(i => i.id)));
     const [notes, setNotes] = useState(quote.notes || '');
+    const [deliveryDate, setDeliveryDate] = useState(quote.deliveryDate || '');
     const [searchTerm, setSearchTerm] = useState('');
     const [isSearchFocused, setIsSearchFocused] = useState(false);
     const [totalDiscount, setTotalDiscount] = useState(0); // Descuento general en porcentaje
@@ -247,6 +248,7 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
             ...quote,
             items: sanitizedItems,
             notes: notes,
+            deliveryDate: deliveryDate,
             subtotal: totals.subtotal,
             totalDiscount: totalDiscount, // Descuento general en porcentaje
             discountAmount: totals.discountAmount, // Monto del descuento
@@ -421,6 +423,24 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
 
                 {/* Panel derecho - Resumen y notas */}
                 <div className="w-full lg:w-80 space-y-4">
+                    {/* Fecha de Entrega */}
+                    <div>
+                        <h3 className="font-semibold mb-2 text-gray-900 dark:text-white flex items-center text-sm">
+                            <Icon name="calendar" className="w-4 h-4 mr-2" />
+                            Fecha de Entrega Prometida
+                        </h3>
+                        <input
+                            type="date"
+                            value={deliveryDate}
+                            onChange={(e) => setDeliveryDate(e.target.value)}
+                            className="w-full text-sm p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            min={new Date().toISOString().split('T')[0]}
+                        />
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            Fecha en la que se compromete a entregar el vehículo al cliente
+                        </p>
+                    </div>
+
                     {/* Notas */}
                     <div>
                         <h3 className="font-semibold mb-2 text-gray-900 dark:text-white flex items-center text-sm">

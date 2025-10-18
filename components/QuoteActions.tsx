@@ -76,7 +76,7 @@ const QuoteActions: React.FC<QuoteActionsProps> = ({ quote, onViewDetails, onEdi
                         bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom + 8}px` : 'auto',
                         right: menuPosition.right !== undefined ? `${menuPosition.right}px` : 'auto',
                     }}
-                    className="fixed z-20 w-56 bg-dark-light border border-gray-700 rounded-lg shadow-xl p-2 space-y-1 animate-fade-in-scale"
+                    className="fixed z-[9999] w-56 bg-dark-light border border-gray-700 rounded-lg shadow-xl p-2 space-y-1 animate-fade-in-scale"
                 >
                     <button onClick={() => handleAction(onViewDetails)} className={menuButtonClasses}>
                         <Icon name="eye" className="w-4 h-4 mr-3" /> Ver Detalles

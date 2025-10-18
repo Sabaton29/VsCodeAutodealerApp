@@ -805,16 +805,6 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
     
     const showProgressTracker = hasApprovedQuotes;
     
-    // Debug: verificar estado de cotizaciones
-    console.log('🔍 WorkOrderDetailView - quotes debug:', {
-        quotesCount: quotes.length,
-        quotes: quotes.map(q => ({ id: q.id, status: q.status })),
-        hasApprovedQuotes,
-        showProgressTracker,
-        condition: (showProgressTracker || quotes.length > 0),
-        approvedQuote: quotes.find(q => q.status === QuoteStatus.APROBADO),
-        firstQuote: quotes[0]
-    });
     
     // Check if diagnostic data is actually meaningful (has content)
     const hasValidDiagnosticData = workOrder.diagnosticData && 
@@ -994,41 +984,137 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
 
                     {/* Control de Calidad - Solo mostrar si el usuario tiene permisos y lo solicita manualmente */}
                     {workOrder.stage === KanbanStage.CONTROL_CALIDAD && quotes.length > 0 && hasPermission('advance:work_order_stage') && showQualityControlModal && (
-                        <QualityControlView 
-                            workOrder={workOrder} 
-                            quote={quotes.find(q => q.status === QuoteStatus.APROBADO)!} 
-                            client={client} 
-                            vehicle={vehicle} 
-                            hasPermission={hasPermission} 
-                            onBack={() => setShowQualityControlModal(false)} 
-                            onClose={() => setShowQualityControlModal(false)}
-                            staffMembers={staffMembers}
-                        />
+                        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                            <QualityControlView 
+                                workOrder={workOrder} 
+                                quote={quotes.find(q => q.status === QuoteStatus.APROBADO)!} 
+                                client={client} 
+                                vehicle={vehicle} 
+                                hasPermission={hasPermission} 
+                                onBack={() => setShowQualityControlModal(false)} 
+                                onClose={() => setShowQualityControlModal(false)}
+                                staffMembers={staffMembers}
+                                isModal={true}
+                            />
+                        </div>
                     )}
 
                     {/* Mostrar resultado del Control de Calidad cuando esté completado */}
                     {(workOrder.stage === KanbanStage.LISTO_ENTREGA || workOrder.stage === KanbanStage.ENTREGADO) && quotes.length > 0 && (() => {
-                        // Debug: verificar el historial
-                        console.log('🔍 WorkOrderDetailView - Verificando control de calidad:', {
-                            workOrderStage: workOrder.stage,
-                            historyLength: workOrder.history?.length || 0,
-                            historyEntries: workOrder.history?.map(h => ({
-                                stage: h.stage,
-                                notes: h.notes,
-                                user: h.user,
-                                date: h.date
-                            })) || []
-                        });
                         
-                        // Buscar la entrada de historial del control de calidad
-                        const qualityControlEntry = workOrder.history?.find(entry => 
-                            entry.notes?.includes('Control de Calidad APROBADO') || 
-                            entry.notes?.includes('Control de Calidad RECHAZADO') ||
-                            entry.stage === 'Control de Calidad' ||
-                            entry.notes?.includes('Control de Calidad')
+                        // Debug: mostrar todas las entradas del historial para investigar
+                        console.log('🔍 DEBUG - Todas las entradas del historial:', workOrder.history?.map(h => ({
+                            stage: h.stage,
+                            user: h.user,
+                            notes: h.notes?.substring(0, 100) + '...',
+                            date: h.date
+                        })));
+                        
+                        // Buscar la entrada de historial del control de calidad completado
+                        // Primero buscar entradas específicas de control de calidad completado
+                        let qualityControlEntry = workOrder.history?.find(entry => 
+                            (entry.notes?.includes('Control de Calidad APROBADO') || 
+                             entry.notes?.includes('Control de Calidad RECHAZADO')) &&
+                            entry.user !== 'Sistema' // Solo entradas completadas por usuarios reales, no por el sistema
                         );
                         
-                        console.log('🔍 WorkOrderDetailView - qualityControlEntry encontrada:', qualityControlEntry);
+                        // Si no se encuentra una entrada específica, buscar cualquier entrada de control de calidad
+                        if (!qualityControlEntry) {
+                            qualityControlEntry = workOrder.history?.find(entry => 
+                                entry.notes?.includes('Control de Calidad') && 
+                                (entry.notes?.includes('APROBADO') || entry.notes?.includes('RECHAZADO'))
+                            );
+                        }
+                        
+                        console.log('🔍 DEBUG - qualityControlEntry encontrada:', qualityControlEntry);
+                        
+                        // Función para manejar la impresión del reporte
+                        const handlePrintReport = () => {
+                            try {
+                                console.log('🔍 DEBUG - Iniciando generación de reporte imprimible');
+                                console.log('🔍 DEBUG - qualityControlEntry:', qualityControlEntry);
+                                
+                                // Verificar que tenemos los datos necesarios
+                                if (!qualityControlEntry) {
+                                    alert('No se encontraron datos del control de calidad para imprimir.');
+                                    return;
+                                }
+                                
+                                // Determinar si fue aprobado
+                                const isApproved = qualityControlEntry.notes?.includes('APROBADO') || 
+                                                 qualityControlEntry.notes?.includes('Listo para Entrega') ||
+                                                 workOrder.stage === 'Listo para Entrega';
+                                
+                                console.log('🔍 DEBUG - isApproved:', isApproved);
+                                
+                                // Crear el reporte imprimible del control de calidad
+                                const reportHtml = renderToString(
+                                    <PrintableQualityControlReport
+                                        workOrder={workOrder}
+                                        client={client || {} as Client}
+                                        vehicle={vehicle || {} as Vehicle}
+                                        inspector={qualityControlEntry.user || 'Sistema'}
+                                        inspectionDate={qualityControlEntry.date}
+                                        isApproved={isApproved}
+                                        notes={qualityControlEntry.notes || ''}
+                                        companyInfo={appSettings?.companyInfo}
+                                        qualityChecksData={qualityControlEntry.qualityChecksData || []}
+                                        checklistSummary={qualityControlEntry.checklistSummary || ''}
+                                    />
+                                );
+                                
+                                console.log('🔍 DEBUG - reportHtml generado:', reportHtml.length, 'caracteres');
+                                
+                                const fullHtml = `
+                                    <!DOCTYPE html>
+                                    <html lang="es">
+                                    <head>
+                                        <meta charset="UTF-8" />
+                                        <title>Reporte de Control de Calidad - ${workOrder.id}</title>
+                                        <script src="https://cdn.tailwindcss.com"></script>
+                                        <link href="https://fonts.googleapis.com/css2?family=Impact&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+                                        <style> body { font-family: 'Inter', sans-serif; } </style>
+                                        <script>
+                                            tailwind.config = {
+                                                theme: { 
+                                                    extend: { 
+                                                        fontFamily: { 
+                                                            heading: ['Impact', 'sans-serif'], 
+                                                            sans: ['Inter', 'sans-serif'] 
+                                                        }, 
+                                                        colors: { 
+                                                            brand: { red: '#C8102E' } 
+                                                        } 
+                                                    } 
+                                                }
+                                            }
+                                        </script>
+                                    </head>
+                                    <body>${reportHtml}</body>
+                                    </html>
+                                `;
+
+                                console.log('🔍 DEBUG - Abriendo ventana de impresión...');
+                                const printWindow = window.open('', '_blank');
+                                if (printWindow) {
+                                    printWindow.document.write(fullHtml);
+                                    printWindow.document.close();
+                                    console.log('🔍 DEBUG - Ventana de impresión abierta, programando impresión...');
+                                    // Esperar a que el contenido se cargue antes de imprimir
+                                    setTimeout(() => {
+                                        console.log('🔍 DEBUG - Ejecutando impresión...');
+                                        printWindow.print();
+                                    }, 1000);
+                                } else {
+                                    console.error('❌ DEBUG - No se pudo abrir la ventana de impresión');
+                                    alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
+                                }
+                            } catch (error) {
+                                console.error('❌ DEBUG - Error generando reporte imprimible:', error);
+                                alert('Error al generar el reporte imprimible: ' + error.message);
+                            }
+                        };
+                        
                         
                         if (qualityControlEntry) {
                             // Determinar si fue aprobado basándose en la etapa actual y el texto
@@ -1108,9 +1194,6 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                     // Obtener datos detallados del checklist si están disponibles
                                                     const qualityChecksData = qualityControlEntry.qualityChecksData || [];
                                                     
-                                                    // Debug: verificar qué datos tenemos
-                                                    console.log('🔍 WorkOrderDetailView - qualityChecksData:', qualityChecksData);
-                                                    console.log('🔍 WorkOrderDetailView - qualityControlEntry:', qualityControlEntry);
                                                     
                                                     // Categorías del control de calidad con sus elementos
                                                     const categories = [
@@ -1162,7 +1245,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                     
                                                     // Función para obtener el estado de un elemento
                                                     const getItemStatus = (itemId: string) => {
-                                                        const itemData = qualityChecksData.find(item => item.id === itemId);
+                                                        const itemData = finalQualityChecksData.find(item => item.id === itemId);
                                                         return itemData ? itemData.status : 'unset';
                                                     };
                                                     
@@ -1181,13 +1264,14 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                     };
                                                     
                                                     // Si no hay datos de qualityChecksData, intentar extraer del checklistSummary
+                                                    let finalQualityChecksData = qualityChecksData;
+                                                    
                                                     if (!qualityChecksData || qualityChecksData.length === 0) {
                                                         // Intentar extraer datos del checklistSummary si existe
                                                         if (qualityControlEntry.checklistSummary) {
-                                                            console.log('🔍 WorkOrderDetailView - Extrayendo datos del checklistSummary:', qualityControlEntry.checklistSummary);
                                                             const summaryItems = qualityControlEntry.checklistSummary.split('|');
                                                             const extractedData = summaryItems.map(item => {
-                                                                const [id, status] = item.split(':');
+                                                                const [id, status, notes] = item.split(':');
                                                                 // Buscar la descripción en las categorías
                                                                 let description = '';
                                                                 let category = '';
@@ -1202,15 +1286,14 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                 return {
                                                                     id,
                                                                     description,
-                                                                    category,
-                                                                    status: status || 'ok'
+                                                                    category: category as 'exterior' | 'funcionalidad' | 'verificacion' | 'documentacion',
+                                                                    status: (status || 'ok') as 'ok' | 'no-ok' | 'na' | 'unset',
+                                                                    notes: notes || ''
                                                                 };
                                                             }).filter(item => item.id && item.description);
                                                             
                                                             if (extractedData.length > 0) {
-                                                                console.log('🔍 WorkOrderDetailView - Datos extraídos del summary:', extractedData);
-                                                                // Usar los datos extraídos en lugar de los por defecto
-                                                                const defaultQualityChecksData = extractedData;
+                                                                finalQualityChecksData = extractedData;
                                                                 
                                                                 return (
                                                                     <div className="space-y-4">
@@ -1235,7 +1318,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                             <div className="bg-gray-700 rounded-lg p-3">
                                                                                 <div className="flex items-center justify-between mb-2">
                                                                                     <span className="text-white font-semibold">Progreso General</span>
-                                                                                    <span className="text-blue-400 font-mono">{defaultQualityChecksData.length}/{defaultQualityChecksData.length}</span>
+                                                                                    <span className="text-blue-400 font-mono">{finalQualityChecksData.length}/{finalQualityChecksData.length}</span>
                                                                                 </div>
                                                                                 <div className="w-full bg-gray-600 rounded-full h-2">
                                                                                     <div 
@@ -1248,7 +1331,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                             {/* Categorías detalladas */}
                                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                                 {categories.map(category => {
-                                                                                    const categoryItems = defaultQualityChecksData.filter(item => item.category === category.id);
+                                                                                    const categoryItems = finalQualityChecksData.filter(item => item.category === category.id);
                                                                                     
                                                                                     return (
                                                                                         <div key={category.id} className="bg-gray-700 rounded-lg p-4">
@@ -1261,16 +1344,19 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                                             </div>
                                                                                             <div className="space-y-2">
                                                                                                 {categoryItems.map((item) => {
+                                                                                                    const status = getItemStatus(item.id);
+                                                                                                    const statusDisplay = getStatusDisplay(status);
+                                                                                                    
                                                                                                     return (
                                                                                                         <div key={item.id} className="flex items-center justify-between">
                                                                                                             <div className="flex items-center gap-2 flex-1">
-                                                                                                                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                                                                                                                <div className={`w-3 h-3 rounded-full ${statusDisplay.color}`}></div>
                                                                                                                 <span className="text-gray-300 text-xs flex-1">{item.description}</span>
                                                                                                             </div>
                                                                                                             <div className="flex items-center gap-1">
-                                                                                                                <span className="text-lg">✅</span>
-                                                                                                                <span className="text-xs font-semibold text-green-400">
-                                                                                                                    OK
+                                                                                                                <span className="text-lg">{statusDisplay.icon}</span>
+                                                                                                                <span className={`text-xs font-semibold ${statusDisplay.textColor}`}>
+                                                                                                                    {statusDisplay.text}
                                                                                                                 </span>
                                                                                                             </div>
                                                                                                         </div>
@@ -1441,7 +1527,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             {/* Categorías detalladas */}
                                                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                                                 {categories.map(category => {
-                                                                    const categoryItems = qualityChecksData.filter(item => item.category === category.id);
+                                                                    const categoryItems = finalQualityChecksData.filter(item => item.category === category.id);
                                                                     const categoryProgress = categoryItems.length > 0 ? categoryItems.filter(item => item.status !== 'unset').length : 0;
                                                                     const categoryTotal = categoryItems.length;
                                                                     
@@ -1458,7 +1544,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                                 {category.items.map((item) => {
                                                                                     const status = getItemStatus(item.id);
                                                                                     const statusDisplay = getStatusDisplay(status);
-                                                                                    const itemData = qualityChecksData.find(data => data.id === item.id);
+                                                                                    const itemData = finalQualityChecksData.find(data => data.id === item.id);
                                                                                     
                                                                                     return (
                                                                                         <div key={item.id} className="flex items-center justify-between">
@@ -1516,7 +1602,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                             {/* Botón para versión imprimible */}
                                             <div className="flex justify-end pt-4 border-t border-gray-700">
                                                 <button
-                                                    onClick={() => setShowQualityControlModal(true)}
+                                                    onClick={handlePrintReport}
                                                     className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"
                                                 >
                                                     <Icon name="printer" className="w-4 h-4" />
@@ -1536,9 +1622,6 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                             <Icon name="check-circle" className="w-6 h-6" />
                                             Control de Calidad
                                         </h2>
-                                        <div className="px-3 py-1 rounded-full text-sm font-semibold bg-yellow-600 text-white">
-                                            🔍 DEBUGGING
-                                        </div>
                                     </div>
                                     
                                     <div className="bg-gray-800 rounded-lg p-4 space-y-3">
@@ -1781,59 +1864,6 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
             </div>
         </div>
         
-        {/* Modal para versión imprimible del Control de Calidad */}
-        {showQualityControlModal && (() => {
-            const qualityControlEntry = workOrder.history?.find(entry => 
-                entry.notes?.includes('Control de Calidad APROBADO') || 
-                entry.notes?.includes('Control de Calidad RECHAZADO') ||
-                entry.stage === 'Control de Calidad' ||
-                entry.notes?.includes('Control de Calidad')
-            );
-            
-            if (!qualityControlEntry) return null;
-            
-            const isApproved = qualityControlEntry.notes?.includes('APROBADO') || 
-                             qualityControlEntry.notes?.includes('Listo para Entrega') ||
-                             workOrder.stage === 'Listo para Entrega';
-            
-            return (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-auto">
-                        <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex justify-between items-center">
-                            <h2 className="text-xl font-bold text-gray-800">Reporte de Control de Calidad</h2>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => window.print()}
-                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                >
-                                    <Icon name="printer" className="w-4 h-4 inline mr-2" />
-                                    Imprimir
-                                </button>
-                                <button
-                                    onClick={() => setShowQualityControlModal(false)}
-                                    className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
-                                >
-                                    <Icon name="x" className="w-4 h-4 inline mr-2" />
-                                    Cerrar
-                                </button>
-                            </div>
-                        </div>
-                        <div className="p-0">
-                            <PrintableQualityControlReport
-                                workOrder={workOrder}
-                                client={client}
-                                vehicle={vehicle}
-                                inspector={qualityControlEntry.user || 'Sistema'}
-                                inspectionDate={qualityControlEntry.date}
-                                isApproved={isApproved}
-                                notes={qualityControlEntry.notes || ''}
-                                companyInfo={appSettings?.companyInfo}
-                            />
-                        </div>
-                    </div>
-                </div>
-            );
-        })()}
         </>
     );
 };

@@ -16,6 +16,9 @@ interface WorkOrderListProps {
     onStartDiagnostic: (workOrderId: string) => void;
     onViewDetails: (workOrderId: string) => void;
     onRegisterDelivery: (workOrderId: string) => void;
+    onPrintReport?: (workOrderId: string) => void;
+    onViewHistory?: (workOrderId: string) => void;
+    onReopenOrder?: (workOrderId: string) => void;
     hasPermission: (permission: Permission) => boolean;
     onEditWorkOrder: (workOrder: WorkOrder) => void;
 }
@@ -31,9 +34,12 @@ const WorkOrderRow: React.FC<{
     onStartDiagnostic: (workOrderId: string) => void;
     onViewDetails: (workOrderId: string) => void;
     onRegisterDelivery: (workOrderId: string) => void;
+    onPrintReport?: (workOrderId: string) => void;
+    onViewHistory?: (workOrderId: string) => void;
+    onReopenOrder?: (workOrderId: string) => void;
     onEdit: () => void;
     hasPermission: (permission: Permission) => boolean;
-}> = ({ order, quote, staffMembers, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, hasPermission, onEdit }) => {
+}> = ({ order, quote, staffMembers, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, onPrintReport, onViewHistory, onReopenOrder, hasPermission, onEdit }) => {
     const statusConfig = STATUS_DISPLAY_CONFIG[order.status] || { bg: 'bg-gray-200 dark:bg-gray-700', text: 'text-gray-800 dark:text-gray-200' };
 
     const mechanics = useMemo(() =>
@@ -67,6 +73,9 @@ const WorkOrderRow: React.FC<{
                     onStartDiagnostic={() => onStartDiagnostic(order.id)}
                     onViewDetails={() => onViewDetails(order.id)}
                     onRegisterDelivery={() => onRegisterDelivery(order.id)}
+                    onPrintReport={onPrintReport ? () => onPrintReport(order.id) : undefined}
+                    onViewHistory={onViewHistory ? () => onViewHistory(order.id) : undefined}
+                    onReopenOrder={onReopenOrder ? () => onReopenOrder(order.id) : undefined}
                     onEdit={onEdit}
                     hasPermission={hasPermission}
                 />
@@ -76,7 +85,7 @@ const WorkOrderRow: React.FC<{
 };
 
 
-const WorkOrderList: React.FC<WorkOrderListProps> = ({ workOrders, quotes, staffMembers, onAssignTechnician, onAdvanceStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, hasPermission, onEditWorkOrder }) => {
+const WorkOrderList: React.FC<WorkOrderListProps> = ({ workOrders, quotes, staffMembers, onAssignTechnician, onAdvanceStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, onPrintReport, onViewHistory, onReopenOrder, hasPermission, onEditWorkOrder }) => {
     return (
         <div className="bg-light dark:bg-dark-light rounded-xl shadow-md overflow-hidden">
             <div className="p-6 border-b border-gray-200 dark:border-gray-800">
@@ -111,6 +120,9 @@ const WorkOrderList: React.FC<WorkOrderListProps> = ({ workOrders, quotes, staff
                                         onStartDiagnostic={onStartDiagnostic}
                                         onViewDetails={onViewDetails}
                                         onRegisterDelivery={onRegisterDelivery}
+                                        onPrintReport={onPrintReport}
+                                        onViewHistory={onViewHistory}
+                                        onReopenOrder={onReopenOrder}
                                         hasPermission={hasPermission}
                                         onEdit={() => onEditWorkOrder(order)}
                                     />

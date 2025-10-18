@@ -1,20 +1,14 @@
 import React, { useState, useMemo, useContext } from 'react';
 import { Appointment, StaffMember, Permission, AppointmentStatus, CalendarView, UserRole } from '../../types';
 import { Icon } from '../Icon';
-// Configuración de colores para estados de citas - DEFINIDA INLINE
-const APPOINTMENT_STATUS_DISPLAY_CONFIG: Record<AppointmentStatus, { text: string; bg: string; borderColor: string; }> = {
-    PROGRAMADA: { text: 'text-blue-800 dark:text-blue-200', bg: 'bg-blue-200 dark:bg-blue-800/50', borderColor: 'border-blue-500' },
-    CONFIRMADA: { text: 'text-green-800 dark:text-green-200', bg: 'bg-green-200 dark:bg-green-800/50', borderColor: 'border-green-500' },
-    CANCELADA: { text: 'text-red-800 dark:text-red-200', bg: 'bg-red-200 dark:bg-red-800/50', borderColor: 'border-red-500' },
-    COMPLETADA: { text: 'text-gray-800 dark:text-gray-200', bg: 'bg-gray-200 dark:bg-gray-700', borderColor: 'border-gray-500' },
-};
+import { APPOINTMENT_STATUS_DISPLAY_CONFIG } from '../../constants';
 import AppointmentDetailSidebar from '../AppointmentDetailSidebar';
 import { UIContext } from '../UIContext';
 
 interface AppointmentsViewProps {
     appointments: Appointment[];
     staffMembers: StaffMember[];
-    openModal: (type: 'CREATE_APPOINTMENT' | 'EDIT_APPOINTMENT', data?: any) => void;
+    openModal: (type: 'CREATE_APPOINTMENT' | 'EDIT_APPOINTMENT' | 'CREATE_WORK_ORDER', data?: any) => void;
     handleConfirmAppointment: (appointmentId: string) => Promise<void>;
     handleCancelAppointment: (appointmentId: string) => Promise<void>;
     handleCreateWorkOrderFromAppointment: (appointmentId: string) => Promise<void>;

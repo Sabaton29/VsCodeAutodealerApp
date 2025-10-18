@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import type { Invoice, PaymentMethod } from '../types';
+import { getInvoiceDisplayId } from '../utils/invoiceId';
 
 type PaymentData = {
     amount: number;
@@ -43,6 +44,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ invoice, onSa
     return (
         <form onSubmit={handleSubmit} className="space-y-4">
             <div className="p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg space-y-1">
+                <p className="text-sm text-gray-500 dark:text-gray-400">Factura: <span className="font-semibold text-light-text dark:text-dark-text">{getInvoiceDisplayId(invoice.id, invoice.issueDate, true, invoice.sequentialId)}</span></p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Cliente: <span className="font-semibold text-light-text dark:text-dark-text">{invoice.clientName}</span></p>
                 <p className="text-sm text-gray-500 dark:text-gray-400">Total Factura: <span className="font-semibold text-light-text dark:text-dark-text">{new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP' }).format(invoice.total)}</span></p>
             </div>

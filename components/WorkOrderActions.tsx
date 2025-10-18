@@ -18,12 +18,15 @@ interface WorkOrderActionsProps {
     onViewDetails: () => void;
     onEdit: () => void;
     onRegisterDelivery: () => void;
+    onPrintReport?: () => void;
+    onViewHistory?: () => void;
+    onReopenOrder?: () => void;
     hasPermission: (permission: Permission) => boolean;
 }
 
 const menuButtonClasses = "flex items-center justify-between w-full px-4 py-2 text-sm text-left text-gray-300 hover:bg-brand-red hover:text-white rounded-md transition-colors disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-gray-300";
 
-const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, technicians, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onEdit, onRegisterDelivery, hasPermission }) => {
+const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, technicians, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onEdit, onRegisterDelivery, onPrintReport, onViewHistory, onReopenOrder, hasPermission }) => {
     const [isOpen, setIsOpen] = useState(false);
     const [isSubMenuOpen, setIsSubMenuOpen] = useState(false);
     const [menuPosition, setMenuPosition] = useState<{ top?: number, bottom?: number, right?: number }>({});
@@ -104,6 +107,7 @@ const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, t
     };
 
     const isReadyForDelivery = workOrder.stage === KanbanStage.LISTO_ENTREGA;
+    const isDelivered = workOrder.stage === KanbanStage.ENTREGADO;
 
     // Permisos para administradores
     const isAdmin = hasPermission('advance:work_order_stage');
@@ -127,7 +131,7 @@ const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, t
 
 
     return (
-        <div>
+        <div className="relative">
             <button ref={buttonRef} onClick={toggleMenu} className="text-gray-400 hover:text-white transition-colors">
                 <Icon name="dots" className="w-5 h-5" />
             </button>
@@ -139,7 +143,7 @@ const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, t
                         bottom: menuPosition.bottom !== undefined ? `${menuPosition.bottom + 8}px` : 'auto',
                         right: menuPosition.right !== undefined ? `${menuPosition.right}px` : 'auto',
                     }}
-                    className="fixed z-20 w-64 bg-dark-light border border-gray-700 rounded-lg shadow-xl p-2 space-y-1 animate-fade-in-scale"
+                    className={`fixed ${isDelivered ? 'z-[10000]' : 'z-[1000]'} w-64 bg-dark-light border border-gray-700 rounded-lg shadow-xl p-2 space-y-1 animate-fade-in-scale`}
                 >
                     <h4 className="px-4 pt-1 pb-2 text-xs font-bold text-gray-500 uppercase">Acciones Rápidas</h4>
                     <button onClick={() => handleAction(onViewDetails)} className={menuButtonClasses}><Icon name="eye" className="w-4 h-4 mr-3" /> Ver Detalles</button>
@@ -170,7 +174,7 @@ const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, t
                             </button>
                             {isSubMenuOpen && (
                                 <div 
-                                    className={`absolute -top-2 w-48 bg-dark-light border border-gray-700 rounded-lg shadow-xl ${subMenuPositionClass}`}
+                                    className={`absolute -top-2 w-48 bg-dark-light border border-gray-700 rounded-lg shadow-xl ${isDelivered ? 'z-[10001]' : 'z-[1001]'} ${subMenuPositionClass}`}
                                     onMouseEnter={handleAssignMenuEnter}
                                     onMouseLeave={handleAssignMenuLeave}
                                 >
@@ -200,7 +204,7 @@ const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, t
                             className={`${menuButtonClasses} bg-orange-600/80 text-white font-bold hover:bg-orange-600`} 
                             disabled={!previousStage}
                         >
-                            <span><Icon name="chevron-left" className="w-4 h-4 mr-3" /> Retroceder a "{previousStage}"</span>
+                            <span><Icon name="arrow-left" className="w-4 h-4 mr-3" /> Retroceder a "{previousStage}"</span>
                         </button>
                     )}
                     {hasPermission('advance:work_order_stage') && isReadyForDelivery && (
@@ -219,7 +223,34 @@ const WorkOrderActions: React.FC<WorkOrderActionsProps> = ({ workOrder, quote, t
                     {hasPermission('edit:work_order') && (
                         <button onClick={() => handleAction(onEdit)} className={menuButtonClasses}><Icon name="edit" className="w-4 h-4 mr-3" /> Editar</button>
                     )}
-                    {hasPermission('cancel:work_order') && (
+                    
+                    {/* Acciones específicas para órdenes entregadas */}
+                    {isDelivered && (
+                        <>
+                            <div className="border-t border-gray-700 my-1"></div>
+                            <h4 className="px-4 pt-1 pb-2 text-xs font-bold text-gray-500 uppercase">Órdenes Entregadas</h4>
+                            
+                            {onPrintReport && (
+                                <button onClick={() => handleAction(onPrintReport)} className={menuButtonClasses}>
+                                    <Icon name="printer" className="w-4 h-4 mr-3" /> Imprimir Reporte
+                                </button>
+                            )}
+                            
+                            {onViewHistory && (
+                                <button onClick={() => handleAction(onViewHistory)} className={menuButtonClasses}>
+                                    <Icon name="clock" className="w-4 h-4 mr-3" /> Ver Historial
+                                </button>
+                            )}
+                            
+                            {onReopenOrder && hasPermission('advance:work_order_stage') && (
+                                <button onClick={() => handleAction(onReopenOrder)} className={`${menuButtonClasses} !text-orange-400 hover:!bg-orange-800/50 hover:!text-white`}>
+                                    <Icon name="chevron-right" className="w-4 h-4 mr-3" /> Reabrir Orden
+                                </button>
+                            )}
+                        </>
+                    )}
+                    
+                    {hasPermission('cancel:work_order') && !isDelivered && (
                         <button onClick={() => handleAction(onCancelOrder)} className={`${menuButtonClasses} !text-red-400 hover:!bg-red-800/50 hover:!text-white`}>
                             <Icon name="trash" className="w-4 h-4 mr-3" /> Cancelar Orden
                         </button>

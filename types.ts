@@ -430,6 +430,7 @@ export enum InvoiceStatus {
 export interface Invoice {
     id: string;
     workOrderId: string;
+    quoteId?: string; // ID de la cotización de la que proviene esta factura
     clientId: string;
     clientName: string;
     vehicleSummary: string;
@@ -444,6 +445,7 @@ export interface Invoice {
     notes?: string;
     paymentTerms?: PaymentTerms;
     vatIncluded?: boolean;
+    sequentialId?: number; // ID secuencial para mostrar (FAC-001, FAC-002, etc.)
     factoringInfo?: {
         company: string;
         commission: number;
@@ -490,6 +492,7 @@ export interface Quote {
     vehicleSummary: string;
     issueDate: string;
     expiryDate: string;
+    deliveryDate?: string; // Fecha de entrega prometida al cliente
     subtotal: number;
     totalDiscount?: number; // Descuento general en porcentaje
     discountAmount?: number; // Monto del descuento general

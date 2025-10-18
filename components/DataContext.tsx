@@ -401,6 +401,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 ...workOrderData,
                 id: workOrderId,
                 status: WorkOrderStatus.EN_PROCESO, // Add default status
+                date: now.toISOString(), // Add the date field
                 history: [initialHistory], // Initialize with reception entry
                 locationId: workOrderData.locationId || '550e8400-e29b-41d4-a716-446655440001', // Fallback to Bogotá if not specified
             };
@@ -796,13 +797,163 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSaveSupplier = createSaveHandler(setSuppliers, 'suppliers');
     const handleDeleteSupplier = createDeleteHandler(setSuppliers, 'suppliers');
 
-    const handleCreatePettyCashTransaction = createUpdater(setPettyCashTransactions, 'petty_cash_transactions');
+    const handleCreatePettyCashTransaction = async (transactionData: Omit<PettyCashTransaction, 'id' | 'date'>): Promise<void> => {
+        try {
+            const transaction: PettyCashTransaction = {
+                ...transactionData,
+                id: crypto.randomUUID(),
+                date: new Date().toISOString(),
+            };
+            const result = await supabaseService.insertPettyCashTransaction(transaction);
+            if (result) {
+                setPettyCashTransactions(prev => [result, ...prev]);
+            }
+        } catch (error) {
+            console.error('Error creating petty cash transaction:', error);
+            throw error;
+        }
+    };
     const handleSavePettyCashTransaction = createSaveHandler(setPettyCashTransactions, 'petty_cash_transactions');
     const handleDeletePettyCashTransaction = createDeleteHandler(setPettyCashTransactions, 'petty_cash_transactions');
 
-    const handleCreateInvoice = createUpdater(setInvoices, 'invoices');
+    const handleCreateInvoice = async (invoiceData: Invoice): Promise<void> => {
+        try {
+            console.log('🔍 handleCreateInvoice - Creating invoice:', invoiceData);
+            const result = await supabaseService.insertInvoice(invoiceData);
+            
+            if (result) {
+                setInvoices(prev => {
+                    const newState = [...prev, result];
+                    console.log('🔍 handleCreateInvoice - Updated state, new count:', newState.length);
+                    return newState;
+                });
+                console.log('✅ handleCreateInvoice - Invoice created successfully');
+            } else {
+                console.error('❌ handleCreateInvoice - No result returned');
+            }
+        } catch (error) {
+            console.error('❌ handleCreateInvoice - Error creating invoice:', error);
+            throw error;
+        }
+    };
     const handleSaveInvoice = createSaveHandler(setInvoices, 'invoices');
     const handleDeleteInvoice = createDeleteHandler(setInvoices, 'invoices');
+
+    const handleCreateInvoiceFromWorkOrder = async (workOrderId: string): Promise<void> => {
+        try {
+            console.log('🔍 handleCreateInvoiceFromWorkOrder - Creating invoice from work order:', workOrderId);
+            
+            // Buscar la orden de trabajo
+            const workOrder = workOrders.find(wo => wo.id === workOrderId);
+            if (!workOrder) {
+                throw new Error('Orden de trabajo no encontrada');
+            }
+
+            console.log('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder structure:', workOrder);
+            console.log('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder.client:', workOrder.client);
+            console.log('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder.clientId:', (workOrder as any).clientId);
+
+            // Buscar la cotización asociada (debe estar aprobada)
+            const approvedQuote = quotes.find(q => 
+                q.workOrderId === workOrderId && 
+                q.status === QuoteStatus.APROBADO
+            );
+            
+            if (!approvedQuote) {
+                throw new Error('No se encontró una cotización aprobada para esta orden de trabajo');
+            }
+
+            // Buscar el cliente - manejar ambos casos (client.id y clientId)
+            const clientId = workOrder.client?.id || (workOrder as any).clientId;
+            const client = clients.find(c => c.id === clientId);
+            if (!client) {
+                throw new Error('Cliente no encontrado');
+            }
+
+            // Buscar el vehículo - manejar ambos casos (vehicle.id y vehicleId)
+            const vehicleId = workOrder.vehicle?.id || (workOrder as any).vehicleId;
+            const vehicle = vehicles.find(v => v.id === vehicleId);
+            if (!vehicle) {
+                throw new Error('Vehículo no encontrado');
+            }
+
+            // Generar ID secuencial para la factura
+            const nextSequentialId = Math.max(0, ...invoices.map(inv => inv.sequentialId || 0)) + 1;
+
+            // Calcular fechas
+            const issueDate = new Date().toISOString().split('T')[0];
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30); // 30 días para pago
+
+            // Crear la factura basada en la cotización
+            const invoiceData: Invoice = {
+                id: crypto.randomUUID(),
+                workOrderId: workOrderId,
+                quoteId: approvedQuote.id, // Agregar el ID de la cotización
+                clientId: clientId,
+                clientName: client.name,
+                vehicleSummary: `${vehicle.year || 'N/A'} ${vehicle.make} ${vehicle.model} - ${vehicle.plate}`,
+                issueDate: issueDate,
+                dueDate: dueDate.toISOString().split('T')[0],
+                subtotal: approvedQuote.subtotal,
+                taxAmount: approvedQuote.taxAmount,
+                total: approvedQuote.total,
+                status: 'Pendiente' as InvoiceStatus,
+                locationId: workOrder.locationId,
+                items: approvedQuote.items?.map(item => ({
+                    ...item,
+                    suppliedByClient: false, // Asegurar que los ítems de la factura no sean suministrados por el cliente
+                    unitPrice: item.unitPrice || 0, // Asegurar que el precio unitario esté definido
+                })) || [],
+                notes: approvedQuote.notes,
+                sequentialId: nextSequentialId
+            };
+
+            console.log('🔍 handleCreateInvoiceFromWorkOrder - Invoice data:', invoiceData);
+
+            // Crear la factura usando la función existente
+            await handleCreateInvoice(invoiceData);
+
+            console.log('✅ handleCreateInvoiceFromWorkOrder - Invoice created successfully');
+            
+        } catch (error) {
+            console.error('❌ handleCreateInvoiceFromWorkOrder - Error creating invoice:', error);
+            throw error;
+        }
+    };
+
+    const handleToggleInvoiceVat = async (invoiceId: string): Promise<void> => {
+        try {
+            console.log('🔍 handleToggleInvoiceVat - Toggling VAT for invoice:', invoiceId);
+            
+            const invoice = invoices.find(inv => inv.id === invoiceId);
+            if (!invoice) {
+                throw new Error('Factura no encontrada');
+            }
+
+            // Calcular nuevo IVA basado en el subtotal
+            const newVatIncluded = !invoice.vatIncluded;
+            const newTaxAmount = newVatIncluded ? invoice.subtotal * 0.19 : 0;
+            const newTotal = invoice.subtotal + newTaxAmount;
+
+            const updateData = {
+                vatIncluded: newVatIncluded,
+                taxAmount: newTaxAmount,
+                total: newTotal
+            };
+
+            console.log('🔍 handleToggleInvoiceVat - Update data:', updateData);
+
+            // Actualizar la factura usando la función existente
+            await handleSaveInvoice({ ...invoice, ...updateData });
+
+            console.log('✅ handleToggleInvoiceVat - Invoice VAT toggled successfully');
+            
+        } catch (error) {
+            console.error('❌ handleToggleInvoiceVat - Error toggling invoice VAT:', error);
+            throw error;
+        }
+    };
 
     const handleCreateQuote = async(quoteData: Omit<Quote, 'id'>): Promise<Quote | null> => {
         try {
@@ -915,51 +1066,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Add history entry
                 let historyEntry: WorkOrderHistoryEntry;
                 
-                // Si se está avanzando desde Control de Calidad, crear una entrada especial
+                // Crear entrada de historial simple para avance manual
                 console.log('🔍 DataContext - handleAdvanceStage - Checking stage transition:', { currentStage, nextStage });
-                if (currentStage === 'Control de Calidad' && nextStage === 'Listo para Entrega') {
-                    console.log('🔍 DataContext - handleAdvanceStage - Creating special quality control entry');
+                
+                if (nextStage === 'Control de Calidad') {
+                    // Si se avanza a Control de Calidad, solo marcar que está listo para control de calidad
+                    console.log('🔍 DataContext - handleAdvanceStage - Advancing to Quality Control stage');
                     historyEntry = {
                         stage: nextStage,
                         date: new Date().toISOString(),
                         user: 'Sistema',
-                        notes: `Control de Calidad APROBADO por Sistema. Etapa avanzada manualmente sin completar checklist detallado.`,
-                        // Crear datos de checklist por defecto (todos OK) para mantener consistencia
-                        qualityChecksData: [
-                            // Exterior
-                            { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería', category: 'exterior', status: 'ok' },
-                            { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante', category: 'exterior', status: 'ok' },
-                            { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar', category: 'exterior', status: 'ok' },
-                            // Funcionalidad
-                            { id: 'func-1', description: 'El vehículo enciende correctamente', category: 'funcionalidad', status: 'ok' },
-                            { id: 'func-2', description: 'No hay luces de advertencia en el tablero', category: 'funcionalidad', status: 'ok' },
-                            { id: 'func-3', description: 'El motor funciona sin ruidos anormales', category: 'funcionalidad', status: 'ok' },
-                            { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto', category: 'funcionalidad', status: 'ok' },
-                            { id: 'func-5', description: 'El sistema de A/C y calefacción funciona', category: 'funcionalidad', status: 'ok' },
-                            { id: 'func-6', description: 'Los frenos responden adecuadamente', category: 'funcionalidad', status: 'ok' },
-                            // Verificación
-                            { id: 'verif-1', description: 'Se completaron todos los trabajos aprobados en la cotización', category: 'verificacion', status: 'ok' },
-                            { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)', category: 'verificacion', status: 'ok' },
-                            { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)', category: 'verificacion', status: 'ok' },
-                            { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos', category: 'verificacion', status: 'ok' },
-                            // Documentación
-                            { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados', category: 'documentacion', status: 'ok' },
-                            { id: 'doc-2', description: 'La orden de trabajo está completamente documentada', category: 'documentacion', status: 'ok' },
-                            { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento', category: 'documentacion', status: 'ok' }
-                        ],
-                        checklistSummary: 'exterior-1:ok|exterior-2:ok|exterior-3:ok|func-1:ok|func-2:ok|func-3:ok|func-4:ok|func-5:ok|func-6:ok|verif-1:ok|verif-2:ok|verif-3:ok|verif-4:ok|doc-1:ok|doc-2:ok|doc-3:ok'
+                        notes: `Etapa avanzada manualmente de ${currentStage} a ${nextStage}. Listo para control de calidad.`,
                     };
-    } else if (nextStage === 'Control de Calidad') {
-        // Si se avanza a Control de Calidad, NO crear datos de checklist por defecto
-        // Solo marcar que está listo para control de calidad
-        console.log('🔍 DataContext - handleAdvanceStage - Advancing to Quality Control stage');
-        historyEntry = {
-            stage: nextStage,
-            date: new Date().toISOString(),
-            user: 'Sistema',
-            notes: `Etapa avanzada manualmente de ${currentStage} a ${nextStage}. Listo para control de calidad.`,
-        };
                 } else {
+                    // Para cualquier otra transición, crear entrada simple
                     historyEntry = {
                         stage: nextStage,
                         date: new Date().toISOString(),
@@ -1458,23 +1578,106 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSavePurchaseOrder = createSaveHandler(setPurchaseOrders, 'purchase_orders');
     const handleDeletePurchaseOrder = createDeleteHandler(setPurchaseOrders, 'purchase_orders');
 
-    const handleCreateOperatingExpense = createUpdater(setOperatingExpenses, 'operating_expenses');
+    const handleCreateOperatingExpense = async (expenseData: Omit<OperatingExpense, 'id' | 'date'>): Promise<void> => {
+        try {
+            const expense: OperatingExpense = {
+                ...expenseData,
+                id: crypto.randomUUID(),
+                date: new Date().toISOString(),
+            };
+            const result = await supabaseService.insertOperatingExpense(expense);
+            if (result) {
+                setOperatingExpenses(prev => [result, ...prev]);
+            }
+        } catch (error) {
+            console.error('Error creating operating expense:', error);
+            throw error;
+        }
+    };
     const handleSaveOperatingExpense = createSaveHandler(setOperatingExpenses, 'operating_expenses');
     const handleDeleteOperatingExpense = createDeleteHandler(setOperatingExpenses, 'operating_expenses');
 
-    const handleCreateFinancialAccount = createUpdater(setFinancialAccounts, 'financial_accounts');
-    const handleSaveFinancialAccount = createSaveHandler(setFinancialAccounts, 'financial_accounts');
+    const handleCreateFinancialAccount = async (accountData: Omit<FinancialAccount, 'id'>): Promise<void> => {
+        try {
+            const account: FinancialAccount = {
+                ...accountData,
+                id: crypto.randomUUID(),
+            };
+            const result = await supabaseService.insertFinancialAccount(account);
+            if (result) {
+                setFinancialAccounts(prev => [result, ...prev]);
+            }
+        } catch (error) {
+            console.error('Error creating financial account:', error);
+            throw error;
+        }
+    };
+    const handleSaveFinancialAccount = async (accountData: FinancialAccount | Omit<FinancialAccount, 'id'>): Promise<void> => {
+        try {
+            console.log('🔍 handleSaveFinancialAccount - Processing account data:', accountData);
+            
+            if ('id' in accountData) {
+                // Es una actualización
+                console.log('🔍 handleSaveFinancialAccount - Updating existing account');
+                const result = await supabaseService.update('financial_accounts', accountData.id, accountData);
+                if (result) {
+                    setFinancialAccounts(prev => prev.map(item => 
+                        item.id === accountData.id ? result : item
+                    ));
+                }
+            } else {
+                // Es una creación
+                console.log('🔍 handleSaveFinancialAccount - Creating new account');
+                const result = await supabaseService.insert('financial_accounts', accountData);
+                if (result) {
+                    setFinancialAccounts(prev => [result, ...prev]);
+                }
+            }
+        } catch (error) {
+            console.error('Error saving financial account:', error);
+            throw error;
+        }
+    };
     const handleDeleteFinancialAccount = createDeleteHandler(setFinancialAccounts, 'financial_accounts');
 
     const handleCreateTimeClockEntry = createUpdater(setTimeClockEntries, 'time_clock_entries');
     const handleSaveTimeClockEntry = createSaveHandler(setTimeClockEntries, 'time_clock_entries');
     const handleDeleteTimeClockEntry = createDeleteHandler(setTimeClockEntries, 'time_clock_entries');
 
-    const handleCreateLoan = createUpdater(setLoans, 'loans');
+    const handleCreateLoan = async (loanData: Omit<Loan, 'id'>): Promise<void> => {
+        try {
+            const loan: Loan = {
+                ...loanData,
+                id: crypto.randomUUID(),
+            };
+            const result = await supabaseService.insertLoan(loan);
+            if (result) {
+                setLoans(prev => [result, ...prev]);
+            }
+        } catch (error) {
+            console.error('Error creating loan:', error);
+            throw error;
+        }
+    };
     const handleSaveLoan = createSaveHandler(setLoans, 'loans');
     const handleDeleteLoan = createDeleteHandler(setLoans, 'loans');
 
-    const handleCreateLoanPayment = createUpdater(setLoanPayments, 'loan_payments');
+    const handleCreateLoanPayment = async (paymentData: Omit<LoanPayment, 'id' | 'paymentDate'>): Promise<void> => {
+        try {
+            const payment: LoanPayment = {
+                ...paymentData,
+                id: crypto.randomUUID(),
+                paymentDate: new Date().toISOString(),
+            };
+            const result = await supabaseService.insertLoanPayment(payment);
+            if (result) {
+                setLoanPayments(prev => [result, ...prev]);
+            }
+        } catch (error) {
+            console.error('Error creating loan payment:', error);
+            throw error;
+        }
+    };
     const handleSaveLoanPayment = createSaveHandler(setLoanPayments, 'loan_payments');
     const handleDeleteLoanPayment = createDeleteHandler(setLoanPayments, 'loan_payments');
 
@@ -2527,10 +2730,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setOperatingExpenses(operatingExpensesData);
             
             // Set invoices with proper status mapping
+            console.log('🔍 DataContext - Raw invoices data from Supabase:', invoicesData);
             const mappedInvoices = invoicesData.map(inv => ({
                 ...inv,
                 status: inv.status as InvoiceStatus,
             }));
+            console.log('🔍 DataContext - Mapped invoices:', mappedInvoices);
             setInvoices(mappedInvoices);
             
             // Set quotes with proper status mapping
@@ -2755,6 +2960,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         handleCreateInvoice,
         handleSaveInvoice,
         handleDeleteInvoice,
+        handleCreateInvoiceFromWorkOrder,
+        handleToggleInvoiceVat,
 
         handleCreateQuote,
         handleSaveQuote,

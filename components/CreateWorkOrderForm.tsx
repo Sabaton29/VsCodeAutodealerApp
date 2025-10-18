@@ -227,7 +227,7 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
     };
 
     return (
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="relative space-y-6">
             <div className="flex justify-end -mt-2">
                 <ToggleSwitch 
                     label="Recepción Avanzada" 
@@ -262,8 +262,9 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
                         </div>
                     </div>
                 </FormSection>
-                 <FormSection title="2. Información del Servicio" icon={<Icon name="clipboard" className="w-5 h-5 text-brand-red" />}>
-                     <div className="space-y-4">
+                 <div className="relative">
+                     <FormSection title="2. Información del Servicio" icon={<Icon name="clipboard" className="w-5 h-5 text-brand-red" />}>
+                         <div className="space-y-4">
                         <div>
                             <label className="block text-sm font-medium mb-1 text-light-text dark:text-dark-text">Servicio Solicitado / Falla Reportada</label>
                             <textarea name="serviceRequested" value={formState.serviceRequested} onChange={handleChange} rows={3} className={inputBaseClasses} required></textarea>
@@ -311,6 +312,7 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
                         </div>
                     </div>
                 </FormSection>
+                </div>
             </div>
             
             {formState.serviceTypeAdvanced && (

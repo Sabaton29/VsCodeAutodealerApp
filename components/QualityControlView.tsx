@@ -14,6 +14,7 @@ interface QualityControlViewProps {
     onBack: () => void;
     onClose?: () => void; // Nueva prop para cerrar sin navegar
     staffMembers: StaffMember[];
+    isModal?: boolean; // Nueva prop para indicar si debe renderizarse como modal
 }
 
 interface QualityCheckItem {
@@ -86,7 +87,8 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
     hasPermission, 
     onBack,
     onClose,
-    staffMembers 
+    staffMembers,
+    isModal = true
 }) => {
     const data = useContext(DataContext);
     const ui = useContext(UIContext);
@@ -103,6 +105,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
         inspectorName: string;
         inspectionDate: string;
     } | null>(null);
+    const [isCompleted, setIsCompleted] = useState(false);
 
     // Inicializar inspector por defecto
     useEffect(() => {
@@ -181,14 +184,6 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
 
         setIsSubmitting(true);
         try {
-            console.log('🔍 QualityControlView - Iniciando control de calidad:', {
-                workOrderId: workOrder.id,
-                approved,
-                selectedInspector,
-                hasNotes: finalNotes.trim().length > 0,
-                completedItems: getOverallProgress().completed,
-                totalItems: getOverallProgress().total
-            });
             
             const inspector = staffMembers.find(member => member.id === selectedInspector);
             const inspectorName = inspector?.name || 'Inspector de Calidad';
@@ -202,13 +197,9 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                 notes: item.notes
             }));
             
-            console.log('🔍 QualityControlView - qualityChecksData before saving:', qualityChecksData);
-            
             const checklistSummary = qualityChecksData.map(item => 
                 `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
             ).join('|');
-            
-            console.log('🔍 QualityControlView - checklistSummary before saving:', checklistSummary);
             
             const historyEntry = {
                 stage: approved ? KanbanStage.LISTO_ENTREGA : KanbanStage.EN_REPARACION,
@@ -224,19 +215,26 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                 checklistSummary: checklistSummary
             };
 
-            // Actualizar historial
-            console.log('🔍 QualityControlView - Guardando control de calidad:', {
-                workOrderId: workOrder.id,
-                historyEntry,
-                qualityChecks: qualityChecks.map(item => ({
-                    id: item.id,
-                    description: item.description,
-                    status: item.status
-                })),
-                finalNotes,
-                selectedInspector
-            });
-            await (data as any).handleUpdateWorkOrderHistory(workOrder.id, historyEntry);
+            // Avanzar o retroceder según el resultado y actualizar historial
+            if (approved) {
+                // Actualizar la etapa y el historial en una sola operación
+                const nextStage = 'Listo para Entrega';
+                const updatedWorkOrder = await data.handleAdvanceStage(workOrder.id, workOrder.stage);
+                
+                // Agregar la entrada específica del control de calidad al historial
+                await (data as any).handleUpdateWorkOrderHistory(workOrder.id, historyEntry);
+                
+                (ui as any).showNotification?.('success', 'Control de Calidad aprobado. Orden lista para entrega');
+            } else {
+                // Retroceder etapa y actualizar historial
+                const previousStage = 'En Reparación';
+                await data.handleRetreatStage(workOrder.id, workOrder.stage);
+                
+                // Agregar la entrada específica del control de calidad al historial
+                await (data as any).handleUpdateWorkOrderHistory(workOrder.id, historyEntry);
+                
+                (ui as any).showNotification?.('info', 'Control de Calidad rechazado. Orden regresada a reparación');
+            }
 
             // Guardar resultado final
             setFinalResult({
@@ -245,18 +243,10 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                 inspectionDate: new Date().toLocaleDateString('es-CO')
             });
 
-            // Avanzar o retroceder según el resultado
-            if (approved) {
-                console.log('🔍 QualityControlView - Aprobando control de calidad, avanzando etapa');
-                await data.handleAdvanceStage(workOrder.id, workOrder.stage);
-                (ui as any).showNotification?.('success', 'Control de Calidad aprobado. Orden lista para entrega');
-            } else {
-                console.log('🔍 QualityControlView - Rechazando control de calidad, retrocediendo etapa');
-                await data.handleRetreatStage(workOrder.id, workOrder.stage);
-                (ui as any).showNotification?.('info', 'Control de Calidad rechazado. Orden regresada a reparación');
-            }
+            // Marcar como completado
+            setIsCompleted(true);
 
-            // Mostrar reporte imprimible
+            // Mostrar opción de imprimir reporte
             setShowPrintableReport(true);
         } catch (error) {
             console.error('Error en control de calidad:', error);
@@ -268,22 +258,24 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
 
     const overallProgress = getOverallProgress();
 
-    return (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    // Si está completado, mostrar resultado y opción de imprimir
+    if (isCompleted && finalResult) {
+        const completedContent = (
             <div className="bg-dark-light rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
                 {/* Header */}
                 <div className="sticky top-0 bg-dark-light border-b border-gray-700 p-6 rounded-t-xl">
                     <div className="flex items-center justify-between">
                         <div>
-                            <h2 className="text-2xl font-bold text-white">Control de Calidad para OT #{workOrder.id}</h2>
+                            <h2 className="text-2xl font-bold text-white">Control de Calidad Completado</h2>
                             <p className="text-gray-300 mt-1">
-                                Realice la inspección final para garantizar la calidad del trabajo antes de la entrega al cliente.
+                                {finalResult.isApproved ? 'Control de Calidad APROBADO' : 'Control de Calidad RECHAZADO'}
                             </p>
                         </div>
                         <button
                             onClick={() => {
-                                // Mostrar mensaje de confirmación antes de salir
-                                if (confirm('¿Está seguro de que desea salir del control de calidad? Los cambios no guardados se perderán.')) {
+                                if (onClose) {
+                                    onClose();
+                                } else {
                                     onBack();
                                 }
                             }}
@@ -295,211 +287,311 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                 </div>
 
                 <div className="p-6 space-y-6">
-                    {/* Inspector Selection */}
-                    <div>
-                        <label className="block text-sm font-medium text-white mb-2">
-                            Inspector de Calidad
-                        </label>
-                        <select
-                            value={selectedInspector}
-                            onChange={(e) => setSelectedInspector(e.target.value)}
-                            className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                            {staffMembers.map(member => (
-                                <option key={member.id} value={member.id}>
-                                    {member.name} - {member.role}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* Progress Overview */}
-                    <div className="bg-gray-800 rounded-lg p-4">
-                        <div className="flex items-center justify-between mb-2">
-                            <span className="text-white font-semibold">Progreso General</span>
-                            <span className="text-gray-300">{overallProgress.completed}/{overallProgress.total} verificaciones</span>
+                    {/* Resultado */}
+                    <div className={`rounded-lg p-6 ${finalResult.isApproved ? 'bg-green-900/20 border border-green-700' : 'bg-red-900/20 border border-red-700'}`}>
+                        <div className="flex items-center gap-3 mb-4">
+                            <Icon name={finalResult.isApproved ? "check-circle" : "x-circle"} className={`w-8 h-8 ${finalResult.isApproved ? 'text-green-400' : 'text-red-400'}`} />
+                            <div>
+                                <h3 className={`text-xl font-bold ${finalResult.isApproved ? 'text-green-400' : 'text-red-400'}`}>
+                                    {finalResult.isApproved ? 'CONTROL DE CALIDAD APROBADO' : 'CONTROL DE CALIDAD RECHAZADO'}
+                                </h3>
+                                <p className="text-gray-300">
+                                    Inspector: {finalResult.inspectorName} | Fecha: {finalResult.inspectionDate}
+                                </p>
+                            </div>
                         </div>
-                        <div className="w-full bg-gray-700 rounded-full h-2">
-                            <div 
-                                className="bg-green-500 h-2 rounded-full transition-all duration-300"
-                                style={{ width: `${(overallProgress.completed / overallProgress.total) * 100}%` }}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Categories */}
-                    <div className="space-y-6">
-                        {QUALITY_CATEGORIES.map(category => {
-                            const categoryItems = qualityChecks.filter(item => item.category === category.id);
-                            const progress = getCategoryProgress(category.id);
-                            
-                            return (
-                                <div key={category.id} className="bg-gray-800 rounded-lg p-4">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <h3 className="text-lg font-semibold text-white flex items-center gap-2">
-                                            <Icon name={category.icon as any} className="w-5 h-5" />
-                                            {category.title}
-                                        </h3>
-                                        <span className="text-sm text-gray-400">
-                                            {progress.completed}/{progress.total} completadas
-                                        </span>
-                                    </div>
-                                    
-                                    <div className="space-y-3">
-                                        {categoryItems.map(item => (
-                                            <div key={item.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
-                                                <span className="text-white text-sm font-medium flex-1">
-                                                    {item.description}
-                                                </span>
-                                                <div className="flex gap-2 ml-4">
-                                                    <button
-                                                        onClick={() => handleStatusChange(item.id, 'ok')}
-                                                        className={getStatusButtonClass(item.id, 'ok')}
-                                                    >
-                                                        OK
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleStatusChange(item.id, 'no-ok')}
-                                                        className={getStatusButtonClass(item.id, 'no-ok')}
-                                                    >
-                                                        NO OK
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleStatusChange(item.id, 'na')}
-                                                        className={getStatusButtonClass(item.id, 'na')}
-                                                    >
-                                                        N/A
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
-
-                    {/* Final Observations */}
-                    <div className="bg-gray-800 rounded-lg p-4">
-                        <h3 className="text-lg font-semibold text-white mb-3">Observaciones Finales</h3>
-                        <div className="relative">
-                            <textarea
-                                value={finalNotes}
-                                onChange={(e) => setFinalNotes(e.target.value)}
-                                placeholder="Añadir comentarios sobre los puntos 'NO OK' o cualquier otra observación relevante..."
-                                className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                                rows={4}
-                            />
-                            <button
-                                onClick={() => {
-                                    // Aquí podrías agregar lógica adicional para guardar las observaciones
-                                    console.log('Guardando observaciones:', finalNotes);
-                                }}
-                                className="absolute bottom-3 right-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                title="Guardar observaciones"
-                            >
-                                <Icon name="check-circle" className="w-4 h-4" />
-                            </button>
+                        
+                        <div className="bg-gray-800 rounded-lg p-4">
+                            <h4 className="font-semibold text-white mb-2">Resumen de Verificaciones:</h4>
+                            <div className="grid grid-cols-2 gap-4 text-sm">
+                                {QUALITY_CATEGORIES.map(category => {
+                                    const categoryItems = qualityChecks.filter(item => item.category === category.id);
+                                    const completed = categoryItems.filter(item => item.status !== 'unset').length;
+                                    return (
+                                        <div key={category.id} className="flex justify-between">
+                                            <span className="text-gray-300">{category.title}:</span>
+                                            <span className="text-white">{completed}/{categoryItems.length}</span>
+                                        </div>
+                                    );
+                                })}
+                            </div>
                         </div>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex justify-center space-x-4 pt-4">
+                    {/* Botones de acción */}
+                    <div className="flex justify-center space-x-4">
                         <button
-                            onClick={() => handleSubmit(false)}
-                            disabled={isSubmitting}
-                            className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                            onClick={() => setShowPrintableReport(true)}
+                            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
                         >
-                            <Icon name="x" className="w-5 h-5 mr-2" />
-                            {isSubmitting ? 'Procesando...' : 'Rechazar'}
+                            <Icon name="printer" className="w-5 h-5" />
+                            Ver Reporte Imprimible
                         </button>
                         
                         <button
-                            onClick={() => handleSubmit(true)}
-                            disabled={!canApprove() || isSubmitting}
-                            className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                            onClick={() => {
+                                if (onClose) {
+                                    onClose();
+                                } else {
+                                    onBack();
+                                }
+                            }}
+                            className="px-6 py-3 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors flex items-center gap-2"
                         >
-                            <Icon name="check-circle" className="w-5 h-5 mr-2" />
-                            {isSubmitting ? 'Procesando...' : 'Aprobar'}
+                            <Icon name="check-circle" className="w-5 h-5" />
+                            Finalizar
                         </button>
                     </div>
+                </div>
+            </div>
+        );
 
-                    {!canApprove() && (
-                        <div className="text-center">
-                            <p className="text-yellow-400 text-sm">
-                                Para aprobar, debes completar todas las verificaciones, seleccionar inspector y agregar observaciones.
-                            </p>
-                        </div>
-                    )}
+        return isModal ? (
+            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                {completedContent}
+            </div>
+        ) : completedContent;
+    }
+
+    const content = (
+        <div className="bg-dark-light rounded-xl w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+            {/* Header */}
+            <div className="sticky top-0 bg-dark-light border-b border-gray-700 p-6 rounded-t-xl">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className="text-2xl font-bold text-white">Control de Calidad para OT #{workOrder.id}</h2>
+                        <p className="text-gray-300 mt-1">
+                            Realice la inspección final para garantizar la calidad del trabajo antes de la entrega al cliente.
+                        </p>
+                    </div>
+                    <button
+                        onClick={() => {
+                            // Mostrar mensaje de confirmación antes de salir
+                            if (confirm('¿Está seguro de que desea salir del control de calidad? Los cambios no guardados se perderán.')) {
+                                if (onClose) {
+                                    onClose();
+                                } else {
+                                    onBack();
+                                }
+                            }
+                        }}
+                        className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-lg transition-colors"
+                    >
+                        <Icon name="x" className="w-6 h-6" />
+                    </button>
+                </div>
+            </div>
+
+            <div className="p-6 space-y-6">
+                {/* Inspector Selection */}
+                <div>
+                    <label className="block text-sm font-medium text-white mb-2">
+                        Inspector de Calidad
+                    </label>
+                    <select
+                        value={selectedInspector}
+                        onChange={(e) => setSelectedInspector(e.target.value)}
+                        className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                        {staffMembers.map(member => (
+                            <option key={member.id} value={member.id}>
+                                {member.name} - {member.role}
+                            </option>
+                        ))}
+                    </select>
                 </div>
 
-                {/* Modal de Reporte Imprimible */}
-                {showPrintableReport && finalResult && (
-                    <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
-                        <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-                            <div className="flex justify-between items-center p-4 border-b">
-                                <h3 className="text-lg font-semibold">Reporte de Control de Calidad</h3>
-                                <div className="flex gap-2">
-                                    <button
-                                        onClick={() => {
-                                            const printWindow = window.open('', '_blank');
-                                            if (printWindow) {
-                                                printWindow.document.write(`
-                                                    <!DOCTYPE html>
-                                                    <html lang="es">
-                                                    <head>
-                                                        <meta charset="UTF-8" />
-                                                        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                                                        <title>Reporte de Control de Calidad - ${workOrder.id}</title>
-                                                        <script src="https://cdn.tailwindcss.com"></script>
-                                                    </head>
-                                                    <body>
-                                                        ${document.querySelector('.printable-quality-report')?.outerHTML || ''}
-                                                    </body>
-                                                    </html>
-                                                `);
-                                                printWindow.document.close();
-                                                printWindow.print();
-                                            }
-                                        }}
-                                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                                    >
-                                        <Icon name="printer" className="w-4 h-4 mr-2" />
-                                        Imprimir
-                                    </button>
-                                    <button
-                                        onClick={() => {
-                                            setShowPrintableReport(false);
-                                            onBack();
-                                        }}
-                                        className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
-                                    >
-                                        Cerrar
-                                    </button>
+                {/* Progress Overview */}
+                <div className="bg-gray-800 rounded-lg p-4">
+                    <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold">Progreso General</span>
+                        <span className="text-gray-300">{overallProgress.completed}/{overallProgress.total} verificaciones</span>
+                    </div>
+                    <div className="w-full bg-gray-700 rounded-full h-2">
+                        <div 
+                            className="bg-green-500 h-2 rounded-full transition-all duration-300"
+                            style={{ width: `${(overallProgress.completed / overallProgress.total) * 100}%` }}
+                        />
+                    </div>
+                </div>
+
+                {/* Categories */}
+                <div className="space-y-6">
+                    {QUALITY_CATEGORIES.map(category => {
+                        const categoryItems = qualityChecks.filter(item => item.category === category.id);
+                        const progress = getCategoryProgress(category.id);
+                        
+                        return (
+                            <div key={category.id} className="bg-gray-800 rounded-lg p-4">
+                                <div className="flex items-center justify-between mb-4">
+                                    <h3 className="text-lg font-semibold text-white flex items-center gap-2">
+                                        <Icon name={category.icon as any} className="w-5 h-5" />
+                                        {category.title}
+                                    </h3>
+                                    <span className="text-sm text-gray-400">
+                                        {progress.completed}/{progress.total} completadas
+                                    </span>
+                                </div>
+                                
+                                <div className="space-y-3">
+                                    {categoryItems.map(item => (
+                                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-700 rounded-lg">
+                                            <span className="text-white text-sm font-medium flex-1">
+                                                {item.description}
+                                            </span>
+                                            <div className="flex gap-2 ml-4">
+                                                <button
+                                                    onClick={() => handleStatusChange(item.id, 'ok')}
+                                                    className={getStatusButtonClass(item.id, 'ok')}
+                                                >
+                                                    OK
+                                                </button>
+                                                <button
+                                                    onClick={() => handleStatusChange(item.id, 'no-ok')}
+                                                    className={getStatusButtonClass(item.id, 'no-ok')}
+                                                >
+                                                    NO OK
+                                                </button>
+                                                <button
+                                                    onClick={() => handleStatusChange(item.id, 'na')}
+                                                    className={getStatusButtonClass(item.id, 'na')}
+                                                >
+                                                    N/A
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
-                            <div className="p-4">
-                                <div className="printable-quality-report">
-                                    <PrintableQualityControlReport
-                                        workOrder={workOrder}
-                                        client={client || {} as Client}
-                                        vehicle={vehicle || {} as Vehicle}
-                                        inspector={finalResult.inspectorName}
-                                        inspectionDate={new Date().toISOString()}
-                                        isApproved={finalResult.isApproved}
-                                        notes={`${finalNotes} checklistSummary: ${qualityChecks.map(item => 
-                                            `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
-                                        ).join('|')}`}
-                                        companyInfo={data.appSettings?.companyInfo || undefined}
-                                    />
-                                </div>
-                            </div>
-                        </div>
+                        );
+                    })}
+                </div>
+
+                {/* Final Observations */}
+                <div className="bg-gray-800 rounded-lg p-4">
+                    <h3 className="text-lg font-semibold text-white mb-3">Observaciones Finales</h3>
+                    <div className="relative">
+                        <textarea
+                            value={finalNotes}
+                            onChange={(e) => setFinalNotes(e.target.value)}
+                            placeholder="Añadir comentarios sobre los puntos 'NO OK' o cualquier otra observación relevante..."
+                            className="w-full px-4 py-3 bg-gray-700 border border-gray-600 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                            rows={4}
+                        />
+                        <button
+                            onClick={() => {
+                                // Aquí podrías agregar lógica adicional para guardar las observaciones
+                                console.log('Guardando observaciones:', finalNotes);
+                            }}
+                            className="absolute bottom-3 right-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            title="Guardar observaciones"
+                        >
+                            <Icon name="check-circle" className="w-4 h-4" />
+                        </button>
+                    </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex justify-center space-x-4 pt-4">
+                    <button
+                        onClick={() => handleSubmit(false)}
+                        disabled={isSubmitting}
+                        className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                    >
+                        <Icon name="x" className="w-5 h-5 mr-2" />
+                        {isSubmitting ? 'Procesando...' : 'Rechazar'}
+                    </button>
+                    
+                    <button
+                        onClick={() => handleSubmit(true)}
+                        disabled={!canApprove() || isSubmitting}
+                        className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center"
+                    >
+                        <Icon name="check-circle" className="w-5 h-5 mr-2" />
+                        {isSubmitting ? 'Procesando...' : 'Aprobar'}
+                    </button>
+                </div>
+
+                {!canApprove() && (
+                    <div className="text-center">
+                        <p className="text-yellow-400 text-sm">
+                            Para aprobar, debes completar todas las verificaciones, seleccionar inspector y agregar observaciones.
+                        </p>
                     </div>
                 )}
             </div>
+
+            {/* Modal de Reporte Imprimible - Solo cuando se solicite */}
+            {showPrintableReport && finalResult && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h3 className="text-lg font-semibold">Reporte de Control de Calidad</h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => {
+                                        const printWindow = window.open('', '_blank');
+                                        if (printWindow) {
+                                            printWindow.document.write(`
+                                                <!DOCTYPE html>
+                                                <html lang="es">
+                                                <head>
+                                                    <meta charset="UTF-8" />
+                                                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                                                    <title>Reporte de Control de Calidad - ${workOrder.id}</title>
+                                                    <script src="https://cdn.tailwindcss.com"></script>
+                                                </head>
+                                                <body>
+                                                    ${document.querySelector('.printable-quality-report')?.outerHTML || ''}
+                                                </body>
+                                                </html>
+                                            `);
+                                            printWindow.document.close();
+                                            printWindow.print();
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    <Icon name="printer" className="w-4 h-4 mr-2" />
+                                    Imprimir
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowPrintableReport(false);
+                                    }}
+                                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-4">
+                            <div className="printable-quality-report">
+                                <PrintableQualityControlReport
+                                    workOrder={workOrder}
+                                    client={client || {} as Client}
+                                    vehicle={vehicle || {} as Vehicle}
+                                    inspector={finalResult.inspectorName}
+                                    inspectionDate={new Date().toISOString()}
+                                    isApproved={finalResult.isApproved}
+                                    notes={`${finalNotes} checklistSummary: ${qualityChecks.map(item => 
+                                        `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
+                                    ).join('|')}`}
+                                    companyInfo={data.appSettings?.companyInfo || undefined}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
+
+    return isModal ? (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            {content}
+        </div>
+    ) : content;
 };
 
 export default QualityControlView;

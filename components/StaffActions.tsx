@@ -46,7 +46,7 @@ const StaffActions: React.FC<StaffActionsProps> = ({ staffMember, onEdit, onDele
                 <Icon name="dots" className="w-5 h-5" />
             </button>
             {isOpen && (
-                <div className="absolute right-0 mt-2 w-48 z-10 bg-dark-light border border-gray-700 rounded-lg shadow-xl p-2 space-y-1">
+                <div className="absolute right-0 mt-2 w-48 z-[9999] bg-dark-light border border-gray-700 rounded-lg shadow-xl p-2 space-y-1">
                     <button 
                         onClick={(e) => { e.stopPropagation(); handleAction(onViewDetails); }} 
                         className={menuButtonClasses}

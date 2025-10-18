@@ -12,8 +12,8 @@ const handleSupabaseError = (error: any, operation: string) => {
     throw new Error(`Failed to ${operation}: ${error.message}`);
 };
 
-// Helper function to convert camelCase to snake_case
-const toSnakeCase = (str: string): string => {
+// Helper function to convert camelCase to snake_case for strings
+const toSnakeCaseString = (str: string): string => {
     // Handle special cases
     if (str === 'isB2B') return 'is_b2b';
     if (str === 'registrationDate') return 'registration_date';
@@ -24,6 +24,9 @@ const toSnakeCase = (str: string): string => {
     if (str === 'idNumber') return 'id_number';
     if (str === 'commissionRate') return 'commission_rate';
     if (str === 'paymentTerms') return 'payment_terms';
+    if (str === 'sequentialId') return 'sequential_id';
+    if (str === 'deliveryDate') return 'delivery_date';
+    if (str === 'date') return 'date'; // Keep date as is
     // Inventory checklist special cases
     if (str === 'spareTire') return 'spare_tire';
     if (str === 'jackKit') return 'jack_kit';
@@ -32,8 +35,24 @@ const toSnakeCase = (str: string): string => {
     return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
 };
 
-// Helper function to convert snake_case to camelCase
-const toCamelCase = (str: string): string => {
+// Helper function to convert camelCase to snake_case for objects
+const toSnakeCase = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(toSnakeCase);
+    
+    const result: any = {};
+    for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            const snakeKey = toSnakeCaseString(key);
+            result[snakeKey] = toSnakeCase(obj[key]);
+        }
+    }
+    return result;
+};
+
+// Helper function to convert snake_case to camelCase for strings
+const toCamelCaseString = (str: string): string => {
     // Handle special cases
     if (str === 'is_b2b') return 'isB2B';
     if (str === 'registration_date') return 'registrationDate';
@@ -44,12 +63,31 @@ const toCamelCase = (str: string): string => {
     if (str === 'id_number') return 'idNumber';
     if (str === 'commission_rate') return 'commissionRate';
     if (str === 'payment_terms') return 'paymentTerms';
+    if (str === 'sequential_id') return 'sequentialId';
+    if (str === 'delivery_date') return 'deliveryDate';
+    if (str === 'date') return 'date'; // Keep date as is
     // Inventory checklist special cases
     if (str === 'spare_tire') return 'spareTire';
     if (str === 'jack_kit') return 'jackKit';
     if (str === 'fire_extinguisher') return 'fireExtinguisher';
     if (str === 'first_aid_kit') return 'firstAidKit';
     return str.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+};
+
+// Helper function to convert snake_case to camelCase for objects
+const toCamelCase = (obj: any): any => {
+    if (obj === null || obj === undefined) return obj;
+    if (typeof obj !== 'object') return obj;
+    if (Array.isArray(obj)) return obj.map(toCamelCase);
+    
+    const result: any = {};
+    for (const key in obj) {
+        if (obj.hasOwnProperty(key)) {
+            const camelKey = toCamelCaseString(key);
+            result[camelKey] = toCamelCase(obj[key]);
+        }
+    }
+    return result;
 };
 
 // Generic function to clean data before sending to Supabase
@@ -110,7 +148,7 @@ const transformData = (data: any, toSnake: boolean = true): any => {
     
     const transformed: any = {};
     for (const [key, value] of Object.entries(data)) {
-        const newKey = toSnake ? toSnakeCase(key) : toCamelCase(key);
+        const newKey = toSnake ? toSnakeCaseString(key) : toCamelCaseString(key);
         transformed[newKey] = transformData(value, toSnake);
         
     }
@@ -1003,37 +1041,555 @@ export const updateAppSettings = async (settingsData: Partial<AppSettings>): Pro
     }
 };
 
-// Funciones que devuelven arrays vacíos temporalmente para evitar errores
+// Funciones financieras - Conectadas a la base de datos
 export const getPettyCashTransactions = async (): Promise<PettyCashTransaction[]> => {
-    return [];
+    try {
+        console.log('🔍 getPettyCashTransactions - Fetching from Supabase...');
+        const { data, error } = await supabase
+            .from('petty_cash_transactions')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (error) {
+            console.error('❌ getPettyCashTransactions - Supabase error:', error);
+            if (error.code === 'PGRST116' || error.message.includes('relation "petty_cash_transactions" does not exist')) {
+                console.warn('⚠️ getPettyCashTransactions - Table does not exist. Please run CREATE_ALL_FINANCIAL_TABLES.sql');
+                return [];
+            }
+            throw error;
+        }
+
+        console.log('✅ getPettyCashTransactions - Success:', data?.length || 0, 'transactions');
+        return data?.map(toCamelCase) || [];
+    } catch (error) {
+        console.error('❌ getPettyCashTransactions - Error:', error);
+        return [];
+    }
 };
 
 export const getInvoices = async (): Promise<Invoice[]> => {
-    return [];
+    try {
+        console.log('🔍 getInvoices - Fetching invoices from Supabase...');
+        const { data, error } = await supabase
+            .from('invoices')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('❌ getInvoices - Supabase error:', error);
+            console.error('❌ getInvoices - Error details:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
+            
+            // Si la tabla no existe, devolver array vacío pero loguear el problema
+            if (error.code === 'PGRST116' || error.message.includes('relation "invoices" does not exist')) {
+                console.warn('⚠️ getInvoices - Table "invoices" does not exist. Please create it using the SQL script provided.');
+                return [];
+            }
+            
+            // Si la columna sequential_id no existe, intentar sin ella
+            if (error.message.includes('column "sequential_id" does not exist')) {
+                console.warn('⚠️ getInvoices - Column "sequential_id" does not exist. Fetching without it...');
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from('invoices')
+                    .select('id, work_order_id, client_id, client_name, vehicle_summary, issue_date, due_date, subtotal, tax_amount, total, status, location_id, items, notes, payment_terms, vat_included, factoring_info, created_at, updated_at')
+                    .order('created_at', { ascending: false });
+                    
+                if (fallbackError) {
+                    console.error('❌ getInvoices - Fallback query also failed:', fallbackError);
+                    return [];
+                }
+                
+                console.log('✅ getInvoices - Fallback query successful:', fallbackData?.length || 0);
+                return fallbackData || [];
+            }
+            
+            throw error;
+        }
+
+        console.log('✅ getInvoices - Successfully fetched invoices:', data?.length || 0);
+        console.log('🔍 getInvoices - Raw data:', data);
+        
+        // Convertir de snake_case a camelCase
+        const convertedData = data?.map(invoice => ({
+            id: invoice.id,
+            workOrderId: invoice.work_order_id,
+            clientId: invoice.client_id,
+            clientName: invoice.client_name,
+            vehicleSummary: invoice.vehicle_summary,
+            issueDate: invoice.issue_date,
+            dueDate: invoice.due_date,
+            subtotal: invoice.subtotal,
+            taxAmount: invoice.tax_amount,
+            total: invoice.total,
+            status: invoice.status as InvoiceStatus,
+            locationId: invoice.location_id,
+            items: invoice.items,
+            notes: invoice.notes,
+            paymentTerms: invoice.payment_terms,
+            vatIncluded: invoice.vat_included,
+            sequentialId: invoice.sequential_id,
+            factoringInfo: invoice.factoring_info
+        })) || [];
+        
+        console.log('🔍 getInvoices - Converted data:', convertedData);
+        return convertedData;
+    } catch (error) {
+        console.error('❌ getInvoices - Error fetching invoices:', error);
+        return [];
+    }
 };
 
 export const getPurchaseOrders = async (): Promise<PurchaseOrder[]> => {
     return [];
 };
 
+// Función para insertar facturas
+// Funciones de inserción para tablas financieras
+export const insertPettyCashTransaction = async (transaction: PettyCashTransaction): Promise<PettyCashTransaction | null> => {
+    try {
+        console.log('🔍 insertPettyCashTransaction - Inserting transaction:', transaction);
+        
+        const transactionData = {
+            id: transaction.id,
+            type: transaction.type,
+            description: transaction.description,
+            amount: transaction.amount,
+            date: transaction.date,
+            payment_method: transaction.paymentMethod,
+            supplier_id: transaction.supplierId,
+            payment_partner_id: transaction.paymentPartnerId,
+            receipt_image_url: transaction.receiptImageUrl,
+            location_id: transaction.locationId,
+            account_id: transaction.accountId,
+            user_id: transaction.userId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        const { data, error } = await supabase
+            .from('petty_cash_transactions')
+            .insert([transactionData])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ insertPettyCashTransaction - Supabase error:', error);
+            return null;
+        }
+
+        console.log('✅ insertPettyCashTransaction - Success:', data);
+        return toCamelCase(data);
+    } catch (error) {
+        console.error('❌ insertPettyCashTransaction - Error:', error);
+        return null;
+    }
+};
+
+export const insertOperatingExpense = async (expense: OperatingExpense): Promise<OperatingExpense | null> => {
+    try {
+        console.log('🔍 insertOperatingExpense - Inserting expense:', expense);
+        
+        const expenseData = {
+            id: expense.id,
+            description: expense.description,
+            category: expense.category,
+            amount: expense.amount,
+            date: expense.date,
+            location_id: expense.locationId,
+            account_id: expense.accountId,
+            user_id: expense.userId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        const { data, error } = await supabase
+            .from('operating_expenses')
+            .insert([expenseData])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ insertOperatingExpense - Supabase error:', error);
+            return null;
+        }
+
+        console.log('✅ insertOperatingExpense - Success:', data);
+        return toCamelCase(data);
+    } catch (error) {
+        console.error('❌ insertOperatingExpense - Error:', error);
+        return null;
+    }
+};
+
+export const insertFinancialAccount = async (account: FinancialAccount): Promise<FinancialAccount | null> => {
+    try {
+        console.log('🔍 insertFinancialAccount - Inserting account:', account);
+        
+        const accountData = {
+            id: account.id,
+            name: account.name,
+            type: account.type,
+            location_id: account.locationId,
+            assigned_user_ids: account.assignedUserIds,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        const { data, error } = await supabase
+            .from('financial_accounts')
+            .insert([accountData])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ insertFinancialAccount - Supabase error:', error);
+            return null;
+        }
+
+        console.log('✅ insertFinancialAccount - Success:', data);
+        return toCamelCase(data);
+    } catch (error) {
+        console.error('❌ insertFinancialAccount - Error:', error);
+        return null;
+    }
+};
+
+export const insertLoan = async (loan: Loan): Promise<Loan | null> => {
+    try {
+        console.log('🔍 insertLoan - Inserting loan:', loan);
+        
+        const loanData = {
+            id: loan.id,
+            staff_id: loan.staffId,
+            location_id: loan.locationId,
+            amount: loan.amount,
+            reason: loan.reason,
+            issue_date: loan.issueDate,
+            deduction_per_pay_period: loan.deductionPerPayPeriod,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        const { data, error } = await supabase
+            .from('loans')
+            .insert([loanData])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ insertLoan - Supabase error:', error);
+            return null;
+        }
+
+        console.log('✅ insertLoan - Success:', data);
+        return toCamelCase(data);
+    } catch (error) {
+        console.error('❌ insertLoan - Error:', error);
+        return null;
+    }
+};
+
+export const insertLoanPayment = async (payment: LoanPayment): Promise<LoanPayment | null> => {
+    try {
+        console.log('🔍 insertLoanPayment - Inserting payment:', payment);
+        
+        const paymentData = {
+            id: payment.id,
+            loan_id: payment.loanId,
+            amount: payment.amount,
+            payment_date: payment.paymentDate,
+            is_payroll_deduction: payment.isPayrollDeduction,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        const { data, error } = await supabase
+            .from('loan_payments')
+            .insert([paymentData])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ insertLoanPayment - Supabase error:', error);
+            return null;
+        }
+
+        console.log('✅ insertLoanPayment - Success:', data);
+        return toCamelCase(data);
+    } catch (error) {
+        console.error('❌ insertLoanPayment - Error:', error);
+        return null;
+    }
+};
+
+export const insertTimeClockEntry = async (entry: TimeClockEntry): Promise<TimeClockEntry | null> => {
+    try {
+        console.log('🔍 insertTimeClockEntry - Inserting entry:', entry);
+        
+        const entryData = {
+            id: entry.id,
+            staff_id: entry.staffId,
+            type: entry.type,
+            timestamp: entry.timestamp,
+            location_id: entry.locationId,
+            notes: entry.notes,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        const { data, error } = await supabase
+            .from('time_clock_entries')
+            .insert([entryData])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ insertTimeClockEntry - Supabase error:', error);
+            return null;
+        }
+
+        console.log('✅ insertTimeClockEntry - Success:', data);
+        return toCamelCase(data);
+    } catch (error) {
+        console.error('❌ insertTimeClockEntry - Error:', error);
+        return null;
+    }
+};
+
+export const insertInvoice = async (invoice: Invoice): Promise<Invoice | null> => {
+    try {
+        console.log('🔍 insertInvoice - Inserting invoice:', invoice);
+        
+        // Convertir a snake_case para Supabase
+        const invoiceData = {
+            id: invoice.id,
+            work_order_id: invoice.workOrderId,
+            client_id: invoice.clientId,
+            client_name: invoice.clientName,
+            vehicle_summary: invoice.vehicleSummary,
+            issue_date: invoice.issueDate,
+            due_date: invoice.dueDate,
+            subtotal: invoice.subtotal,
+            tax_amount: invoice.taxAmount,
+            total: invoice.total,
+            status: invoice.status,
+            location_id: invoice.locationId,
+            items: invoice.items,
+            notes: invoice.notes,
+            payment_terms: invoice.paymentTerms,
+            vat_included: invoice.vatIncluded,
+            sequential_id: invoice.sequentialId,
+            factoring_info: invoice.factoringInfo,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+        };
+        
+        console.log('🔍 insertInvoice - Converted data for Supabase:', invoiceData);
+        
+        const { data, error } = await supabase
+            .from('invoices')
+            .insert([invoiceData])
+            .select()
+            .single();
+
+        if (error) {
+            console.error('❌ insertInvoice - Supabase error:', error);
+            console.error('❌ insertInvoice - Error details:', {
+                message: error.message,
+                details: error.details,
+                hint: error.hint,
+                code: error.code
+            });
+            
+            // Si la tabla no existe, mostrar mensaje de error más claro
+            if (error.code === 'PGRST116' || error.message.includes('relation "invoices" does not exist')) {
+                console.error('❌ insertInvoice - Table "invoices" does not exist. Please create it first.');
+                alert('Error: La tabla de facturas no existe en la base de datos. Por favor, ejecuta el script SQL para crear la tabla.');
+                return null;
+            }
+            
+            // Si la columna sequential_id no existe, intentar insertar sin ella
+            if (error.message.includes('column "sequential_id" does not exist')) {
+                console.warn('⚠️ insertInvoice - Column "sequential_id" does not exist. Inserting without it...');
+                const { sequentialId, ...invoiceWithoutSequentialId } = invoice;
+                const { data: fallbackData, error: fallbackError } = await supabase
+                    .from('invoices')
+                    .insert([invoiceWithoutSequentialId])
+                    .select()
+                    .single();
+                    
+                if (fallbackError) {
+                    console.error('❌ insertInvoice - Fallback insert also failed:', fallbackError);
+                    alert('Error: No se pudo insertar la factura. Verifica la estructura de la tabla.');
+                    return null;
+                }
+                
+                console.log('✅ insertInvoice - Fallback insert successful:', fallbackData);
+                return fallbackData;
+            }
+            
+            throw error;
+        }
+
+        console.log('✅ insertInvoice - Successfully inserted invoice:', data);
+        
+        // Convertir de vuelta a camelCase
+        const convertedData: Invoice = {
+            id: data.id,
+            workOrderId: data.work_order_id,
+            clientId: data.client_id,
+            clientName: data.client_name,
+            vehicleSummary: data.vehicle_summary,
+            issueDate: data.issue_date,
+            dueDate: data.due_date,
+            subtotal: data.subtotal,
+            taxAmount: data.tax_amount,
+            total: data.total,
+            status: data.status as InvoiceStatus,
+            locationId: data.location_id,
+            items: data.items,
+            notes: data.notes,
+            paymentTerms: data.payment_terms,
+            vatIncluded: data.vat_included,
+            sequentialId: data.sequential_id,
+            factoringInfo: data.factoring_info
+        };
+        
+        console.log('✅ insertInvoice - Converted response:', convertedData);
+        return convertedData;
+    } catch (error) {
+        console.error('❌ insertInvoice - Error inserting invoice:', error);
+        return null;
+    }
+};
+
 export const getOperatingExpenses = async (): Promise<OperatingExpense[]> => {
-    return [];
+    try {
+        console.log('🔍 getOperatingExpenses - Fetching from Supabase...');
+        const { data, error } = await supabase
+            .from('operating_expenses')
+            .select('*')
+            .order('date', { ascending: false });
+
+        if (error) {
+            console.error('❌ getOperatingExpenses - Supabase error:', error);
+            if (error.code === 'PGRST116' || error.message.includes('relation "operating_expenses" does not exist')) {
+                console.warn('⚠️ getOperatingExpenses - Table does not exist. Please run CREATE_ALL_FINANCIAL_TABLES.sql');
+                return [];
+            }
+            throw error;
+        }
+
+        console.log('✅ getOperatingExpenses - Success:', data?.length || 0, 'expenses');
+        return data?.map(toCamelCase) || [];
+    } catch (error) {
+        console.error('❌ getOperatingExpenses - Error:', error);
+        return [];
+    }
 };
 
 export const getFinancialAccounts = async (): Promise<FinancialAccount[]> => {
-    return [];
+    try {
+        console.log('🔍 getFinancialAccounts - Fetching from Supabase...');
+        const { data, error } = await supabase
+            .from('financial_accounts')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            console.error('❌ getFinancialAccounts - Supabase error:', error);
+            if (error.code === 'PGRST116' || error.message.includes('relation "financial_accounts" does not exist')) {
+                console.warn('⚠️ getFinancialAccounts - Table does not exist. Please run CREATE_ALL_FINANCIAL_TABLES.sql');
+                return [];
+            }
+            throw error;
+        }
+
+        console.log('✅ getFinancialAccounts - Success:', data?.length || 0, 'accounts');
+        return data?.map(toCamelCase) || [];
+    } catch (error) {
+        console.error('❌ getFinancialAccounts - Error:', error);
+        return [];
+    }
 };
 
 export const getTimeClockEntries = async (): Promise<TimeClockEntry[]> => {
-    return [];
+    try {
+        console.log('🔍 getTimeClockEntries - Fetching from Supabase...');
+        const { data, error } = await supabase
+            .from('time_clock_entries')
+            .select('*')
+            .order('timestamp', { ascending: false });
+
+        if (error) {
+            console.error('❌ getTimeClockEntries - Supabase error:', error);
+            if (error.code === 'PGRST116' || error.message.includes('relation "time_clock_entries" does not exist')) {
+                console.warn('⚠️ getTimeClockEntries - Table does not exist. Please run CREATE_ALL_FINANCIAL_TABLES.sql');
+                return [];
+            }
+            throw error;
+        }
+
+        console.log('✅ getTimeClockEntries - Success:', data?.length || 0, 'entries');
+        return data?.map(toCamelCase) || [];
+    } catch (error) {
+        console.error('❌ getTimeClockEntries - Error:', error);
+        return [];
+    }
 };
 
 export const getLoans = async (): Promise<Loan[]> => {
-    return [];
+    try {
+        console.log('🔍 getLoans - Fetching from Supabase...');
+        const { data, error } = await supabase
+            .from('loans')
+            .select('*')
+            .order('issue_date', { ascending: false });
+
+        if (error) {
+            console.error('❌ getLoans - Supabase error:', error);
+            if (error.code === 'PGRST116' || error.message.includes('relation "loans" does not exist')) {
+                console.warn('⚠️ getLoans - Table does not exist. Please run CREATE_ALL_FINANCIAL_TABLES.sql');
+                return [];
+            }
+            throw error;
+        }
+
+        console.log('✅ getLoans - Success:', data?.length || 0, 'loans');
+        return data?.map(toCamelCase) || [];
+    } catch (error) {
+        console.error('❌ getLoans - Error:', error);
+        return [];
+    }
 };
 
 export const getLoanPayments = async (): Promise<LoanPayment[]> => {
-    return [];
+    try {
+        console.log('🔍 getLoanPayments - Fetching from Supabase...');
+        const { data, error } = await supabase
+            .from('loan_payments')
+            .select('*')
+            .order('payment_date', { ascending: false });
+
+        if (error) {
+            console.error('❌ getLoanPayments - Supabase error:', error);
+            if (error.code === 'PGRST116' || error.message.includes('relation "loan_payments" does not exist')) {
+                console.warn('⚠️ getLoanPayments - Table does not exist. Please run CREATE_ALL_FINANCIAL_TABLES.sql');
+                return [];
+            }
+            throw error;
+        }
+
+        console.log('✅ getLoanPayments - Success:', data?.length || 0, 'payments');
+        return data?.map(toCamelCase) || [];
+    } catch (error) {
+        console.error('❌ getLoanPayments - Error:', error);
+        return [];
+    }
 };
 
 export const getNotifications = async (): Promise<Notification[]> => {
@@ -1169,15 +1725,26 @@ export const supabaseService = {
     getAppSettings,
     updateAppSettings,
     
-    // Additional functions
+    // Financial functions
     getPettyCashTransactions,
-    getInvoices,
-    getPurchaseOrders,
+    insertPettyCashTransaction,
     getOperatingExpenses,
+    insertOperatingExpense,
     getFinancialAccounts,
+    insertFinancialAccount,
     getTimeClockEntries,
+    insertTimeClockEntry,
     getLoans,
+    insertLoan,
     getLoanPayments,
+    insertLoanPayment,
+    
+    // Invoices
+    getInvoices,
+    insertInvoice,
+    
+    // Other functions
+    getPurchaseOrders,
     getNotifications,
     getAppointments,
     insertNotification,

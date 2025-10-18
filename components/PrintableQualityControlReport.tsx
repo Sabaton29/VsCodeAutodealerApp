@@ -10,6 +10,14 @@ interface PrintableQualityControlReportProps {
   isApproved: boolean;
   notes: string;
   companyInfo?: CompanyInfo;
+  qualityChecksData?: Array<{
+    id: string;
+    description: string;
+    category: 'exterior' | 'funcionalidad' | 'verificacion' | 'documentacion';
+    status: 'ok' | 'no-ok' | 'na' | 'unset';
+    notes?: string;
+  }>;
+  checklistSummary?: string;
 }
 
 const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps> = ({
@@ -20,7 +28,9 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
   inspectionDate,
   isApproved,
   notes,
-  companyInfo
+  companyInfo,
+  qualityChecksData = [],
+  checklistSummary = ''
 }) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
@@ -148,23 +158,32 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
               CRITERIOS DE CALIDAD EVALUADOS
             </h3>
             {(() => {
-              // Extraer datos del checklist de las notas si están disponibles
-              const checklistSummary = notes.match(/checklistSummary: (.+?)(?:\s|$)/)?.[1];
-              let qualityChecksData: Array<{
-                id: string;
-                description: string;
-                category: string;
-                status: string;
-                notes?: string;
-              }> = [];
+              // Debug: mostrar los datos recibidos
+              console.log('🔍 DEBUG PrintableQualityControlReport - qualityChecksData:', qualityChecksData);
+              console.log('🔍 DEBUG PrintableQualityControlReport - checklistSummary:', checklistSummary);
               
-              if (checklistSummary) {
-                // Parsear el summary del checklist
-                qualityChecksData = checklistSummary.split('|').map(item => {
-                  const [id, status, notes] = item.split(':');
-                  return { id, status, description: '', category: '', notes };
-                });
+              // Usar los datos reales del control de calidad si están disponibles
+              let finalQualityChecksData = qualityChecksData;
+              
+              // Si no hay datos directos, intentar extraer del checklistSummary
+              if (!finalQualityChecksData || finalQualityChecksData.length === 0) {
+                if (checklistSummary) {
+                  // Parsear el summary del checklist
+                  const summaryItems = checklistSummary.split('|');
+                  finalQualityChecksData = summaryItems.map(item => {
+                    const [id, status, notes] = item.split(':');
+                    return { 
+                      id, 
+                      status: (status || 'ok') as 'ok' | 'no-ok' | 'na' | 'unset', 
+                      description: '', 
+                      category: '' as 'exterior' | 'funcionalidad' | 'verificacion' | 'documentacion', 
+                      notes 
+                    };
+                  });
+                }
               }
+              
+              console.log('🔍 DEBUG PrintableQualityControlReport - finalQualityChecksData:', finalQualityChecksData);
               
               // Categorías del control de calidad
               const categories = [
@@ -212,7 +231,7 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
               
               // Función para obtener el estado de un elemento
               const getItemStatus = (itemId: string) => {
-                const itemData = qualityChecksData.find(item => item.id === itemId);
+                const itemData = finalQualityChecksData.find(item => item.id === itemId);
                 return itemData ? itemData.status : 'ok'; // Default a 'ok' si no hay datos
               };
               
@@ -234,7 +253,7 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                       {category.items.map(item => {
                         const status = getItemStatus(item.id);
                         const icon = getStatusIcon(status);
-                        const itemData = qualityChecksData.find(data => data.id === item.id);
+                        const itemData = finalQualityChecksData.find(data => data.id === item.id);
                         
                         return (
                           <div key={item.id} className="flex items-center justify-between mb-1">

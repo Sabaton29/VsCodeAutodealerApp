@@ -3,6 +3,7 @@ import { DataContext } from './components/DataContext';
 import { UIContext } from './components/UIContext';
 import { usePermissions } from './hooks/usePermissions';
 import { getQuoteDisplayId } from './utils/quoteId';
+import { getInvoiceDisplayId } from './utils/invoiceId';
 import { QuoteStatus } from './types';
 
 // Core components - loaded immediately
@@ -781,7 +782,7 @@ const AppContent: React.FC = () => {
                 }}
                 currentUser={ui.currentUser}
              /></Suspense>;
-            case 'Órdenes de Trabajo': return <Suspense fallback={<LoadingSpinner />}><WorkOrdersView selectedLocationId={ui.selectedLocationId} workOrders={filteredWorkOrders} quotes={filteredQuotes} staffMembers={staffMembers} handleAssignTechnician={data.handleAssignTechnician} handleAdvanceStage={data.handleAdvanceStage} handleCancelOrder={data.handleCancelOrder} onStartDiagnostic={handleStartDiagnostic} onViewDetails={(id) => setView('workOrder', id)} onEditWorkOrder={(wo) => openModal('EDIT_WORK_ORDER', wo)} currentUser={ui.currentUser} hasPermission={hasPermission} onRegisterDelivery={(workOrderId) => openModal('REGISTER_DELIVERY', workOrders.find(wo => wo.id === workOrderId))} /></Suspense>;
+            case 'Órdenes de Trabajo': return <Suspense fallback={<LoadingSpinner />}><WorkOrdersView selectedLocationId={ui.selectedLocationId} workOrders={filteredWorkOrders} quotes={filteredQuotes} invoices={invoices} staffMembers={staffMembers} handleAssignTechnician={data.handleAssignTechnician} handleAdvanceStage={data.handleAdvanceStage} handleCancelOrder={data.handleCancelOrder} onStartDiagnostic={handleStartDiagnostic} onViewDetails={(id) => setView('workOrder', id)} onEditWorkOrder={(wo) => openModal('EDIT_WORK_ORDER', wo)} currentUser={ui.currentUser} hasPermission={hasPermission} onRegisterDelivery={(workOrderId) => openModal('REGISTER_DELIVERY', workOrders.find(wo => wo.id === workOrderId))} /></Suspense>;
             case 'Citas': 
                 console.log('🔍 App.tsx - Rendering AppointmentsView with data:', data);
                 console.log('🔍 App.tsx - handleConfirmAppointment type:', typeof data?.handleConfirmAppointment);
@@ -1281,7 +1282,7 @@ const ModalManager: React.FC = () => {
                     hasPermission={hasPermission}
                 />
             </Modal>
-            <Modal isOpen={type === 'REGISTER_PAYMENT'} onClose={closeModal} title={`Registrar Pago para Factura #${modalData?.id ?? ''}`} size="lg">
+            <Modal isOpen={type === 'REGISTER_PAYMENT'} onClose={closeModal} title={`Registrar Pago para Factura ${modalData?.id ? getInvoiceDisplayId(modalData.id, modalData.issueDate, true, modalData.sequentialId) : 'N/A'}`} size="lg">
                 {modalData && <RegisterPaymentForm 
                     invoice={modalData} 
                     onSave={async(invoiceId, paymentData) => { await data.handleRegisterPayment(invoiceId, paymentData); closeModal(); }} 
@@ -1533,7 +1534,8 @@ const ModalManager: React.FC = () => {
                     onCancel={closeModal}
                     initialData={modalData !== 'new' ? modalData : undefined}
                     staffMembers={data.staffMembers.filter(s => selectedLocationId === 'ALL_LOCATIONS' || s.locationId === selectedLocationId)}
-                    selectedLocationId={selectedLocationId}
+                    selectedLocationId={selectedLocationId === 'ALL_LOCATIONS' ? (data.locations.length > 0 ? data.locations[0].id : '') : selectedLocationId}
+                    locations={data.locations}
                 />
             </Modal>
             <Modal isOpen={type === 'ASSIGN_ACCOUNTS'} onClose={closeModal} title={`Asignar Cuentas a ${modalData?.name ?? ''}`} size="lg">

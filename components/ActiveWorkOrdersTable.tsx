@@ -1,14 +1,16 @@
 
 import React, { useMemo, memo } from 'react';
-import { KanbanStage, UserRole, type WorkOrder, type StaffMember, type Permission, type Quote } from '../types';
+import { KanbanStage, UserRole, type WorkOrder, type StaffMember, type Permission, type Quote, type Invoice } from '../types';
 import { STAGE_DISPLAY_CONFIG } from '../constants';
 import { Icon } from './Icon';
 import WorkOrderActions from './WorkOrderActions';
 import { calculateBusinessTimeInStage } from '../utils/time';
+import InvoicingIndicator from './InvoicingIndicator';
 
 interface ActiveWorkOrdersTableProps {
     workOrders: WorkOrder[];
     quotes: Quote[];
+    invoices: Invoice[];
     staffMembers: StaffMember[];
     onAssignTechnician: (workOrderId: string, staffMemberId: string) => void;
     onAdvanceStage: (workOrderId: string, currentStage: KanbanStage) => void;
@@ -17,6 +19,9 @@ interface ActiveWorkOrdersTableProps {
     onStartDiagnostic: (workOrderId: string) => void;
     onViewDetails: (workOrderId: string) => void;
     onRegisterDelivery: (workOrderId: string) => void;
+    onPrintReport?: (workOrderId: string) => void;
+    onViewHistory?: (workOrderId: string) => void;
+    onReopenOrder?: (workOrderId: string) => void;
     onEditWorkOrder: (workOrder: WorkOrder) => void;
     hasPermission: (permission: Permission) => boolean;
     activeFilter: KanbanStage | 'Todos';
@@ -44,7 +49,7 @@ const SortableTh: React.FC<{
 };
 
 
-const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ workOrders, quotes, staffMembers, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, hasPermission, activeFilter, sortConfig, requestSort, onEditWorkOrder }) => {
+const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ workOrders, quotes, invoices, staffMembers, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, onPrintReport, onViewHistory, onReopenOrder, hasPermission, activeFilter, sortConfig, requestSort, onEditWorkOrder }) => {
     const staffMap = useMemo(() => new Map(staffMembers.map(t => [t.id, t.name])), [staffMembers]);
     
     const showDeliveredSeparately = activeFilter === 'Todos';
@@ -66,7 +71,7 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
         : `No hay órdenes de trabajo en etapa de ${activeFilter}.`;
 
     return (
-        <div className="bg-dark-light rounded-xl overflow-hidden">
+        <div className="bg-dark-light rounded-xl overflow-visible">
              <div className="p-5">
                 <h2 className="text-xl font-bold text-dark-text">Órdenes de Servicio</h2>
                 <p className="text-sm text-gray-400 mt-1">
@@ -76,7 +81,7 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
                     }
                 </p>
             </div>
-             <div className="overflow-x-auto">
+             <div className="overflow-x-auto overflow-y-visible">
                  <table className="w-full text-sm text-left text-gray-400">
                     <thead className="text-xs text-gray-400 uppercase bg-black dark:bg-gray-900/20">
                         <tr>
@@ -86,12 +91,13 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
                             <SortableTh sortKey="technician" sortConfig={sortConfig} requestSort={requestSort}>Técnico</SortableTh>
                             <SortableTh sortKey="timeInStage" sortConfig={sortConfig} requestSort={requestSort}>Tiempo en Etapa (Hábil)</SortableTh>
                             <SortableTh sortKey="stage" sortConfig={sortConfig} requestSort={requestSort}>Etapa Actual</SortableTh>
+                            <th scope="col" className="px-5 py-3">Fecha de Entrega</th>
                             <th scope="col" className="px-5 py-3">Acciones</th>
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-800">
                         {activeOrders.length === 0 && deliveredOrders.length === 0 && (
-                            <tr><td colSpan={7} className="text-center py-10 text-gray-500">{noOrdersMessage}</td></tr>
+                            <tr><td colSpan={8} className="text-center py-10 text-gray-500">{noOrdersMessage}</td></tr>
                         )}
                         {activeOrders.length > 0 && activeOrders.map(order => {
                             const quote = quotes.find(q => (order.linkedQuoteIds || []).includes(q.id));
@@ -100,6 +106,7 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
                                     key={order.id} 
                                     order={order} 
                                     quote={quote}
+                                    invoices={invoices}
                                     technicianName={staffMap.get(order.staffMemberId || '')}
                                     staffMembers={staffMembers}
                                     onAssignTechnician={onAssignTechnician}
@@ -109,6 +116,9 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
                                     onStartDiagnostic={onStartDiagnostic}
                                     onViewDetails={onViewDetails}
                                     onRegisterDelivery={onRegisterDelivery}
+                                    onPrintReport={onPrintReport}
+                                    onViewHistory={onViewHistory}
+                                    onReopenOrder={onReopenOrder}
                                     onEdit={() => onEditWorkOrder(order)}
                                     hasPermission={hasPermission}
                                 />
@@ -119,7 +129,7 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
                             <>
                                 {showDeliveredSeparately && activeOrders.length > 0 && (
                                     <tr>
-                                        <td colSpan={7} className="px-5 py-3 bg-black dark:bg-gray-900/30 text-xs font-bold uppercase text-gray-400 tracking-wider">
+                                        <td colSpan={8} className="px-5 py-3 bg-black dark:bg-gray-900/30 text-xs font-bold uppercase text-gray-400 tracking-wider">
                                             Entregados Recientemente
                                         </td>
                                     </tr>
@@ -131,6 +141,7 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
                                             key={order.id} 
                                             order={order} 
                                             quote={quote}
+                                            invoices={invoices}
                                             isDelivered={true}
                                             technicianName={staffMap.get(order.staffMemberId || '')}
                                             staffMembers={staffMembers}
@@ -141,6 +152,9 @@ const ActiveWorkOrdersTable: React.FC<ActiveWorkOrdersTableProps> = memo(({ work
                                             onStartDiagnostic={onStartDiagnostic}
                                             onViewDetails={onViewDetails}
                                             onRegisterDelivery={onRegisterDelivery}
+                                            onPrintReport={onPrintReport}
+                                            onViewHistory={onViewHistory}
+                                            onReopenOrder={onReopenOrder}
                                             onEdit={() => onEditWorkOrder(order)}
                                             hasPermission={hasPermission}
                                         />
@@ -160,6 +174,7 @@ ActiveWorkOrdersTable.displayName = 'ActiveWorkOrdersTable';
 interface WorkOrderRowProps {
     order: WorkOrder;
     quote?: Quote;
+    invoices: Invoice[];
     technicianName?: string;
     staffMembers: StaffMember[];
     onAssignTechnician: (workOrderId: string, staffMemberId: string) => void;
@@ -169,13 +184,16 @@ interface WorkOrderRowProps {
     onStartDiagnostic: (workOrderId: string) => void;
     onViewDetails: (workOrderId: string) => void;
     onRegisterDelivery: (workOrderId: string) => void;
+    onPrintReport?: (workOrderId: string) => void;
+    onViewHistory?: (workOrderId: string) => void;
+    onReopenOrder?: (workOrderId: string) => void;
     onEdit: () => void;
     hasPermission: (permission: Permission) => boolean;
     isDelivered?: boolean;
 }
 
 
-const WorkOrderRow: React.FC<WorkOrderRowProps> = ({ order, quote, technicianName, staffMembers, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, hasPermission, isDelivered = false, onEdit }) => {
+const WorkOrderRow: React.FC<WorkOrderRowProps> = ({ order, quote, invoices, technicianName, staffMembers, onAssignTechnician, onAdvanceStage, onRetreatStage, onCancelOrder, onStartDiagnostic, onViewDetails, onRegisterDelivery, onPrintReport, onViewHistory, onReopenOrder, hasPermission, isDelivered = false, onEdit }) => {
     const stageConfig = STAGE_DISPLAY_CONFIG[order.stage] || STAGE_DISPLAY_CONFIG.Recepción;
     const finalTechnicianName = technicianName || 'Sin asignar';
     const timeInStage = calculateBusinessTimeInStage(order.history);
@@ -186,12 +204,18 @@ const WorkOrderRow: React.FC<WorkOrderRowProps> = ({ order, quote, technicianNam
     );
 
     return (
-        <tr className={`hover:bg-gray-800/50 ${isDelivered ? 'opacity-60' : ''}`}>
+        <tr className={`hover:bg-gray-800/50 ${isDelivered ? 'opacity-60 relative z-[98]' : ''}`}>
             <td className="px-5 py-4 font-medium text-white">
                 <div className="font-bold">{order.id}</div>
                 <div className="text-xs text-gray-400">
-                    {order.createdAt ? new Date(order.createdAt).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Sin fecha'}
+                    {order.date ? new Date(order.date).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Sin fecha'}
                 </div>
+                <InvoicingIndicator 
+                    workOrderId={order.id} 
+                    invoices={invoices} 
+                    quotes={[quote].filter(Boolean) as Quote[]} 
+                    showDetails={false}
+                />
             </td>
             <td className="px-5 py-4">
                 <div className="font-mono font-bold text-white">{order.vehicle?.plate || 'N/A'}</div>
@@ -212,12 +236,22 @@ const WorkOrderRow: React.FC<WorkOrderRowProps> = ({ order, quote, technicianNam
                     <span>{timeInStage}</span>
                 </div>
             </td>
-            <td className="px-5 py-4">
+            <td className="px-5 py-4 relative z-[99]">
                  <span className={`px-3 py-1.5 text-xs font-bold rounded-md ${stageConfig.bg} ${stageConfig.text}`}>
                     {order.stage}
                 </span>
             </td>
-            <td className="px-5 py-4">
+            <td className="px-5 py-4 text-white">
+                <div className="text-sm">
+                    {quote?.deliveryDate ? new Date(quote.deliveryDate).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }) : 'Pendiente'}
+                </div>
+                {quote?.deliveryDate && (
+                    <div className="text-xs text-blue-400">
+                        Prometido
+                    </div>
+                )}
+            </td>
+            <td className="px-5 py-4 relative z-[100]">
                  <WorkOrderActions 
                     workOrder={order} 
                     quote={quote}
@@ -229,6 +263,9 @@ const WorkOrderRow: React.FC<WorkOrderRowProps> = ({ order, quote, technicianNam
                     onStartDiagnostic={() => onStartDiagnostic(order.id)}
                     onViewDetails={() => onViewDetails(order.id)}
                     onRegisterDelivery={() => onRegisterDelivery(order.id)}
+                    onPrintReport={onPrintReport ? () => onPrintReport(order.id) : undefined}
+                    onViewHistory={onViewHistory ? () => onViewHistory(order.id) : undefined}
+                    onReopenOrder={onReopenOrder ? () => onReopenOrder(order.id) : undefined}
                     onEdit={onEdit}
                     hasPermission={hasPermission}
                  />

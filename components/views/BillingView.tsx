@@ -3,6 +3,7 @@ import { type Invoice, type Permission, InvoiceStatus } from '../../types';
 import { INVOICE_STATUS_DISPLAY_CONFIG } from '../../constants';
 import { Icon } from '../Icon';
 import InvoiceActions from '../InvoiceActions';
+import { getInvoiceDisplayId } from '../../utils/invoiceId';
 
 interface BillingViewProps {
     selectedLocationId: string;
@@ -23,12 +24,13 @@ const BillingView: React.FC<BillingViewProps> = ({ selectedLocationId, invoices,
         if (!searchTerm) {
             return invoices;
         }
-        return invoices.filter(inv =>
-            inv.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            inv.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            inv.vehicleSummary.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            inv.status.toLowerCase().includes(searchTerm.toLowerCase()),
-        );
+        return invoices.filter(inv => {
+            const displayId = getInvoiceDisplayId(inv.id, inv.issueDate, true, inv.sequentialId);
+            return displayId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                inv.clientName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                inv.vehicleSummary.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                inv.status.toLowerCase().includes(searchTerm.toLowerCase());
+        });
     }, [searchTerm, invoices]);
 
     return (
@@ -79,7 +81,7 @@ const BillingView: React.FC<BillingViewProps> = ({ selectedLocationId, invoices,
                                             className="bg-light dark:bg-dark-light border-b dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 cursor-pointer"
                                         >
                                             <th scope="row" className="px-6 py-4 font-bold text-gray-900 whitespace-nowrap dark:text-white">
-                                                {invoice.id}
+                                                {getInvoiceDisplayId(invoice.id, invoice.issueDate, true, invoice.sequentialId)}
                                             </th>
                                             <td className="px-6 py-4">
                                                 <p className="font-medium text-light-text dark:text-dark-text">{invoice.clientName}</p>

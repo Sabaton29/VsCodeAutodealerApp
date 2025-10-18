@@ -926,13 +926,8 @@ const ProgressTracker: React.FC<ProgressTrackerProps> = ({ workOrder, quote, quo
                                 <button
                                     onClick={async () => {
                                         try {
-                                            console.log('🔍 Enviando a control de calidad...');
                                             await data.handleAdvanceStage(workOrder.id, workOrder.stage);
-                                            console.log('✅ Orden enviada a Control de Calidad exitosamente');
                                             setShowQualityControlModal(false);
-                                            
-                                            // Mostrar notificación de éxito
-                                            console.log('✅ Orden enviada a Control de Calidad exitosamente');
                                         } catch (error) {
                                             console.error('❌ Error enviando a control de calidad:', error);
                                         }

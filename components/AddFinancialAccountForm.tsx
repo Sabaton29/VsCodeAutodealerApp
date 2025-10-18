@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import type { FinancialAccount, StaffMember } from '../types';
+import type { FinancialAccount, StaffMember, Location } from '../types';
 import { Icon } from './Icon';
 
 interface AddFinancialAccountFormProps {
@@ -8,16 +8,17 @@ interface AddFinancialAccountFormProps {
     initialData?: FinancialAccount;
     selectedLocationId: string;
     staffMembers: StaffMember[];
+    locations: Location[];
 }
 
 const inputClasses = "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-900/50 focus:outline-none focus:ring-2 focus:ring-brand-red text-light-text dark:text-dark-text";
 const labelClasses = "block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1";
 
-const AddFinancialAccountForm: React.FC<AddFinancialAccountFormProps> = ({ onSave, onCancel, initialData, selectedLocationId, staffMembers }) => {
+const AddFinancialAccountForm: React.FC<AddFinancialAccountFormProps> = ({ onSave, onCancel, initialData, selectedLocationId, staffMembers, locations }) => {
     const [formData, setFormData] = useState({
         name: '',
         type: 'Caja Menor' as 'Caja Menor' | 'Banco',
-        locationId: selectedLocationId,
+        locationId: selectedLocationId || (locations.length > 0 ? locations[0].id : ''),
         assignedUserIds: [] as string[],
     });
 
@@ -52,7 +53,7 @@ const AddFinancialAccountForm: React.FC<AddFinancialAccountFormProps> = ({ onSav
 
     const handleAddUser = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const userId = e.target.value;
-        if (userId && !formData.assignedUserIds.includes(userId)) {
+        if (userId && userId !== 'undefined' && userId !== undefined && !formData.assignedUserIds.includes(userId)) {
             setFormData(prev => ({
                 ...prev,
                 assignedUserIds: [...prev.assignedUserIds, userId],
@@ -68,10 +69,24 @@ const AddFinancialAccountForm: React.FC<AddFinancialAccountFormProps> = ({ onSav
             alert('Por favor, ingrese un nombre para la cuenta.');
             return;
         }
+        if (!formData.locationId) {
+            alert('Por favor, seleccione una sede.');
+            return;
+        }
+        
+        // Filtrar valores undefined del array assignedUserIds
+        const cleanFormData = {
+            ...formData,
+            assignedUserIds: formData.assignedUserIds.filter(id => id && id !== 'undefined' && id !== undefined)
+        };
+        
+        console.log('🔍 AddFinancialAccountForm - Form data before sending:', cleanFormData);
+        console.log('🔍 AddFinancialAccountForm - assignedUserIds:', cleanFormData.assignedUserIds);
+        
         if (isEditing) {
-            onSave({ ...initialData!, ...formData });
+            onSave({ ...initialData!, ...cleanFormData });
         } else {
-            onSave(formData);
+            onSave(cleanFormData);
         }
     };
 
@@ -92,8 +107,9 @@ const AddFinancialAccountForm: React.FC<AddFinancialAccountFormProps> = ({ onSav
                 <div>
                     <label htmlFor="locationId" className={labelClasses}>Sede</label>
                      <select id="locationId" name="locationId" value={formData.locationId} onChange={handleChange} className={inputClasses}>
-                        <option value="L1">Sede Bogotá</option>
-                        <option value="L2">Sede Cali</option>
+                        {locations.map(location => (
+                            <option key={location.id} value={location.id}>{location.name}</option>
+                        ))}
                     </select>
                 </div>
             </div>
