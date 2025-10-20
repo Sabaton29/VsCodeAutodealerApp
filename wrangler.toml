@@ -1,0 +1,6 @@
+name = "autodealer-frontend"
+compatibility_date = "2025-10-20"
+
+[site]
+bucket = "./dist"
+entry-point = "workers-site"
