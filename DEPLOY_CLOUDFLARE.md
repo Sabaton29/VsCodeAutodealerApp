@@ -27,3 +27,13 @@ Notas y advertencias
 - No intentes desplegar `backend/server.js` en Workers: usa un servicio Node (Render, Railway, Fly, Cloud Run) para el backend.
 - Si prefieres Pages, no uses `npx wrangler deploy` en el build step: Pages hace su propio deploy después del build.
 - Revisa `vite.config.ts` y define en Cloudflare/Pages las env vars que uses en build (GEMINI_API_KEY o variables `VITE_...`).
+
+GitHub Actions (quick setup)
+
+Si vas a usar la acción de GitHub incluida en este repo, crea estos Secrets en GitHub (Repository -> Settings -> Secrets -> Actions):
+
+- `CF_PAGES_API_TOKEN` - token de Cloudflare con permisos de Pages Deploy
+- `CF_ACCOUNT_ID` - tu Cloudflare account id
+- `CF_PROJECT_NAME` - el nombre del proyecto Pages (project name)
+
+La acción `deploy-cloudflare-pages.yml` hace `npm ci`, `npm run build` y publica `./dist` en Pages.
