@@ -94,9 +94,9 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                 <h1 className="text-4xl font-heading font-bold text-white tracking-wide">Agenda de Citas</h1>
                 <div className="flex items-center gap-4">
                      <div className="flex items-center gap-2 p-1 bg-dark-light rounded-lg">
-                        <button onClick={() => changeDate(-1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{color: 'white !important'}}><Icon name="chevron-down" className="w-5 h-5 rotate-90" style={{color: 'white !important'}} /></button>
-                        <h2 className="text-xl font-heading font-semibold capitalize text-center w-40 sm:w-64 text-white" style={{color: 'white !important'}}>{headerDateString}</h2>
-                        <button onClick={() => changeDate(1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{color: 'white !important'}}><Icon name="chevron-right" className="w-5 h-5" style={{color: 'white !important'}} /></button>
+                        <button onClick={() => changeDate(-1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{ color: 'white !important' }}><Icon name="chevron-down" className="w-5 h-5 rotate-90" style={{ color: 'white !important' }} /></button>
+                        <h2 className="text-xl font-heading font-semibold capitalize text-center w-40 sm:w-64 text-white" style={{ color: 'white !important' }}>{headerDateString}</h2>
+                        <button onClick={() => changeDate(1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{ color: 'white !important' }}><Icon name="chevron-right" className="w-5 h-5" style={{ color: 'white !important' }} /></button>
                         <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-sm font-heading font-medium bg-gray-700 text-white rounded-md hover:bg-gray-600">Hoy</button>
                     </div>
 
@@ -164,15 +164,15 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                     onClose={() => setSelectedAppointment(null)}
                     staffMembers={staffMembers}
                     onConfirm={async(id) => { 
-                        console.log('🔍 AppointmentsView - onConfirm called with ID:', id);
-                        console.log('🔍 AppointmentsView - handleConfirmAppointment type:', typeof handleConfirmAppointment);
+                        console.warn('🔍 AppointmentsView - onConfirm called with ID:', id);
+                        console.warn('🔍 AppointmentsView - handleConfirmAppointment type:', typeof handleConfirmAppointment);
                         if (handleConfirmAppointment) {
-                            console.log('🔍 AppointmentsView - Calling handleConfirmAppointment...');
+                            console.warn('🔍 AppointmentsView - Calling handleConfirmAppointment...');
                             try {
                                 await handleConfirmAppointment(id); 
-                                console.log('🔍 AppointmentsView - handleConfirmAppointment completed successfully');
+                                console.warn('🔍 AppointmentsView - handleConfirmAppointment completed successfully');
                                 setSelectedAppointment(prev => prev ? { ...prev, status: AppointmentStatus.CONFIRMADA } : null);
-                                console.log('🔍 AppointmentsView - Selected appointment updated');
+                                console.warn('🔍 AppointmentsView - Selected appointment updated');
                             } catch (error) {
                                 console.error('🔍 AppointmentsView - Error in handleConfirmAppointment:', error);
                             }
@@ -181,15 +181,15 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                         }
                     }}
                     onCancel={async(id) => { 
-                        console.log('🔍 AppointmentsView - onCancel called with ID:', id);
-                        console.log('🔍 AppointmentsView - handleCancelAppointment type:', typeof handleCancelAppointment);
+                        console.warn('🔍 AppointmentsView - onCancel called with ID:', id);
+                        console.warn('🔍 AppointmentsView - handleCancelAppointment type:', typeof handleCancelAppointment);
                         if (handleCancelAppointment) {
-                            console.log('🔍 AppointmentsView - Calling handleCancelAppointment...');
+                            console.warn('🔍 AppointmentsView - Calling handleCancelAppointment...');
                             try {
                                 await handleCancelAppointment(id); 
-                                console.log('🔍 AppointmentsView - handleCancelAppointment completed successfully');
+                                console.warn('🔍 AppointmentsView - handleCancelAppointment completed successfully');
                                 setSelectedAppointment(null);
-                                console.log('🔍 AppointmentsView - Selected appointment cleared');
+                                console.warn('🔍 AppointmentsView - Selected appointment cleared');
                             } catch (error) {
                                 console.error('🔍 AppointmentsView - Error in handleCancelAppointment:', error);
                             }
@@ -201,10 +201,10 @@ const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
                         if (handleCreateWorkOrderFromAppointment) {
                             try {
                                 const initialData = await handleCreateWorkOrderFromAppointment(id);
-                                console.log('🔍 AppointmentsView - Opening work order modal with initial data:', initialData);
+                                console.warn('🔍 AppointmentsView - Opening work order modal with initial data:', initialData);
                                 openModal('CREATE_WORK_ORDER', { 
                                     initialData,
-                                    appointmentId: id // Pasar el ID de la cita para vincular después
+                                    appointmentId: id, // Pasar el ID de la cita para vincular después
                                 });
                                 setSelectedAppointment(null);
                             } catch (error) {
@@ -282,14 +282,14 @@ const MonthCalendar: React.FC<any> = ({ appointments, currentDate, onAppointment
                     onDragEnter={onDragEnter} onDragLeave={onDragLeave}
                 >
                     {dayData && <>
-                        <div className="text-sm font-semibold text-white" style={{color: 'white !important'}}>{dayData.day}</div>
+                        <div className="text-sm font-semibold text-white" style={{ color: 'white !important' }}>{dayData.day}</div>
                         <div className="space-y-1 mt-1">
                             {dayData.appointments.slice(0, 3).map((app: Appointment) => {
                                 const statusConfig = APPOINTMENT_STATUS_DISPLAY_CONFIG[app.status];
                                 return (
                                 <div key={app.id} onClick={() => onAppointmentClick(app)} draggable onDragStart={(e) => onDragStart(e, app)} onDragEnd={onDragEnd} className={`p-1.5 rounded-md bg-black dark:bg-gray-900/30 border-l-4 ${statusConfig.borderColor} cursor-grab hover:bg-black dark:bg-gray-900/50`}>
-                                    <p className="text-xs font-bold truncate text-white" style={{color: 'white !important'}}>{app.clientName}</p>
-                                    <p className="text-[10px] text-gray-300 truncate" style={{color: '#D1D5DB !important'}}>{app.serviceRequested}</p>
+                                    <p className="text-xs font-bold truncate text-white" style={{ color: 'white !important' }}>{app.clientName}</p>
+                                    <p className="text-[10px] text-gray-300 truncate" style={{ color: '#D1D5DB !important' }}>{app.serviceRequested}</p>
                                 </div>
                             );})}
                             {dayData.appointments.length > 3 && <div className="text-xs text-center text-gray-400">...y {dayData.appointments.length - 3} más</div>}

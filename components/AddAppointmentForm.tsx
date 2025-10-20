@@ -64,7 +64,7 @@ const AddAppointmentForm: React.FC<AddAppointmentFormProps> = (props) => {
         e.preventDefault();
         const { clientId, vehicleId, date, time, serviceRequested, locationId } = formData;
         if (!clientId || !vehicleId || !date || !time || !serviceRequested) {
-            alert('Por favor, complete todos los campos requeridos.');
+            console.warn('Por favor, complete todos los campos requeridos.');
             return;
         }
 

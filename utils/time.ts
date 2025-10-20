@@ -1,5 +1,5 @@
 
-import type { WorkOrderHistoryEntry } from './types';
+import type { WorkOrderHistoryEntry } from '../types';
 
 /**
  * Calculates the total time elapsed in business hours between a start date and now.

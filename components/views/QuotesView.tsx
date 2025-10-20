@@ -24,21 +24,21 @@ const QuotesView: React.FC<QuotesViewProps> = ({ selectedLocationId, quotes, has
     const [searchTerm, setSearchTerm] = useState('');
     const [statusFilter, setStatusFilter] = useState<string>('ALL');
     
-    console.log('🔍 QuotesView - Received quotes:', quotes.length);
-    console.log('🔍 QuotesView - Quotes data:', quotes);
-    console.log('🔍 QuotesView - selectedLocationId:', selectedLocationId);
+    console.warn('🔍 QuotesView - Received quotes:', quotes.length);
+    console.warn('🔍 QuotesView - Quotes data:', quotes);
+    console.warn('🔍 QuotesView - selectedLocationId:', selectedLocationId);
 
     const filteredQuotes = useMemo(() => {
-        console.log('🔍 QuotesView - filteredQuotes - searchTerm:', searchTerm);
-        console.log('🔍 QuotesView - filteredQuotes - statusFilter:', statusFilter);
-        console.log('🔍 QuotesView - filteredQuotes - input quotes count:', quotes.length);
+        console.warn('🔍 QuotesView - filteredQuotes - searchTerm:', searchTerm);
+        console.warn('🔍 QuotesView - filteredQuotes - statusFilter:', statusFilter);
+        console.warn('🔍 QuotesView - filteredQuotes - input quotes count:', quotes.length);
         
         let filtered = quotes;
         
         // Filtrar por estado
         if (statusFilter !== 'ALL') {
             filtered = filtered.filter(q => q.status === statusFilter);
-            console.log('🔍 QuotesView - filteredQuotes - after status filter:', filtered.length);
+            console.warn('🔍 QuotesView - filteredQuotes - after status filter:', filtered.length);
         }
         
         // Filtrar por término de búsqueda
@@ -49,10 +49,10 @@ const QuotesView: React.FC<QuotesViewProps> = ({ selectedLocationId, quotes, has
                 q.vehicleSummary.toLowerCase().includes(searchTerm.toLowerCase()) ||
                 q.status.toLowerCase().includes(searchTerm.toLowerCase()),
             );
-            console.log('🔍 QuotesView - filteredQuotes - after search filter:', filtered.length);
+            console.warn('🔍 QuotesView - filteredQuotes - after search filter:', filtered.length);
         }
         
-        console.log('🔍 QuotesView - filteredQuotes - final count:', filtered.length);
+        console.warn('🔍 QuotesView - filteredQuotes - final count:', filtered.length);
         return filtered;
     }, [searchTerm, statusFilter, quotes]);
 
@@ -124,11 +124,11 @@ const QuotesView: React.FC<QuotesViewProps> = ({ selectedLocationId, quotes, has
                                 filteredQuotes
                                     .sort((a, b) => new Date(b.createdAt || b.issueDate).getTime() - new Date(a.createdAt || a.issueDate).getTime())
                                     .map((quote: Quote, index: number) => {
-                                    console.log(`🔍 QuotesView - Rendering quote ${index + 1}:`, quote.id, quote.status, quote.workOrderId);
+                                    console.warn(`🔍 QuotesView - Rendering quote ${index + 1}:`, quote.id, quote.status, quote.workOrderId);
                                     const statusConfig = QUOTE_STATUS_DISPLAY_CONFIG[quote.status] || { text: 'text-gray-800 dark:text-gray-200', bg: 'bg-gray-200 dark:bg-gray-700' };
                                     
                                     // Debug: verificar sequentialId
-                                    console.log('🔍 QuotesView - Quote sequentialId:', {
+                                    console.warn('🔍 QuotesView - Quote sequentialId:', {
                                         id: quote.id,
                                         sequentialId: quote.sequentialId,
                                         sequentialIdType: typeof quote.sequentialId,

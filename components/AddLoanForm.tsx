@@ -30,7 +30,7 @@ const AddLoanForm: React.FC<AddLoanFormProps> = ({ onSave, onCancel, staffMember
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.staffId || formData.amount <= 0 || formData.deductionPerPayPeriod <= 0) {
-            alert('Por favor complete todos los campos con valores válidos.');
+            console.warn('Por favor complete todos los campos con valores válidos.');
             return;
         }
         onSave({ ...formData, locationId: selectedLocationId });

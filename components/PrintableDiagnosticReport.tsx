@@ -126,7 +126,7 @@ const PrintableDiagnosticReport: React.FC<PrintableDiagnosticReportProps> = ({ w
                                 alt="AUTO DEALER" 
                                 style={{ height: '150px', width: 'auto', display: 'block', maxWidth: '100%', objectFit: 'contain' }}
                                 onError={(e) => {
-                                    console.log('Error loading logo:', companyInfo?.logoUrl);
+                                    console.warn('Error loading logo:', companyInfo?.logoUrl);
                                     e.currentTarget.src = '/images/company/logo.png';
                                 }} 
                             />

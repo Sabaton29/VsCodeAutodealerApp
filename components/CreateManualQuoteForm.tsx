@@ -124,7 +124,7 @@ const CreateManualQuoteForm: React.FC<CreateManualQuoteFormProps> = ({ clients, 
         const client = clients.find(c => c.id === selectedClientId);
         const vehicle = vehicles.find(v => v.id === selectedVehicleId);
         if (!client || !vehicle) {
-            alert("Por favor seleccione un cliente y un vehículo.");
+            console.warn("Por favor seleccione un cliente y un vehículo.");
             return;
         }
 

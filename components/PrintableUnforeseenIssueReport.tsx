@@ -1,5 +1,6 @@
 import React from 'react';
 import { WorkOrder, Client, Vehicle, CompanyInfo, UnforeseenIssue } from '../types';
+import { formatDate } from '../utils/format';
 
 interface PrintableUnforeseenIssueReportProps {
     workOrder: WorkOrder;
@@ -14,7 +15,7 @@ const PrintableUnforeseenIssueReport: React.FC<PrintableUnforeseenIssueReportPro
     client,
     vehicle,
     companyInfo,
-    issue
+    issue,
 }) => {
     const getPriorityColor = (priority: string) => {
         switch (priority) {
@@ -45,15 +46,7 @@ const PrintableUnforeseenIssueReport: React.FC<PrintableUnforeseenIssueReportPro
         }).format(amount);
     };
 
-    const formatDate = (dateString: string) => {
-        return new Date(dateString).toLocaleDateString('es-CO', {
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
+    // use shared formatDate which accepts string | Date
 
     return (
         <>
@@ -258,7 +251,7 @@ const PrintableUnforeseenIssueReport: React.FC<PrintableUnforeseenIssueReportPro
                                     <span className="font-semibold text-gray-600">Servicios:</span>
                                     <span className="ml-2">
                                         {formatCurrency(
-                                            issue.requiredServices?.reduce((total, s) => total + (s.quantity * s.estimatedPrice), 0) || 0
+                                            issue.requiredServices?.reduce((total, s) => total + (s.quantity * s.estimatedPrice), 0) || 0,
                                         )}
                                     </span>
                                 </div>
@@ -266,7 +259,7 @@ const PrintableUnforeseenIssueReport: React.FC<PrintableUnforeseenIssueReportPro
                                     <span className="font-semibold text-gray-600">Repuestos:</span>
                                     <span className="ml-2">
                                         {formatCurrency(
-                                            issue.requiredParts?.reduce((total, p) => total + (p.quantity * p.estimatedPrice), 0) || 0
+                                            issue.requiredParts?.reduce((total, p) => total + (p.quantity * p.estimatedPrice), 0) || 0,
                                         )}
                                     </span>
                                 </div>

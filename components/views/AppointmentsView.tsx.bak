@@ -1,0 +1,442 @@
+import React, { useState, useMemo, useContext } from 'react';
+import { Appointment, StaffMember, Permission, AppointmentStatus, CalendarView, UserRole } from '../../types';
+import { Icon } from '../Icon';
+import { APPOINTMENT_STATUS_DISPLAY_CONFIG } from '../../constants';
+import AppointmentDetailSidebar from '../AppointmentDetailSidebar';
+import { UIContext } from '../UIContext';
+
+interface AppointmentsViewProps {
+    appointments: Appointment[];
+    staffMembers: StaffMember[];
+    openModal: (type: 'CREATE_APPOINTMENT' | 'EDIT_APPOINTMENT' | 'CREATE_WORK_ORDER', data?: any) => void;
+    handleConfirmAppointment: (appointmentId: string) => Promise<void>;
+    handleCancelAppointment: (appointmentId: string) => Promise<void>;
+    handleCreateWorkOrderFromAppointment: (appointmentId: string) => Promise<void>;
+    handleRescheduleAppointment: (appointmentId: string, newDateTime: string) => Promise<void>;
+    hasPermission: (permission: Permission) => boolean;
+}
+
+const WEEK_DAYS = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
+
+const AppointmentsView: React.FC<AppointmentsViewProps> = (props) => {
+    const { appointments, openModal, handleConfirmAppointment, handleCancelAppointment, handleCreateWorkOrderFromAppointment, handleRescheduleAppointment, hasPermission, staffMembers } = props;
+    
+    const ui = useContext(UIContext);
+    if (!ui) throw new Error("UIContext is missing");
+    const { calendarView, setCalendarView } = ui;
+
+    const [currentDate, setCurrentDate] = useState(new Date());
+    const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+    const [statusFilters, setStatusFilters] = useState<Set<AppointmentStatus>>(() => new Set(Object.values(AppointmentStatus)));
+    const [advisorFilter, setAdvisorFilter] = useState<string>('all');
+
+    const serviceAdvisors = useMemo(() => staffMembers.filter(s => s.role === UserRole.ASESOR_SERVICIO), [staffMembers]);
+
+    const filteredAppointments = useMemo(() => {
+        return appointments.filter(app => {
+            const statusMatch = statusFilters.has(app.status);
+            const advisorMatch = advisorFilter === 'all' || app.advisorId === advisorFilter;
+            return statusMatch && advisorMatch;
+        });
+    }, [appointments, statusFilters, advisorFilter]);
+    
+    const toggleStatusFilter = (status: AppointmentStatus) => {
+        setStatusFilters(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(status)) {
+                newSet.delete(status);
+            } else {
+                newSet.add(status);
+            }
+            return newSet;
+        });
+    };
+
+    const changeDate = (delta: number) => {
+        setCurrentDate(prev => {
+            const newDate = new Date(prev);
+            if (calendarView === 'month') {
+                newDate.setMonth(prev.getMonth() + delta);
+            } else if (calendarView === 'week') {
+                newDate.setDate(prev.getDate() + (delta * 7));
+            } else { // day
+                newDate.setDate(prev.getDate() + delta);
+            }
+            return newDate;
+        });
+    };
+    
+    const headerDateString = useMemo(() => {
+        const options: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'long' };
+        if (calendarView === 'month') {
+            return currentDate.toLocaleString('es-CO', { month: 'long', year: 'numeric' });
+        }
+        if (calendarView === 'week') {
+            const start = new Date(currentDate);
+            start.setDate(start.getDate() - start.getDay());
+            const end = new Date(start);
+            end.setDate(end.getDate() + 6);
+            if (start.getMonth() === end.getMonth()) {
+                return `${start.getDate()} - ${end.getDate()} de ${start.toLocaleString('es-CO', { month: 'long', year: 'numeric' })}`;
+            }
+            return `${start.toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+        }
+        return currentDate.toLocaleDateString('es-CO', { weekday: 'long', day: 'numeric', month: 'long' });
+    }, [currentDate, calendarView]);
+
+    const handleAppointmentClick = (app: Appointment) => {
+        setSelectedAppointment(app);
+    };
+
+    return (
+        <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+                <h1 className="text-4xl font-heading font-bold text-white tracking-wide">Agenda de Citas</h1>
+                <div className="flex items-center gap-4">
+                     <div className="flex items-center gap-2 p-1 bg-dark-light rounded-lg">
+                        <button onClick={() => changeDate(-1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{ color: 'white !important' }}><Icon name="chevron-down" className="w-5 h-5 rotate-90" style={{ color: 'white !important' }} /></button>
+                        <h2 className="text-xl font-heading font-semibold capitalize text-center w-40 sm:w-64 text-white" style={{ color: 'white !important' }}>{headerDateString}</h2>
+                        <button onClick={() => changeDate(1)} className="p-2 rounded-md hover:bg-gray-700 text-white" style={{ color: 'white !important' }}><Icon name="chevron-right" className="w-5 h-5" style={{ color: 'white !important' }} /></button>
+                        <button onClick={() => setCurrentDate(new Date())} className="px-3 py-1.5 text-sm font-heading font-medium bg-gray-700 text-white rounded-md hover:bg-gray-600">Hoy</button>
+                    </div>
+
+                    <div className="flex items-center bg-dark-light p-1 rounded-lg">
+                        {(['month', 'week', 'day'] as CalendarView[]).map(view => (
+                            <button key={view} onClick={() => setCalendarView(view)} className={`px-3 py-1.5 text-sm font-heading font-medium rounded-md capitalize transition-colors ${calendarView === view ? 'bg-brand-red text-white' : 'text-white hover:bg-gray-700'}`}>
+                                {view === 'month' ? 'Mes' : view === 'week' ? 'Semana' : 'Día'}
+                            </button>
+                        ))}
+                    </div>
+
+                    {hasPermission('manage:appointments') && (
+                        <button onClick={() => openModal('CREATE_APPOINTMENT')} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-brand-red rounded-lg shadow-md hover:bg-red-700">
+                            <Icon name="plus" className="w-5 h-5" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            <div className="bg-dark-light rounded-xl shadow-md">
+                 <div className="flex flex-wrap items-center gap-x-6 gap-y-3 p-4 border-b border-gray-700">
+                    <div className="flex items-center gap-2">
+                        <span className="text-sm font-heading font-semibold mr-2 text-white">Estado:</span>
+                        {Object.values(AppointmentStatus).map(status => {
+                            const config = APPOINTMENT_STATUS_DISPLAY_CONFIG[status];
+                            const isActive = statusFilters.has(status);
+                            return (
+                                <button
+                                    key={status}
+                                    onClick={() => toggleStatusFilter(status)}
+                                    className={`flex items-center gap-2 px-2.5 py-1 text-sm font-heading font-medium rounded-full transition-all ${
+                                        isActive ? `${config.bg} ${config.text} font-bold` : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                    }`}
+                                >
+                                    <div className={`w-2.5 h-2.5 rounded-full border-2 ${isActive ? 'border-white' : 'border-transparent'} ${config.borderColor.replace('border-', 'bg-')}`}></div>
+                                    {status}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <label htmlFor="advisor-filter" className="text-sm font-heading font-semibold text-white">Asesor:</label>
+                        <select
+                            id="advisor-filter"
+                            value={advisorFilter}
+                            onChange={e => setAdvisorFilter(e.target.value)}
+                            className="bg-gray-900/50 border border-gray-700 rounded-md px-2 py-1 text-sm text-white focus:ring-brand-red focus:border-brand-red"
+                        >
+                            <option value="all" className="text-white bg-gray-800">Todos los Asesores</option>
+                            {serviceAdvisors.map(advisor => (
+                                <option key={advisor.id} value={advisor.id} className="text-white bg-gray-800">{advisor.name}</option>
+                            ))}
+                        </select>
+                    </div>
+                </div>
+
+                {calendarView === 'month' && <MonthCalendar {...props} appointments={filteredAppointments} currentDate={currentDate} onAppointmentClick={handleAppointmentClick} />}
+                {calendarView === 'week' && <WeekCalendar {...props} appointments={filteredAppointments} currentDate={currentDate} onAppointmentClick={handleAppointmentClick} />}
+                {calendarView === 'day' && <DayCalendar {...props} appointments={filteredAppointments} currentDate={currentDate} onAppointmentClick={handleAppointmentClick} />}
+            </div>
+
+            {selectedAppointment && (
+                <AppointmentDetailSidebar
+                    appointment={selectedAppointment}
+                    onClose={() => setSelectedAppointment(null)}
+                    staffMembers={staffMembers}
+                    onConfirm={async(id) => { 
+                        console.debug('🔍 AppointmentsView - onConfirm called with ID:', id);
+                        console.debug('🔍 AppointmentsView - handleConfirmAppointment type:', typeof handleConfirmAppointment);
+                        if (handleConfirmAppointment) {
+                            console.debug('🔍 AppointmentsView - Calling handleConfirmAppointment...');
+                            try {
+                                await handleConfirmAppointment(id); 
+                                console.debug('🔍 AppointmentsView - handleConfirmAppointment completed successfully');
+                                setSelectedAppointment(prev => prev ? { ...prev, status: AppointmentStatus.CONFIRMADA } : null);
+                                console.debug('🔍 AppointmentsView - Selected appointment updated');
+                            } catch (error) {
+                                console.error('🔍 AppointmentsView - Error in handleConfirmAppointment:', error);
+                            }
+                        } else {
+                            console.error('🔍 AppointmentsView - handleConfirmAppointment is not available');
+                        }
+                    }}
+                    onCancel={async(id) => { 
+                        console.debug('🔍 AppointmentsView - onCancel called with ID:', id);
+                        console.debug('🔍 AppointmentsView - handleCancelAppointment type:', typeof handleCancelAppointment);
+                        if (handleCancelAppointment) {
+                            console.debug('🔍 AppointmentsView - Calling handleCancelAppointment...');
+                            try {
+                                await handleCancelAppointment(id); 
+                                console.debug('🔍 AppointmentsView - handleCancelAppointment completed successfully');
+                                setSelectedAppointment(null);
+                                console.debug('🔍 AppointmentsView - Selected appointment cleared');
+                            } catch (error) {
+                                console.error('🔍 AppointmentsView - Error in handleCancelAppointment:', error);
+                            }
+                        } else {
+                            console.error('🔍 AppointmentsView - handleCancelAppointment is not available');
+                        }
+                    }}
+                    onCreateWorkOrder={async(id) => { 
+                        if (handleCreateWorkOrderFromAppointment) {
+                            try {
+                                const initialData = await handleCreateWorkOrderFromAppointment(id);
+                                console.debug('🔍 AppointmentsView - Opening work order modal with initial data:', initialData);
+                                openModal('CREATE_WORK_ORDER', { 
+                                    initialData,
+                                    appointmentId: id, // Pasar el ID de la cita para vincular después
+                                });
+                                setSelectedAppointment(null);
+                            } catch (error) {
+                                console.error('Error preparing work order from appointment:', error);
+                            }
+                        }
+                    }}
+                    onEdit={(app) => { setSelectedAppointment(null); openModal('EDIT_APPOINTMENT', app); }}
+                    hasPermission={hasPermission}
+                />
+            )}
+        </div>
+    );
+};
+
+const MonthCalendar: React.FC<any> = ({ appointments, currentDate, onAppointmentClick, handleRescheduleAppointment }) => {
+    const grid = useMemo(() => {
+        const year = currentDate.getFullYear();
+        const month = currentDate.getMonth();
+        const firstDayOfMonth = new Date(year, month, 1).getDay();
+        const daysInMonth = new Date(year, month + 1, 0).getDate();
+        const grid = [];
+        let day = 1;
+        for (let i = 0; i < 6; i++) {
+            const week = [];
+            for (let j = 0; j < 7; j++) {
+                if (i === 0 && j < firstDayOfMonth) { week.push(null); } 
+                else if (day > daysInMonth) { week.push(null); } 
+                else {
+                    const dayDate = new Date(year, month, day);
+                    const dayAppointments = appointments.filter((app: Appointment) => {
+                        const appDate = new Date(app.appointmentDateTime);
+                        return appDate.getFullYear() === year && appDate.getMonth() === month && appDate.getDate() === day;
+                    }).sort((a: Appointment, b: Appointment) => new Date(a.appointmentDateTime).getTime() - new Date(b.appointmentDateTime).getTime());
+                    week.push({ day, date: dayDate, appointments: dayAppointments });
+                    day++;
+                }
+            }
+            grid.push(week);
+            if (day > daysInMonth) break;
+        }
+        return grid;
+    }, [currentDate, appointments]);
+    
+    // Drag and Drop handlers
+    const onDragStart = (e: React.DragEvent, app: Appointment) => {
+        e.dataTransfer.setData('appointmentId', app.id);
+        (e.target as HTMLElement).classList.add('dragging');
+    };
+    const onDragEnd = (e: React.DragEvent) => (e.target as HTMLElement).classList.remove('dragging');
+    const onDragOver = (e: React.DragEvent) => e.preventDefault();
+    const onDragEnter = (e: React.DragEvent) => (e.target as HTMLElement).closest('.calendar-cell')?.classList.add('drag-over');
+    const onDragLeave = (e: React.DragEvent) => (e.target as HTMLElement).closest('.calendar-cell')?.classList.remove('drag-over');
+    const onDrop = (e: React.DragEvent, newDate: Date) => {
+        e.preventDefault();
+        (e.target as HTMLElement).closest('.calendar-cell')?.classList.remove('drag-over');
+        const appointmentId = e.dataTransfer.getData('appointmentId');
+        const appointment = appointments.find((app:Appointment) => app.id === appointmentId);
+        if (appointment) {
+            const originalTime = new Date(appointment.appointmentDateTime);
+            const newDateTime = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), originalTime.getHours(), originalTime.getMinutes());
+            handleRescheduleAppointment(appointmentId, newDateTime.toISOString());
+        }
+    };
+
+
+    return (
+        <div className="grid grid-cols-7 gap-px bg-gray-700 border border-gray-700">
+            {WEEK_DAYS.map(day => <div key={day} className="text-center font-bold text-xs py-2 bg-black dark:bg-gray-900/20 text-gray-400">{day}</div>)}
+            {grid.flat().map((dayData, index) => (
+                <div 
+                    key={index} 
+                    className={`p-1.5 min-h-[120px] bg-dark-light calendar-cell ${!dayData ? 'bg-gray-800/30' : ''}`}
+                    onDragOver={onDragOver} onDrop={(e) => dayData && onDrop(e, dayData.date)}
+                    onDragEnter={onDragEnter} onDragLeave={onDragLeave}
+                >
+                    {dayData && <>
+                        <div className="text-sm font-semibold text-white" style={{ color: 'white !important' }}>{dayData.day}</div>
+                        <div className="space-y-1 mt-1">
+                            {dayData.appointments.slice(0, 3).map((app: Appointment) => {
+                                const statusConfig = APPOINTMENT_STATUS_DISPLAY_CONFIG[app.status];
+                                return (
+                                <div key={app.id} onClick={() => onAppointmentClick(app)} draggable onDragStart={(e) => onDragStart(e, app)} onDragEnd={onDragEnd} className={`p-1.5 rounded-md bg-black dark:bg-gray-900/30 border-l-4 ${statusConfig.borderColor} cursor-grab hover:bg-black dark:bg-gray-900/50`}>
+                                    <p className="text-xs font-bold truncate text-white" style={{ color: 'white !important' }}>{app.clientName}</p>
+                                    <p className="text-[10px] text-gray-300 truncate" style={{ color: '#D1D5DB !important' }}>{app.serviceRequested}</p>
+                                </div>
+                            );})}
+                            {dayData.appointments.length > 3 && <div className="text-xs text-center text-gray-400">...y {dayData.appointments.length - 3} más</div>}
+                        </div>
+                    </>}
+                </div>
+            ))}
+        </div>
+    );
+};
+
+const WeekCalendar: React.FC<any> = ({ appointments, currentDate, onAppointmentClick, handleRescheduleAppointment }) => {
+    const weekDays = useMemo(() => {
+        const startOfWeek = new Date(currentDate);
+        startOfWeek.setDate(startOfWeek.getDate() - startOfWeek.getDay());
+        return Array.from({ length: 7 }).map((_, i) => {
+            const day = new Date(startOfWeek);
+            day.setDate(day.getDate() + i);
+            return day;
+        });
+    }, [currentDate]);
+
+    // Drag and Drop handlers
+    const onDragStart = (e: React.DragEvent, app: Appointment) => {
+        e.dataTransfer.setData('appointmentId', app.id);
+        (e.target as HTMLElement).classList.add('dragging');
+    };
+    const onDragEnd = (e: React.DragEvent) => (e.target as HTMLElement).classList.remove('dragging');
+    const onDragOver = (e: React.DragEvent) => e.preventDefault();
+    const onDragEnter = (e: React.DragEvent) => (e.target as HTMLElement).closest('.calendar-cell')?.classList.add('drag-over');
+    const onDragLeave = (e: React.DragEvent) => (e.target as HTMLElement).closest('.calendar-cell')?.classList.remove('drag-over');
+    const onDrop = (e: React.DragEvent, newDate: Date) => {
+        e.preventDefault();
+        (e.target as HTMLElement).closest('.calendar-cell')?.classList.remove('drag-over');
+        const appointmentId = e.dataTransfer.getData('appointmentId');
+        const appointment = appointments.find((app:Appointment) => app.id === appointmentId);
+        if (appointment) {
+            const originalTime = new Date(appointment.appointmentDateTime);
+            const newDateTime = new Date(newDate.getFullYear(), newDate.getMonth(), newDate.getDate(), originalTime.getHours(), originalTime.getMinutes());
+            handleRescheduleAppointment(appointmentId, newDateTime.toISOString());
+        }
+    };
+
+    return (
+        <div className="grid grid-cols-7 gap-px bg-gray-700 border border-gray-700">
+            {weekDays.map(day => (
+                <div key={day.toISOString()} className="text-center font-bold text-xs py-2 bg-black dark:bg-gray-900/20 text-gray-400">
+                    {WEEK_DAYS[day.getDay()]} <span className="block font-normal text-lg text-white">{day.getDate()}</span>
+                </div>
+            ))}
+            {weekDays.map(day => {
+                 const dayAppointments = appointments.filter((app: Appointment) => {
+                    const appDate = new Date(app.appointmentDateTime);
+                    return appDate.toDateString() === day.toDateString();
+                }).sort((a: Appointment, b: Appointment) => new Date(a.appointmentDateTime).getTime() - new Date(b.appointmentDateTime).getTime());
+                return (
+                    <div key={day.toISOString()} className="p-1.5 min-h-[240px] bg-dark-light calendar-cell"
+                         onDragOver={onDragOver} onDrop={(e) => onDrop(e, day)}
+                         onDragEnter={onDragEnter} onDragLeave={onDragLeave}>
+                        <div className="space-y-1.5">
+                            {dayAppointments.map((app: Appointment) => {
+                                const statusConfig = APPOINTMENT_STATUS_DISPLAY_CONFIG[app.status];
+                                return (
+                                <div key={app.id} onClick={() => onAppointmentClick(app)} draggable onDragStart={(e) => onDragStart(e, app)} onDragEnd={onDragEnd} className={`p-1.5 rounded-md bg-black dark:bg-gray-900/30 border-l-4 ${statusConfig.borderColor} cursor-grab hover:bg-black dark:bg-gray-900/50`}>
+                                    <p className="text-xs font-bold">{new Date(app.appointmentDateTime).toLocaleTimeString('es-CO', { hour: 'numeric', minute: '2-digit' })}</p>
+                                    <p className="text-[11px] text-gray-300 truncate">{app.clientName}</p>
+                                    <p className="text-[10px] text-gray-400 truncate">{app.serviceRequested}</p>
+                                </div>
+                            );})}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
+const DayCalendar: React.FC<any> = ({ appointments, currentDate, onAppointmentClick, handleRescheduleAppointment }) => {
+    const timeSlots = Array.from({ length: 12 }, (_, i) => 7 + i); // 7am to 6pm (19:00)
+    
+    const dayAppointments = appointments.filter((app: Appointment) => new Date(app.appointmentDateTime).toDateString() === currentDate.toDateString());
+
+    const getPosition = (app: Appointment) => {
+        const appDate = new Date(app.appointmentDateTime);
+        const startHour = appDate.getHours() + appDate.getMinutes() / 60;
+        const top = (startHour - 7) * 4; // 4rem per hour (h-16)
+        const durationHours = 1; // Assume 1 hour duration for simplicity
+        const height = durationHours * 4;
+        return { top, height };
+    };
+
+    const onDragStart = (e: React.DragEvent, app: Appointment) => {
+        e.dataTransfer.setData('appointmentId', app.id);
+        (e.target as HTMLElement).classList.add('dragging');
+    };
+    const onDragEnd = (e: React.DragEvent) => (e.target as HTMLElement).classList.remove('dragging');
+    const onDragOver = (e: React.DragEvent) => e.preventDefault();
+    const onDragEnter = (e: React.DragEvent) => (e.currentTarget as HTMLElement).classList.add('drag-over');
+    const onDragLeave = (e: React.DragEvent) => (e.currentTarget as HTMLElement).classList.remove('drag-over');
+    const onDrop = (e: React.DragEvent, hour: number) => {
+        e.preventDefault();
+        (e.currentTarget as HTMLElement).classList.remove('drag-over');
+        const appointmentId = e.dataTransfer.getData('appointmentId');
+        if (appointmentId) {
+            const target = (e.target as HTMLElement).closest('.calendar-cell');
+            if (!target) return;
+            const rect = target.getBoundingClientRect();
+            const y = e.clientY - rect.top;
+            const minute = Math.floor((y / rect.height) * 60);
+            const newDateTime = new Date(currentDate);
+            newDateTime.setHours(hour, minute, 0, 0);
+            handleRescheduleAppointment(appointmentId, newDateTime.toISOString());
+        }
+    };
+
+    return (
+        <div className="flex">
+            <div className="w-16 flex-shrink-0 text-right pr-2">
+                {timeSlots.map(hour => <div key={hour} className="h-16 text-xs text-gray-400 -mt-1.5">{`${hour}:00`}</div>)}
+            </div>
+            <div className="flex-grow border-l border-gray-700 relative">
+                {timeSlots.map(hour => (
+                    <div key={hour} className="h-16 border-b border-gray-800/50 calendar-cell" 
+                         onDragOver={onDragOver} onDrop={(e) => onDrop(e, hour)}
+                         onDragEnter={onDragEnter} onDragLeave={onDragLeave}/>
+                ))}
+                {dayAppointments.map((app: Appointment) => {
+                    const { top, height } = getPosition(app);
+                    const statusConfig = APPOINTMENT_STATUS_DISPLAY_CONFIG[app.status];
+                    return (
+                        <div
+                            key={app.id}
+                            onClick={() => onAppointmentClick(app)}
+                            draggable
+                            onDragStart={(e) => onDragStart(e, app)}
+                            onDragEnd={onDragEnd}
+                            className={`absolute left-1 right-1 p-2 ${statusConfig.bg.replace('/50', '/80')} rounded-lg cursor-grab hover:opacity-80 border-l-4 ${statusConfig.borderColor}`}
+                            style={{ top: `${top}rem`, height: `${height}rem`, minHeight: '2rem' }}
+                        >
+                            <p className={`text-xs font-bold ${statusConfig.text}`}>{new Date(app.appointmentDateTime).toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit' })} {app.clientName}</p>
+                            <p className={`text-[10px] ${statusConfig.text} opacity-80 truncate`}>{app.serviceRequested}</p>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+};
+
+export default AppointmentsView;

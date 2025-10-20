@@ -88,19 +88,19 @@ const AddTransactionForm: React.FC<AddTransactionFormProps> = ({ onSave, onCance
         if (!currentUser) return;
         
         if (!formData.description || formData.amount <= 0) {
-            alert('Por favor complete la descripción y un monto válido.');
+            console.warn('Por favor complete la descripción y un monto válido.');
             return;
         }
         if (formData.paymentMethod === 'Crédito' && !formData.supplierId) {
-            alert('Por favor seleccione un proveedor para el gasto a crédito.');
+            console.warn('Por favor seleccione un proveedor para el gasto a crédito.');
             return;
         }
         if (formData.paymentMethod === 'Tarjeta de Crédito (Socio)' && !formData.paymentPartnerId) {
-            alert('Por favor seleccione un socio comercial de pago.');
+            console.warn('Por favor seleccione un socio comercial de pago.');
             return;
         }
         if (formData.paymentMethod !== 'Tarjeta de Crédito (Socio)' && !formData.accountId) {
-            alert('Por favor seleccione una cuenta de origen/destino.');
+            console.warn('Por favor seleccione una cuenta de origen/destino.');
             return;
         }
 

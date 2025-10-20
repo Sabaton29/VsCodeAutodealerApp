@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react';
 import { Icon } from '../Icon';
+import { formatDateTime } from '../../utils/format';
 import { StaffMember, Permission, WorkOrder, TimeClockEntry, Loan, LoanPayment } from '../../types';
 import { STATUS_DISPLAY_CONFIG } from '../../constants';
 
@@ -18,7 +19,6 @@ interface StaffDetailViewProps {
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
-const formatDateTime = (dateString: string) => new Date(dateString).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const StaffDetailView: React.FC<StaffDetailViewProps> = ({ staffMember, workOrders, timeClockEntries, loans, loanPayments, onBack, onEditStaff, onViewWorkOrder, hasPermission }) => {
 

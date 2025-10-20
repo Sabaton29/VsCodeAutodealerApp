@@ -37,7 +37,7 @@ const ReleaseRetentionModal: React.FC<ReleaseRetentionModalProps> = ({ invoice, 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!releaseData.accountId) {
-            alert('Por favor, seleccione la cuenta donde se recibió el dinero.');
+            console.warn('Por favor, seleccione la cuenta donde se recibió el dinero.');
             return;
         }
         onSave(invoice.id, releaseData);

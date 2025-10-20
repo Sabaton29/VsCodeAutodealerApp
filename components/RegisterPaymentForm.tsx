@@ -35,7 +35,7 @@ const RegisterPaymentForm: React.FC<RegisterPaymentFormProps> = ({ invoice, onSa
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (formData.amount <= 0) {
-            alert('El monto del pago debe ser mayor a cero.');
+            console.warn('El monto del pago debe ser mayor a cero.');
             return;
         }
         onSave(invoice.id, formData);

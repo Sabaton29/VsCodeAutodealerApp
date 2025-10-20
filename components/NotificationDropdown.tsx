@@ -1,6 +1,7 @@
 import React from 'react';
 import { Notification } from '../types';
 import { Icon } from './Icon';
+import { toDate } from '../utils/format';
 
 interface NotificationDropdownProps {
     notifications: Notification[];
@@ -8,8 +9,10 @@ interface NotificationDropdownProps {
     onMarkAllAsRead: () => void;
 }
 
-const timeSince = (dateString: string): string => {
-    const seconds = Math.floor((new Date().getTime() - new Date(dateString).getTime()) / 1000);
+const timeSince = (input?: string | Date | null): string => {
+    const d = toDate(input);
+    if (!d) return '0 s';
+    const seconds = Math.floor((new Date().getTime() - d.getTime()) / 1000);
     let interval = seconds / 31536000;
     if (interval > 1) return `${Math.floor(interval)} años`;
     interval = seconds / 2592000;

@@ -34,7 +34,7 @@ const PrintableInvoice: React.FC<PrintableInvoiceProps> = ({ invoice, client, ve
                         alt="AUTO DEALER" 
                         style={{ height: '150px', width: 'auto', display: 'block', maxWidth: '100%', objectFit: 'contain' }}
                         onError={(e) => {
-                            console.log('Error loading logo:', appSettings?.companyInfo.logoUrl);
+                            console.warn('Error loading logo:', appSettings?.companyInfo.logoUrl);
                             e.currentTarget.style.display = 'none';
                             e.currentTarget.nextElementSibling?.classList.remove('hidden');
                         }} 

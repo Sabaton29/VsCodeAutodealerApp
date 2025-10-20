@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from 'react';
+import React, { useState, useContext, useEffect, useRef } from 'react';
 import { WorkOrder, Service, InventoryItem, Supplier, UnforeseenIssue, Client, Vehicle } from '../types';
 import { Icon } from './Icon';
 import { DataContext } from './DataContext';
@@ -37,7 +37,7 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
     vehicle,
     onSave, 
     onCancel,
-    onCreateQuoteFromIssue
+    onCreateQuoteFromIssue,
 }) => {
     const data = useContext(DataContext);
     const ui = useContext(UIContext);
@@ -50,6 +50,11 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
     // Fotos
     const [selectedImages, setSelectedImages] = useState<File[]>([]);
     const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    // Cámara / captura
+    const [showCaptureModal, setShowCaptureModal] = useState(false);
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
     
     // Servicios
     const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
@@ -67,11 +72,11 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
 
     // Filtrar servicios y repuestos
     const filteredServices = data.services.filter(service => 
-        service.name.toLowerCase().includes(serviceSearchTerm.toLowerCase())
+        service.name.toLowerCase().includes(serviceSearchTerm.toLowerCase()),
     );
     
     const filteredParts = data.inventoryItems.filter(part => 
-        part.name.toLowerCase().includes(partSearchTerm.toLowerCase())
+        part.name.toLowerCase().includes(partSearchTerm.toLowerCase()),
     );
 
     const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -85,83 +90,64 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
         }
     };
 
-    const handleCameraCapture = async () => {
+    const handleCameraCapture = async() => {
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ 
                 video: { 
-                    facingMode: 'environment', // Usar cámara trasera si está disponible
+                    facingMode: 'environment',
                     width: { ideal: 1280 },
-                    height: { ideal: 720 }
-                } 
+                    height: { ideal: 720 },
+                },
             });
-            
-            // Crear un video temporal para capturar la foto
-            const video = document.createElement('video');
-            video.srcObject = stream;
-            video.play();
-            
-            // Crear un canvas para capturar la imagen
-            const canvas = document.createElement('canvas');
-            const ctx = canvas.getContext('2d');
-            
-            video.addEventListener('loadedmetadata', () => {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                
-                // Mostrar modal de captura
-                const captureModal = document.createElement('div');
-                captureModal.className = 'fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50';
-                captureModal.innerHTML = `
-                    <div class="bg-white rounded-lg p-6 max-w-md mx-4">
-                        <h3 class="text-lg font-semibold mb-4 text-center">Capturar Foto</h3>
-                        <div class="mb-4">
-                            <video id="captureVideo" width="100%" height="auto" autoplay></video>
-                        </div>
-                        <div class="flex gap-3 justify-center">
-                            <button id="captureBtn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                                Capturar
-                            </button>
-                            <button id="cancelBtn" class="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700">
-                                Cancelar
-                            </button>
-                        </div>
-                    </div>
-                `;
-                
-                document.body.appendChild(captureModal);
-                
-                const captureVideo = captureModal.querySelector('#captureVideo') as HTMLVideoElement;
-                const captureBtn = captureModal.querySelector('#captureBtn') as HTMLButtonElement;
-                const cancelBtn = captureModal.querySelector('#cancelBtn') as HTMLButtonElement;
-                
-                captureVideo.srcObject = stream;
-                
-                captureBtn.addEventListener('click', () => {
-                    // Capturar la foto
-                    ctx?.drawImage(video, 0, 0);
-                    canvas.toBlob((blob) => {
-                        if (blob) {
-                            const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                            setSelectedImages(prev => [...prev, file]);
-                            setImagePreviews(prev => [...prev, URL.createObjectURL(file)]);
-                        }
-                    }, 'image/jpeg', 0.8);
-                    
-                    // Limpiar solo el modal de captura, NO el modal principal
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(captureModal);
-                });
-                
-                cancelBtn.addEventListener('click', () => {
-                    stream.getTracks().forEach(track => track.stop());
-                    document.body.removeChild(captureModal);
-                });
-            });
-            
+            // Guardar stream y mostrar modal controlado por React
+            setCameraStream(stream);
+            setShowCaptureModal(true);
+            // Assign stream to video element when available via effect below
         } catch (error) {
             console.error('Error accediendo a la cámara:', error);
-            alert('No se pudo acceder a la cámara. Por favor, usa la opción de seleccionar archivos.');
+            console.warn('No se pudo acceder a la cámara. Por favor, usa la opción de seleccionar archivos.');
         }
+    };
+
+    // Efecto para asignar el stream al video cuando cambia
+    useEffect(() => {
+        if (videoRef.current && cameraStream) {
+            videoRef.current.srcObject = cameraStream;
+            videoRef.current.play().catch(() => {});
+        }
+        return () => {};
+    }, [cameraStream]);
+
+    const captureFromCamera = () => {
+        if (!videoRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current || document.createElement('canvas');
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                setSelectedImages(prev => [...prev, file]);
+                setImagePreviews(prev => [...prev, URL.createObjectURL(file)]);
+            }
+        }, 'image/jpeg', 0.8);
+
+        // Stop stream and close modal
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setShowCaptureModal(false);
+    };
+
+    const cancelCapture = () => {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setShowCaptureModal(false);
     };
 
     const removeImage = (index: number) => {
@@ -178,7 +164,7 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
             serviceName: service.name,
             quantity: 1,
             estimatedPrice: (service as any).price || 0,
-            notes: ''
+            notes: '',
         };
         setSelectedServices(prev => [...prev, newService]);
         setShowServiceSelector(false);
@@ -188,8 +174,8 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
     const updateService = (index: number, field: keyof ServiceItem, value: any) => {
         setSelectedServices(prev => 
             prev.map((service, i) => 
-                i === index ? { ...service, [field]: value } : service
-            )
+                i === index ? { ...service, [field]: value } : service,
+            ),
         );
     };
 
@@ -204,7 +190,7 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
             quantity: 1,
             estimatedPrice: part.salePrice || 0,
             supplierId: part.supplierId || '',
-            notes: ''
+            notes: '',
         };
         setSelectedParts(prev => [...prev, newPart]);
         setShowPartSelector(false);
@@ -214,8 +200,8 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
     const updatePart = (index: number, field: keyof PartItem, value: any) => {
         setSelectedParts(prev => 
             prev.map((part, i) => 
-                i === index ? { ...part, [field]: value } : part
-            )
+                i === index ? { ...part, [field]: value } : part,
+            ),
         );
     };
 
@@ -225,19 +211,19 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
 
     const calculateTotalCost = () => {
         const servicesCost = selectedServices.reduce((total, service) => 
-            total + (service.quantity * service.estimatedPrice), 0
+            total + (service.quantity * service.estimatedPrice), 0,
         );
         const partsCost = selectedParts.reduce((total, part) => 
-            total + (part.quantity * part.estimatedPrice), 0
+            total + (part.quantity * part.estimatedPrice), 0,
         );
         return servicesCost + partsCost;
     };
 
-    const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async(e: React.FormEvent) => {
         e.preventDefault();
         
         if (!description.trim()) {
-            alert('Por favor, describe el imprevisto encontrado');
+            console.warn('Por favor, describe el imprevisto encontrado');
             return;
         }
 
@@ -247,20 +233,20 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
             let uploadedImageUrls: string[] = [];
             if (selectedImages.length > 0) {
                 try {
-                    console.log('🔍 EnhancedReportUnforeseenIssueModal - Subiendo imágenes:', selectedImages.length);
+                    console.warn('🔍 EnhancedReportUnforeseenIssueModal - Subiendo imágenes:', selectedImages.length);
                     
                     // Subir imágenes directamente usando uploadFileToStorage con el mismo path que las tareas
-                    const uploadPromises = selectedImages.map(async (file, index) => {
+                    const uploadPromises = selectedImages.map(async(file, index) => {
                         const fileName = `unforeseen_${workOrder.id}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
                         const path = `progress/${workOrder.id}/${fileName}`;
-                        console.log('🔍 EnhancedReportUnforeseenIssueModal - Subiendo archivo:', fileName, 'path:', path);
+                        console.warn('🔍 EnhancedReportUnforeseenIssueModal - Subiendo archivo:', fileName, 'path:', path);
                         // Importar directamente el servicio de Supabase
                         const { uploadFileToStorage } = await import('../services/supabase');
                         return await uploadFileToStorage(file, 'progress-updates', path);
                     });
                     
                     uploadedImageUrls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
-                    console.log('🔍 EnhancedReportUnforeseenIssueModal - URLs subidas:', uploadedImageUrls);
+                    console.warn('🔍 EnhancedReportUnforeseenIssueModal - URLs subidas:', uploadedImageUrls);
                 } catch (uploadError) {
                     console.warn('Error subiendo imágenes, continuando sin ellas:', uploadError);
                     uploadedImageUrls = [];
@@ -279,19 +265,19 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
                 priority,
                 status: 'pending',
                 estimatedCost: calculateTotalCost() || estimatedCost,
-                notes: notes.trim() || undefined
+                notes: notes.trim() || undefined,
             };
 
             await onSave(issue);
             setSavedIssue(issue);
-            alert('Imprevisto reportado exitosamente');
+            console.warn('Imprevisto reportado exitosamente');
             // Mostrar el reporte imprimible después de un pequeño delay
             setTimeout(() => {
                 setShowPrintableReport(true);
             }, 500);
         } catch (error) {
             console.error('Error reportando imprevisto:', error);
-            alert('Error al reportar imprevisto');
+            console.warn('Error al reportar imprevisto');
         } finally {
             setIsSubmitting(false);
         }
@@ -757,6 +743,36 @@ const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssue
                                 />
                             </div>
                         </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de captura controlado por React */}
+            {showCaptureModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-md mx-4 w-full">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Capturar Foto</h3>
+                        <div className="mb-4">
+                            <video ref={videoRef} id="captureVideo" width="100%" height="auto" autoPlay playsInline className="rounded-md" />
+                        </div>
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                type="button"
+                                onClick={captureFromCamera}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Capturar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelCapture}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                        {/* canvas hidden for capture */}
+                        <canvas ref={canvasRef} style={{ display: 'none' }} />
                     </div>
                 </div>
             )}

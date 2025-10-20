@@ -30,7 +30,7 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
   notes,
   companyInfo,
   qualityChecksData = [],
-  checklistSummary = ''
+  checklistSummary = '',
 }) => {
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('es-CO', {
@@ -38,7 +38,7 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
       month: 'long',
       day: 'numeric',
       hour: '2-digit',
-      minute: '2-digit'
+      minute: '2-digit',
     });
   };
 
@@ -159,8 +159,8 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
             </h3>
             {(() => {
               // Debug: mostrar los datos recibidos
-              console.log('🔍 DEBUG PrintableQualityControlReport - qualityChecksData:', qualityChecksData);
-              console.log('🔍 DEBUG PrintableQualityControlReport - checklistSummary:', checklistSummary);
+              console.warn('🔍 DEBUG PrintableQualityControlReport - qualityChecksData:', qualityChecksData);
+              console.warn('🔍 DEBUG PrintableQualityControlReport - checklistSummary:', checklistSummary);
               
               // Usar los datos reales del control de calidad si están disponibles
               let finalQualityChecksData = qualityChecksData;
@@ -177,13 +177,13 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                       status: (status || 'ok') as 'ok' | 'no-ok' | 'na' | 'unset', 
                       description: '', 
                       category: '' as 'exterior' | 'funcionalidad' | 'verificacion' | 'documentacion', 
-                      notes 
+                      notes, 
                     };
                   });
                 }
               }
               
-              console.log('🔍 DEBUG PrintableQualityControlReport - finalQualityChecksData:', finalQualityChecksData);
+              console.warn('🔍 DEBUG PrintableQualityControlReport - finalQualityChecksData:', finalQualityChecksData);
               
               // Categorías del control de calidad
               const categories = [
@@ -193,8 +193,8 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                   items: [
                     { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería' },
                     { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante' },
-                    { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar' }
-                  ]
+                    { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar' },
+                  ],
                 },
                 {
                   id: 'funcionalidad',
@@ -205,8 +205,8 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                     { id: 'func-3', description: 'El motor funciona sin ruidos anormales' },
                     { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto' },
                     { id: 'func-5', description: 'El sistema de A/C y calefacción funciona' },
-                    { id: 'func-6', description: 'Los frenos responden adecuadamente' }
-                  ]
+                    { id: 'func-6', description: 'Los frenos responden adecuadamente' },
+                  ],
                 },
                 {
                   id: 'verificacion',
@@ -215,8 +215,8 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                     { id: 'verif-1', description: 'Se completaron todos los trabajos aprobados en la cotización' },
                     { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)' },
                     { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)' },
-                    { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos' }
-                  ]
+                    { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos' },
+                  ],
                 },
                 {
                   id: 'documentacion',
@@ -224,9 +224,9 @@ const PrintableQualityControlReport: React.FC<PrintableQualityControlReportProps
                   items: [
                     { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados' },
                     { id: 'doc-2', description: 'La orden de trabajo está completamente documentada' },
-                    { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento' }
-                  ]
-                }
+                    { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento' },
+                  ],
+                },
               ];
               
               // Función para obtener el estado de un elemento

@@ -42,7 +42,7 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
     const currentQuote = quote;
     
     // 🚨 DEBUG CRÍTICO: Verificar qué datos llegan al componente
-    console.log('🚨 ApproveQuoteForm - DATOS RECIBIDOS:', {
+    console.warn('🚨 ApproveQuoteForm - DATOS RECIBIDOS:', {
         quote: currentQuote,
         quoteItems: currentQuote?.items,
         quoteItemsLength: currentQuote?.items?.length,
@@ -57,11 +57,11 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
     });
 
     useEffect(() => {
-        console.log('🔍 ApproveQuoteForm - useEffect - currentQuote.items:', currentQuote.items);
+        console.warn('🔍 ApproveQuoteForm - useEffect - currentQuote.items:', currentQuote.items);
         
         // 🚨 SOLUCIÓN SIMPLE: USAR LOS ITEMS EXACTAMENTE COMO ESTÁN GUARDADOS
         const initialItems = (currentQuote.items || []).map(item => {
-            console.log(`🚨 ApproveQuoteForm - USANDO precio guardado para ${item.description}:`, {
+            console.warn(`🚨 ApproveQuoteForm - USANDO precio guardado para ${item.description}:`, {
                 originalUnitPrice: item.unitPrice,
                 originalQuantity: item.quantity,
                 originalType: item.type,
@@ -79,7 +79,7 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
             };
         });
         
-        console.log('🔍 ApproveQuoteForm - useEffect - initialItems after processing:', initialItems);
+        console.warn('🔍 ApproveQuoteForm - useEffect - initialItems after processing:', initialItems);
         setItems(initialItems);
         
         const prices: Record<string, number> = {};
@@ -226,12 +226,12 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
             taxAmount, 
             taxDiscountAmount,
             taxAmountWithDiscount,
-            total 
+            total, 
         };
     }, [items, approvedItemIds, totalDiscount]);
 
     const handleSave = () => {
-        console.log('🚨 ApproveQuoteForm - handleSave INICIADO');
+        console.warn('🚨 ApproveQuoteForm - handleSave INICIADO');
         const finalItems = items.filter(i => approvedItemIds.has(i.id));
         
         // Asegurar que todos los items tengan unitPrice como número válido
@@ -257,13 +257,13 @@ const ApproveQuoteForm: React.FC<ApproveQuoteFormProps> = ({ quote, onSave, onCa
             status: QuoteStatus.APROBADO,
         };
         
-        console.log('🔍 ApproveQuoteForm - handleSave - finalQuoteData:', finalQuoteData);
-        console.log('🔍 ApproveQuoteForm - handleSave - totals:', totals);
-        console.log('🔍 ApproveQuoteForm - handleSave - sanitizedItems:', sanitizedItems);
+        console.warn('🔍 ApproveQuoteForm - handleSave - finalQuoteData:', finalQuoteData);
+        console.warn('🔍 ApproveQuoteForm - handleSave - totals:', totals);
+        console.warn('🔍 ApproveQuoteForm - handleSave - sanitizedItems:', sanitizedItems);
         
-        console.log('🚨 ApproveQuoteForm - Llamando a onSave...');
+        console.warn('🚨 ApproveQuoteForm - Llamando a onSave...');
         onSave(finalQuoteData);
-        console.log('🚨 ApproveQuoteForm - onSave completado');
+        console.warn('🚨 ApproveQuoteForm - onSave completado');
     };
     
     const inputClasses = "w-full text-right bg-gray-100 dark:bg-gray-800 rounded p-1 font-mono border border-gray-300 dark:border-gray-700 text-light-text dark:text-dark-text disabled:opacity-50";

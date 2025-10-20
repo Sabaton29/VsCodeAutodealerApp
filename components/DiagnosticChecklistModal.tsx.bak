@@ -1,0 +1,876 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { ChecklistStatus, UserRole, QuoteItem, Service, InventoryItem, DiagnosticType } from '../types';
+import type { WorkOrder, DiagnosticData, Client, Vehicle, StaffMember } from '../types';
+import { DIAGNOSTIC_CHECKLIST_SECTIONS, DIAGNOSTIC_LEVELS } from '../constants';
+import { getDiagnosticConfigByType } from '../constants/diagnosticConfig';
+import { Icon } from './Icon';
+import { uploadFileToStorage } from '../services/supabase';
+
+interface DiagnosticChecklistModalProps {
+    onCancel: () => void;
+    workOrder: WorkOrder;
+    diagnosticType: DiagnosticType;
+    onSave: (workOrderId: string, data: DiagnosticData, staffIds: { advisorId?: string; mechanicId?: string; }, recommendedItems: QuoteItem[], diagnosticType: DiagnosticType) => void;
+    clients: Client[];
+    vehicles: Vehicle[];
+    staffMembers: StaffMember[];
+    services: Service[];
+    inventoryItems: InventoryItem[];
+}
+
+type SearchableItem = {
+    id: string;
+    type: 'service' | 'inventory';
+    name: string;
+    price: number;
+    taxRate: number;
+    category: string;
+}
+
+const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
+const selectClasses = "w-full text-sm px-3 py-1 border border-gray-600 rounded-md bg-gray-800 focus:outline-none focus:ring-1 focus:ring-brand-red text-white";
+
+// Función para validar datos de diagnóstico
+const validateDiagnosticData = (data: DiagnosticData): string[] => {
+    const errors: string[] = [];
+    
+    Object.entries(data).forEach(([sectionTitle, sectionData]) => {
+        if (sectionData && typeof sectionData === 'object') {
+            // Verificar si hay componentes requeridos sin completar
+            const requiredComponents = (sectionData as any).requiredComponents || [];
+            const completedComponents = (sectionData as any).completedComponents || [];
+            
+            requiredComponents.forEach((component: any) => {
+                if (!completedComponents.includes(component.id)) {
+                    errors.push(`${sectionTitle}: ${component.name} (requerido)`);
+                }
+            });
+        }
+    });
+    
+    return errors;
+};
+
+// Función para comprimir imágenes
+const compressImage = (file: File, quality: number = 0.8, maxWidth: number = 1920): Promise<File> => {
+    return new Promise((resolve) => {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        const img = new Image();
+        
+        img.onload = () => {
+            // Calcular nuevas dimensiones
+            let { width, height } = img;
+            if (width > maxWidth) {
+                height = (height * maxWidth) / width;
+                width = maxWidth;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Dibujar imagen redimensionada
+            ctx?.drawImage(img, 0, 0, width, height);
+            
+            // Convertir a blob
+            canvas.toBlob((blob) => {
+                if (blob) {
+                    const compressedFile = new File([blob], file.name, {
+                        type: 'image/jpeg',
+                        lastModified: Date.now(),
+                    });
+                    resolve(compressedFile);
+                } else {
+                    resolve(file); // Fallback al archivo original
+                }
+            }, 'image/jpeg', quality);
+        };
+        
+        img.src = URL.createObjectURL(file);
+    });
+};
+
+const DiagnosticChecklistModal: React.FC<DiagnosticChecklistModalProps> = ({ onCancel, workOrder, diagnosticType, onSave, clients, vehicles, staffMembers, services, inventoryItems }) => {
+    
+    const [diagnosticData, setDiagnosticData] = useState<DiagnosticData>(workOrder.diagnosticData || {});
+    const [previewUrls, setPreviewUrls] = useState<{[section: string]: string[]}>({});
+    const [selectedAdvisorId, setSelectedAdvisorId] = useState(workOrder.advisorId || '');
+    const [selectedMechanicId, setSelectedMechanicId] = useState(workOrder.staffMemberId || '');
+    const [recommendedItems, setRecommendedItems] = useState<QuoteItem[]>([]);
+    const [isSaving, setIsSaving] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isSearchFocused, setIsSearchFocused] = useState(false);
+
+    const serviceAdvisors = useMemo(() => staffMembers.filter(s => s.locationId === workOrder.locationId && s.role === UserRole.ASESOR_SERVICIO), [staffMembers, workOrder.locationId]);
+    const mechanics = useMemo(() => staffMembers.filter(s => s.locationId === workOrder.locationId && s.role === UserRole.MECANICO), [staffMembers, workOrder.locationId]);
+
+    const diagnosticConfig = useMemo(() => {
+        return getDiagnosticConfigByType(diagnosticType);
+    }, [diagnosticType]);
+
+    const searchableItems = useMemo<SearchableItem[]>(() => {
+        const serviceItems: SearchableItem[] = services.map(s => ({
+            id: s.id, type: 'service', name: s.name, 
+            price: (workOrder.locationId === 'L1' ? 108000 : 95000) * s.durationHours,
+            taxRate: 19, category: s.category,
+        }));
+        const inventoryItemsTyped: SearchableItem[] = inventoryItems.map(i => ({
+            id: i.id, type: 'inventory', name: i.name,
+            price: i.salePrice, taxRate: i.taxRate, category: i.category,
+        }));
+        return [...serviceItems, ...inventoryItemsTyped];
+    }, [services, inventoryItems, workOrder.locationId]);
+
+    const searchResults = useMemo(() => {
+        if (!searchTerm) return [];
+        return searchableItems.filter(item => item.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    }, [searchTerm, searchableItems]);
+
+    useEffect(() => {
+        const initialState: DiagnosticData = {};
+        
+        // Usar la nueva configuración de diagnósticos
+        diagnosticConfig.forEach(item => {
+            const sectionKey = `${item.name} - ${item.category}`;
+            initialState[sectionKey] = { 
+                items: {}, 
+                customItems: [], 
+                observations: '', 
+                imageFiles: [],
+                components: {},
+                isEnabled: true, // Por defecto, todas las secciones están habilitadas
+            };
+            
+            const existingSectionData = workOrder.diagnosticData?.[sectionKey];
+
+            // Inicializar componentes
+            item.components.forEach(component => {
+                initialState[sectionKey].components![component.name] = ChecklistStatus.OK;
+                if (existingSectionData?.components?.[component.name]) {
+                    initialState[sectionKey].components![component.name] = existingSectionData.components[component.name];
+                }
+            });
+
+            initialState[sectionKey].customItems = existingSectionData?.customItems || [];
+            // Try different possible field names for observations
+            const observationsValue = existingSectionData?.observations || 
+                                   (existingSectionData as any)?.observation || 
+                                   (existingSectionData as any)?.observations || '';
+            initialState[sectionKey].observations = observationsValue;
+            initialState[sectionKey].imageUrls = (existingSectionData as any)?.imageUrls || [];
+            initialState[sectionKey].imageFiles = []; // Start with no new files
+            
+            // Preservar el estado de habilitación de la sección
+            initialState[sectionKey].isEnabled = (existingSectionData as any)?.isEnabled !== false;
+        });
+        
+        setDiagnosticData(initialState);
+        setRecommendedItems(workOrder.recommendedItems || []);
+    }, [workOrder, diagnosticConfig]);
+    
+    // FIX: Updated useEffect to correctly combine existing imageUrls and new file previews.
+    useEffect(() => {
+        const newUrls: {[section: string]: string[]} = {};
+        Object.entries(diagnosticData).forEach(([sectionTitle, sectionData]) => {
+            newUrls[sectionTitle] = [
+                ...((sectionData as any).imageUrls || []).filter((url: string) => url && !url.startsWith('blob:')),
+                ...((sectionData as any).imageFiles || []).map((file: File) => URL.createObjectURL(file)),
+            ];
+        });
+        setPreviewUrls(newUrls);
+
+        return () => {
+            Object.values(newUrls).flat().forEach(url => {
+                if (url.startsWith('blob:')) {
+                    URL.revokeObjectURL(url);
+                }
+            });
+        };
+    }, [diagnosticData]);
+
+    const client = clients.find(c => c.id === workOrder.client?.id);
+    const vehicle = vehicles.find(v => v.id === workOrder.vehicle?.id);
+
+    const handleSaveClick = async() => {
+        try {
+            setIsSaving(true);
+            setUploadProgress(0);
+            
+            console.debug('🔍 DIAGNOSTIC DEBUG - Original diagnosticData:', diagnosticData);
+            
+            // Validar que se completen los campos requeridos
+            const validationErrors = validateDiagnosticData(diagnosticData);
+            if (validationErrors.length > 0) {
+                console.warn(`Por favor completa los campos requeridos:\n${validationErrors.join('\n')}`);
+                setIsSaving(false);
+                return;
+            }
+            
+            // Convert imageFiles to data URLs before saving
+            const processedDiagnosticData = { ...diagnosticData };
+            
+            for (const sectionKey in processedDiagnosticData) {
+                const sectionData = processedDiagnosticData[sectionKey];
+                console.debug(`🔍 DIAGNOSTIC DEBUG - Processing section ${sectionKey}:`, sectionData);
+                console.debug(`🔍 DIAGNOSTIC DEBUG - Custom items in ${sectionKey}:`, (sectionData as any).customItems);
+                
+                if (sectionData && (sectionData as any).imageFiles && (sectionData as any).imageFiles.length > 0) {
+                    console.debug(`🔍 DIAGNOSTIC DEBUG - Found ${(sectionData as any).imageFiles.length} files in section ${sectionKey}`);
+                    
+                    // Comprimir y subir archivos a Supabase Storage
+                    const uploadPromises = (sectionData as any).imageFiles.map(async(file: File, index: number) => {
+                        try {
+                            // Comprimir imagen antes de subir
+                            const compressedFile = await compressImage(file, 0.8, 1920);
+                            const fileName = `diagnostic_${workOrder.id}_${sectionKey.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${index}.jpg`;
+                            const path = `diagnostics/${workOrder.id}/${fileName}`;
+                            
+                            console.debug(`🔍 DIAGNOSTIC DEBUG - Uploading compressed file: ${fileName} to path: ${path}`);
+                            console.debug(`🔍 DIAGNOSTIC DEBUG - Original size: ${file.size} bytes, Compressed size: ${compressedFile.size} bytes`);
+                            
+                            const url = await uploadFileToStorage(compressedFile, 'diagnostic-images', path);
+                            if (url) {
+                                console.debug(`🔍 DIAGNOSTIC DEBUG - File uploaded successfully: ${url}`);
+                                return url;
+                            } else {
+                                console.error(`🔍 DIAGNOSTIC DEBUG - Failed to upload file: ${fileName}`);
+                                return null;
+                            }
+                        } catch (error) {
+                            console.error(`🔍 DIAGNOSTIC DEBUG - Error compressing/uploading file:`, error);
+                            return null;
+                        }
+                    });
+                    
+                    const uploadedUrls = await Promise.all(uploadPromises);
+                    const validUrls = uploadedUrls.filter(url => url !== null);
+                    
+                    console.debug(`🔍 DIAGNOSTIC DEBUG - Uploaded ${validUrls.length} files to storage:`, validUrls);
+                    
+                    // Add uploaded URLs to existing imageUrls
+                    const existingUrls = (sectionData as any).imageUrls || [];
+                    (sectionData as any).imageUrls = [...existingUrls, ...validUrls];
+                    (sectionData as any).imageFiles = []; // Clear files after upload
+                    
+                    console.debug(`🔍 DIAGNOSTIC DEBUG - Final imageUrls for section ${sectionKey}:`, (sectionData as any).imageUrls);
+                }
+            }
+            
+            console.debug('🔍 DIAGNOSTIC DEBUG - Final processedDiagnosticData:', processedDiagnosticData);
+            
+            await onSave(workOrder.id, processedDiagnosticData, { advisorId: selectedAdvisorId, mechanicId: selectedMechanicId }, recommendedItems, diagnosticType);
+            // The modal will be closed by the parent component after successful save
+        } catch (error) {
+            console.error('Error saving diagnostic:', error);
+            console.warn('Error al guardar el diagnóstico. Por favor, inténtalo de nuevo.');
+        } finally {
+            setIsSaving(false);
+            setUploadProgress(0);
+        }
+    };
+    
+    const renderHeaderInfo = (label: string, value?: string | number) => (
+        <div>
+            <p className="text-xs text-gray-400">{label}</p>
+            <p className="font-semibold text-sm text-white">{value || 'N/A'}</p>
+        </div>
+    );
+
+    const renderComponentRow = (
+        sectionKey: string,
+        component: { id: string; name: string; required: boolean },
+    ) => {
+        const status = diagnosticData[sectionKey]?.components?.[component.name] || ChecklistStatus.OK;
+        
+        const handleStatus = (newStatus: ChecklistStatus) => {
+            setDiagnosticData(prev => ({
+                ...prev,
+                [sectionKey]: {
+                    ...prev[sectionKey],
+                    components: {
+                        ...prev[sectionKey]?.components,
+                        [component.name]: newStatus,
+                    },
+                },
+            }));
+        };
+
+        return (
+            <tr key={component.id} className="bg-gray-800 border-b border-gray-700">
+                <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                        <span className="text-white">{component.name}</span>
+                        {component.required && (
+                            <span className="bg-red-600 text-white text-xs px-1.5 py-0.5 rounded">
+                                Requerido
+                            </span>
+                        )}
+                    </div>
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionKey}-${component.name}`}
+                        checked={status === ChecklistStatus.OK}
+                        onChange={() => handleStatus(ChecklistStatus.OK)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionKey}-${component.name}`}
+                        checked={status === ChecklistStatus.MAL}
+                        onChange={() => handleStatus(ChecklistStatus.MAL)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionKey}-${component.name}`}
+                        checked={status === ChecklistStatus.MANTEN}
+                        onChange={() => handleStatus(ChecklistStatus.MANTEN)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionKey}-${component.name}`}
+                        checked={status === ChecklistStatus.CAMBIO}
+                        onChange={() => handleStatus(ChecklistStatus.CAMBIO)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="px-6 py-4 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionKey}-${component.name}`}
+                        checked={status === ChecklistStatus.NA}
+                        onChange={() => handleStatus(ChecklistStatus.NA)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+            </tr>
+        );
+    };
+    
+    const renderChecklistRow = (
+      sectionTitle: string,
+      itemName: string,
+      isCustom: boolean,
+      customId?: string,
+    ) => {
+        const status = isCustom
+            ? diagnosticData[sectionTitle]?.customItems?.find(i => i.id === customId)?.status
+            : diagnosticData[sectionTitle]?.items[itemName];
+        
+        const handleStatus = (newStatus: ChecklistStatus) => {
+            if (isCustom) {
+                setDiagnosticData(prev => ({
+                    ...prev,
+                    [sectionTitle]: {
+                        ...prev[sectionTitle],
+                        customItems: prev[sectionTitle]?.customItems?.map(item => 
+                            item.id === customId ? { ...item, status: newStatus } : item,
+                        ) || [],
+                    },
+                }));
+            } else {
+                setDiagnosticData(prev => ({
+                    ...prev,
+                    [sectionTitle]: {
+                        ...prev[sectionTitle],
+                        items: { ...prev[sectionTitle]?.items, [itemName]: newStatus },
+                    },
+                }));
+            }
+        };
+
+        return (
+            <tr key={customId || itemName} className="border-b border-gray-700">
+                <td className="p-2 font-medium">
+                    {isCustom ? (
+                        <div className="flex items-center">
+                            <input
+                                type="text"
+                                value={itemName}
+                                onChange={e => {
+                                    setDiagnosticData(prev => ({
+                                        ...prev,
+                                        [sectionTitle]: {
+                                            ...prev[sectionTitle],
+                                            customItems: prev[sectionTitle]?.customItems?.map(item => 
+                                                item.id === customId ? { ...item, name: e.target.value } : item,
+                                            ) || [],
+                                        },
+                                    }));
+                                }}
+                                className="bg-gray-800 border border-gray-600 rounded px-2 py-1 text-white text-sm"
+                            />
+                            <button
+                                onClick={() => {
+                                    setDiagnosticData(prev => ({
+                                        ...prev,
+                                        [sectionTitle]: {
+                                            ...prev[sectionTitle],
+                                            customItems: prev[sectionTitle]?.customItems?.filter(item => item.id !== customId) || [],
+                                        },
+                                    }));
+                                }}
+                                className="ml-2 text-red-400 hover:text-red-300"
+                            >
+                                <Icon name="trash" className="w-4 h-4" />
+                            </button>
+                        </div>
+                    ) : (
+                        itemName
+                    )}
+                </td>
+                <td className="p-2 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionTitle}-${customId || itemName}`}
+                        checked={status === ChecklistStatus.OK}
+                        onChange={() => handleStatus(ChecklistStatus.OK)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="p-2 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionTitle}-${customId || itemName}`}
+                        checked={status === ChecklistStatus.MAL}
+                        onChange={() => handleStatus(ChecklistStatus.MAL)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="p-2 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionTitle}-${customId || itemName}`}
+                        checked={status === ChecklistStatus.MANTEN}
+                        onChange={() => handleStatus(ChecklistStatus.MANTEN)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="p-2 text-center">
+                    <input
+                        type="radio"
+                        name={`${sectionTitle}-${customId || itemName}`}
+                        checked={status === ChecklistStatus.CAMBIO}
+                        onChange={() => handleStatus(ChecklistStatus.CAMBIO)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                    />
+                </td>
+                <td className="p-2 text-center">
+                        <input
+                            type="radio"
+                            name={`${sectionTitle}-${customId || itemName}`}
+                        checked={status === ChecklistStatus.NA}
+                        onChange={() => handleStatus(ChecklistStatus.NA)}
+                        className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 focus:ring-brand-red"
+                        />
+                    </td>
+            </tr>
+        );
+    };
+
+    const handleAddCustomItem = (sectionTitle: string) => {
+        const newItem = {
+            id: Date.now().toString(),
+            name: '',
+            status: ChecklistStatus.OK,
+        };
+        setDiagnosticData(prev => ({
+            ...prev,
+            [sectionTitle]: {
+                ...prev[sectionTitle],
+                customItems: [...(prev[sectionTitle]?.customItems || []), newItem],
+            },
+        }));
+    };
+
+    const handleObservationChange = (sectionTitle: string, value: string) => {
+        setDiagnosticData(prev => ({
+            ...prev,
+            [sectionTitle]: { ...prev[sectionTitle], observations: value },
+        }));
+    };
+
+    const handleFileChange = (sectionTitle: string, event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        setDiagnosticData(prev => ({
+            ...prev,
+            [sectionTitle]: {
+                ...prev[sectionTitle],
+                imageFiles: [...(prev[sectionTitle]?.imageFiles || []), ...files],
+            },
+        }));
+    };
+
+    const handleRemoveImage = (sectionTitle: string, index: number) => {
+        setDiagnosticData(prev => {
+            const sectionData = prev[sectionTitle];
+            if (!sectionData) return prev;
+            
+            const newImageUrls = [...(sectionData.imageUrls || [])];
+            const newImageFiles = [...(sectionData.imageFiles || [])];
+            
+            if (index < newImageUrls.length) {
+                newImageUrls.splice(index, 1);
+            } else {
+                const fileIndex = index - newImageUrls.length;
+                newImageFiles.splice(fileIndex, 1);
+            }
+            
+            return {
+                ...prev,
+                [sectionTitle]: {
+                    ...sectionData,
+                    imageUrls: newImageUrls,
+                    imageFiles: newImageFiles,
+                },
+            };
+        });
+    };
+
+    const addRecommendedItem = (item: SearchableItem) => {
+        const newQuoteItem: QuoteItem = {
+            id: item.id,
+            type: item.type,
+            description: item.name,
+            quantity: 1,
+            unitPrice: item.price,
+            taxRate: item.taxRate,
+        };
+        
+        setRecommendedItems(prev => [...prev, newQuoteItem]);
+        setSearchTerm(''); // Clear search after adding
+    };
+
+    const removeRecommendedItem = (index: number) => {
+        setRecommendedItems(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const updateRecommendedItemQuantity = (index: number, quantity: number) => {
+        if (quantity < 1) return; // No permitir cantidades menores a 1
+        
+        setRecommendedItems(prev => prev.map((item, i) => {
+            if (i === index) {
+                // Para repuestos sólidos (no líquidos), asegurar que sea entero
+                const isLiquid = item.type === 'inventory' && (
+                    item.description.toLowerCase().includes('aceite') ||
+                    item.description.toLowerCase().includes('líquido') ||
+                    item.description.toLowerCase().includes('fluido')
+                );
+                
+                return { 
+                    ...item, 
+                    quantity: isLiquid ? quantity : Math.round(quantity),
+                };
+            }
+            return item;
+        }));
+    };
+
+    const toggleSectionEnabled = (sectionKey: string) => {
+        setDiagnosticData(prev => ({
+            ...prev,
+            [sectionKey]: {
+                ...prev[sectionKey],
+                isEnabled: !prev[sectionKey].isEnabled,
+            },
+        }));
+    };
+
+    const tableHeader = (
+        <thead className="text-xs text-gray-400 uppercase bg-gray-700">
+            <tr>
+                <th scope="col" className="px-6 py-3">ELEMENTO</th>
+                <th scope="col" className="px-6 py-3 text-center">OK</th>
+                <th scope="col" className="px-6 py-3 text-center">MAL</th>
+                <th scope="col" className="px-6 py-3 text-center">MANT.</th>
+                <th scope="col" className="px-6 py-3 text-center">CAMB.</th>
+                <th scope="col" className="px-6 py-3 text-center">N/A</th>
+            </tr>
+        </thead>
+    );
+
+    console.debug('🔍 DiagnosticChecklistModal - Rendering with recommendedItems:', recommendedItems.length);
+
+    return (
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="bg-black dark:bg-gray-900/20 p-4 rounded-lg">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-4">
+                    {renderHeaderInfo('Orden de Servicio:', workOrder.id)}
+                    {renderHeaderInfo('Cliente:', client?.name)}
+                    {renderHeaderInfo('Kilometraje:', workOrder.mileage)}
+                    {renderHeaderInfo('Fecha Ingreso:', new Date(workOrder.date).toLocaleDateString('es-CO'))}
+                    {renderHeaderInfo('Vehículo:', `${vehicle?.make} ${vehicle?.model}`)}
+                    {renderHeaderInfo('Placas:', vehicle?.plate)}
+                    <div>
+                        <label className="text-xs text-gray-400 block mb-1">Asesor de Servicio</label>
+                        <select value={selectedAdvisorId} onChange={e => setSelectedAdvisorId(e.target.value)} className={selectClasses}>
+                            <option value="">-- No Asignado --</option>
+                            {serviceAdvisors.map(sa => <option key={sa.id} value={sa.id}>{sa.name}</option>)}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="text-xs text-gray-400 block mb-1">Mecánico Asignado</label>
+                        <select value={selectedMechanicId} onChange={e => setSelectedMechanicId(e.target.value)} className={selectClasses}>
+                            <option value="">-- No Asignado --</option>
+                            {mechanics.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            {/* Checklist Body */}
+            <div className="space-y-6">
+                {diagnosticConfig.map(item => {
+                    const sectionKey = `${item.name} - ${item.category}`;
+                    return (
+                        <div key={item.id} className="bg-gray-800 rounded-lg border border-gray-700">
+                            <div className="p-4 border-b border-gray-700">
+                                <div className="flex items-start justify-between">
+                                    <div className="flex-1">
+                                        <h3 className="text-lg font-semibold text-white mb-2">{item.name}</h3>
+                                        <p className="text-gray-400 text-sm mb-3">{item.description}</p>
+                                        <div className="flex items-center gap-3">
+                                            <span className="bg-gray-600 text-white text-xs px-2 py-1 rounded-full">
+                                                {item.category}
+                                            </span>
+                                            {item.required && (
+                                                <span className="bg-red-600 text-white text-xs px-2 py-1 rounded-full">
+                                                    Requerido
+                                                </span>
+                                            )}
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2 ml-4">
+                                        <label className="flex items-center gap-2 cursor-pointer">
+                                            <input
+                                                type="checkbox"
+                                                checked={diagnosticData[sectionKey]?.isEnabled !== false}
+                                                onChange={() => toggleSectionEnabled(sectionKey)}
+                                                className="w-4 h-4 text-brand-red bg-gray-700 border-gray-600 rounded focus:ring-brand-red focus:ring-2"
+                                            />
+                                            <span className="text-sm text-gray-300">
+                                                {diagnosticData[sectionKey]?.isEnabled !== false ? 'Incluir en reporte' : 'Excluir del reporte'}
+                                            </span>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div className={`p-4 ${diagnosticData[sectionKey]?.isEnabled === false ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <table className="w-full text-sm text-left text-gray-300">
+                                    <thead className="text-xs text-gray-400 uppercase bg-gray-700">
+                                        <tr>
+                                            <th scope="col" className="px-6 py-3">Componente</th>
+                                            <th scope="col" className="px-6 py-3 text-center">OK</th>
+                                            <th scope="col" className="px-6 py-3 text-center">MAL</th>
+                                            <th scope="col" className="px-6 py-3 text-center">MANT.</th>
+                                            <th scope="col" className="px-6 py-3 text-center">CAMB.</th>
+                                            <th scope="col" className="px-6 py-3 text-center">N/A</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {item.components.map(component => renderComponentRow(sectionKey, component))}
+                                        {diagnosticData[sectionKey]?.customItems?.map(customItem => renderChecklistRow(sectionKey, customItem.name, true, customItem.id))}
+                                    </tbody>
+                                </table>
+                            </div>
+                            
+                            <div className={`p-4 border-t border-gray-700 ${diagnosticData[sectionKey]?.isEnabled === false ? 'opacity-50 pointer-events-none' : ''}`}>
+                                <button 
+                                    onClick={() => handleAddCustomItem(sectionKey)} 
+                                    disabled={diagnosticData[sectionKey]?.isEnabled === false}
+                                    className="flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-gray-600 rounded-md hover:bg-gray-500 transition-colors mb-4 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <Icon name="plus" className="w-4 h-4"/> Añadir Otro
+                                </button>
+                                <div>
+                                     <label className="text-sm font-medium text-gray-300 mb-2 block">Observaciones:</label>
+                                     <textarea
+                                        value={diagnosticData[sectionKey]?.observations || ''}
+                                        onChange={e => handleObservationChange(sectionKey, e.target.value)}
+                                        rows={2}
+                                        className="w-full mt-1 p-2 bg-gray-800 border border-gray-700 rounded-md focus:ring-brand-red focus:border-brand-red"
+                                    />
+                                    <div className="mt-2 flex items-center gap-2">
+                                        <label htmlFor={`file-upload-${sectionKey}`} className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-gray-600 rounded-md hover:bg-gray-500 transition-colors">
+                                            <Icon name="paperclip" className="w-4 h-4"/> Adjuntar Foto
+                                        </label>
+                                        <input id={`file-upload-${sectionKey}`} type="file" multiple accept="image/*" className="hidden" onChange={(e) => handleFileChange(sectionKey, e)} />
+                                        
+                                        <label htmlFor={`camera-capture-${sectionKey}`} className="cursor-pointer inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-white bg-gray-600 rounded-md hover:bg-gray-500 transition-colors">
+                                            <Icon name="camera" className="w-4 h-4"/> Tomar Foto
+                                        </label>
+                                        <input id={`camera-capture-${sectionKey}`} type="file" accept="image/*" capture="environment" className="hidden" onChange={(e) => handleFileChange(sectionKey, e)} />
+                                    </div>
+                                    {(previewUrls[sectionKey]?.length || 0) > 0 && (
+                                        <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-3 mt-3">
+                                            {previewUrls[sectionKey]?.map((url, index) => (
+                                                <div key={url} className="relative group">
+                                                    <img src={url} alt={`Evidencia ${index + 1}`} className="w-full h-20 object-cover rounded-lg" />
+                                                    <button type="button" onClick={() => handleRemoveImage(sectionKey, index)} className="absolute -top-1.5 -right-1.5 bg-brand-red text-white rounded-full p-0.5 opacity-0 group-hover:opacity-100 transition-opacity" aria-label="Eliminar imagen">
+                                                        <Icon name="x" className="w-3.5 h-3.5" />
+                                                    </button>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+
+            {/* Repuestos y Servicios Recomendados */}
+            <div className="bg-gray-800 rounded-lg border border-gray-700">
+                <div className="p-4 border-b border-gray-700">
+                    <h3 className="text-lg font-semibold text-white">Repuestos y Servicios Recomendados</h3>
+                </div>
+                <div className="p-4">
+                    {/* Search Bar */}
+                    <div className="relative mb-4">
+                        <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <Icon name="search" className="h-5 w-5 text-gray-400" />
+                        </div>
+                        <input
+                            type="text"
+                            placeholder="Buscar para añadir repuestos o servicios..."
+                            value={searchTerm}
+                            onChange={(e) => setSearchTerm(e.target.value)}
+                            onFocus={() => setIsSearchFocused(true)}
+                            onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+                            className="block w-full pl-10 pr-3 py-2 border border-gray-600 rounded-md bg-gray-700 text-white placeholder-gray-400 focus:outline-none focus:ring-1 focus:ring-brand-red focus:border-brand-red"
+                        />
+                        
+                        {/* Search Results Dropdown */}
+                        {isSearchFocused && searchResults.length > 0 && (
+                            <div className="absolute z-10 w-full mt-1 bg-gray-700 border border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                                {searchResults.map(item => (
+                                    <button
+                                        key={item.id}
+                                        type="button"
+                                        onClick={() => addRecommendedItem(item)}
+                                        className="w-full px-4 py-2 text-left text-white hover:bg-gray-600 border-b border-gray-600 last:border-b-0"
+                                    >
+                                        <div className="flex justify-between items-center">
+                                            <span className="font-medium">{item.name}</span>
+                                            <span className="text-sm text-gray-300">
+                                                {formatCurrency(item.price)}
+                                                <span className="ml-2 text-xs bg-gray-600 px-2 py-1 rounded">
+                                                    {item.type === 'service' ? 'Servicio' : 'Repuesto'}
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                     </div>
+
+                    {/* Recommended Items List */}
+                        {recommendedItems.length > 0 ? (
+                        <div className="space-y-2">
+                            {recommendedItems.map((item, index) => (
+                                <div key={index} className="flex items-center justify-between bg-gray-700 rounded-lg p-3">
+                                    <div className="flex-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="font-medium text-white">{item.description}</span>
+                                            <span className="text-xs bg-gray-600 text-gray-300 px-2 py-1 rounded">
+                                                {item.type === 'service' ? 'Servicio' : 'Repuesto'}
+                                            </span>
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-2">
+                                            <div className="flex items-center gap-2">
+                                                <label className="text-sm text-gray-400">Cantidad:</label>
+                                                <input
+                                                    type="number"
+                                                    min="1"
+                                                    step={item.type === 'inventory' && !item.description.toLowerCase().includes('aceite') && !item.description.toLowerCase().includes('líquido') && !item.description.toLowerCase().includes('fluido') ? "1" : "0.1"}
+                                                    value={item.quantity}
+                                                    onChange={(e) => {
+                                                        const newValue = parseFloat(e.target.value) || 1;
+                                                        // Para repuestos sólidos, redondear a entero
+                                                        if (item.type === 'inventory' && !item.description.toLowerCase().includes('aceite') && !item.description.toLowerCase().includes('líquido') && !item.description.toLowerCase().includes('fluido')) {
+                                                            updateRecommendedItemQuantity(index, Math.round(newValue));
+                                                        } else {
+                                                            updateRecommendedItemQuantity(index, newValue);
+                                                        }
+                                                    }}
+                                                    className="w-20 px-2 py-1 text-sm border border-gray-600 rounded bg-gray-700 text-white focus:outline-none focus:ring-1 focus:ring-brand-red focus:border-brand-red"
+                                                />
+                                                {item.type === 'inventory' && (
+                                                    <span className="text-xs text-gray-500">
+                                                        {item.description.toLowerCase().includes('aceite') || 
+                                                         item.description.toLowerCase().includes('líquido') ||
+                                                         item.description.toLowerCase().includes('fluido') ? 'litros' : 'unidades'}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-sm text-gray-400">
+                                                Precio unitario: {formatCurrency(item.unitPrice)}
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-lg font-semibold text-white">
+                                            {formatCurrency(item.unitPrice * item.quantity)}
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeRecommendedItem(index)}
+                                            className="text-red-400 hover:text-red-300 p-1"
+                                        >
+                                            <Icon name="x" className="w-4 h-4" />
+                                        </button>
+                 </div>
+            </div>
+                                ))}
+                            </div>
+                        ) : (
+                        <div className="text-center py-8">
+                            <p className="text-gray-400">No se han recomendado ítems.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+            
+            <div className="flex justify-end gap-4 pt-4 border-t border-gray-700">
+                <button type="button" onClick={onCancel} className="px-6 py-2 text-sm font-semibold text-gray-300 bg-gray-700 rounded-lg hover:bg-gray-600 transition-colors">
+                    Cancelar
+                </button>
+                <button 
+                    type="button" 
+                    onClick={handleSaveClick} 
+                    disabled={isSaving}
+                    className={`px-6 py-2 text-sm font-semibold text-white rounded-lg shadow-md transition-colors flex items-center gap-2 ${
+                        isSaving 
+                            ? 'bg-gray-500 cursor-not-allowed' 
+                            : 'bg-brand-red hover:bg-red-700'
+                    }`}
+                >
+                    {isSaving ? (
+                        <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                            Guardando... {uploadProgress > 0 && `${uploadProgress}%`}
+                        </>
+                    ) : (
+                        'Guardar Diagnóstico'
+                    )}
+                </button>
+            </div>
+        </div>
+    );
+};
+
+export default DiagnosticChecklistModal;

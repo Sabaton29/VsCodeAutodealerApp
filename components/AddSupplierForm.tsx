@@ -48,7 +48,7 @@ const AddSupplierForm: React.FC<AddSupplierFormProps> = ({ onSave, onCancel, ini
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name || !formData.nit || !formData.contactPerson) {
-            alert('Por favor complete todos los campos obligatorios.');
+            console.warn('Por favor complete todos los campos obligatorios.');
             return;
         }
         if (isEditing) {

@@ -14,7 +14,7 @@ const ReportUnforeseenIssueModal: React.FC<ReportUnforeseenIssueModalProps> = ({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!description.trim()) {
-            alert('Por favor, describa el imprevisto encontrado.');
+            console.warn('Por favor, describa el imprevisto encontrado.');
             return;
         }
         onSave(workOrder.id, description);

@@ -330,7 +330,7 @@ const AppContent: React.FC = () => {
                     const workOrder = data.workOrders.find(wo => wo.id === workOrderId);
                     const client = data.clients.find(c => c.id === workOrder?.clientId);
                     
-                    console.log('🔍 Client and Vehicle debug:', {
+                    console.debug('🔍 Client and Vehicle debug:', {
                         workOrderId,
                         workOrder: workOrder ? { id: workOrder.id, clientId: workOrder.clientId, vehicle: workOrder.vehicle } : null,
                         client: client ? { id: client.id, name: client.name } : null,
@@ -338,12 +338,12 @@ const AppContent: React.FC = () => {
                     });
                     
                     if (!workOrder || !client) {
-                        alert('No se encontró la orden de trabajo o el cliente.');
+                        console.warn('No se encontró la orden de trabajo o el cliente.');
                         return;
                     }
 
                     // Debug: Ver estructura de workOrder
-                    console.log('🔍 WorkOrder structure:', {
+                    console.debug('🔍 WorkOrder structure:', {
                         id: workOrder.id,
                         clientId: workOrder.clientId,
                         vehicle: workOrder.vehicle,
@@ -357,13 +357,13 @@ const AppContent: React.FC = () => {
                         console.warn('⚠️ WorkOrder no tiene locationId:', workOrder);
                         // Usar la ubicación seleccionada como fallback
                         workOrder.locationId = ui.selectedLocationId;
-                        console.log('🔧 Usando selectedLocationId como fallback:', ui.selectedLocationId);
+                        console.debug('🔧 Usando selectedLocationId como fallback:', ui.selectedLocationId);
                     }
 
                     // Debug: Ver qué cotizaciones tenemos
-                    console.log('🔍 WorkOrder linkedQuoteIds:', workOrder.linkedQuoteIds);
-                    console.log('🔍 WorkOrder ID:', workOrderId);
-                    console.log('🔍 All quotes:', data.quotes.map(q => ({ 
+                    console.debug('🔍 WorkOrder linkedQuoteIds:', workOrder.linkedQuoteIds);
+                    console.debug('🔍 WorkOrder ID:', workOrderId);
+                    console.debug('🔍 All quotes:', data.quotes.map(q => ({ 
                         id: q.id, 
                         status: q.status, 
                         workOrderId: q.workOrderId,
@@ -372,8 +372,8 @@ const AppContent: React.FC = () => {
                     })));
                     
                     // Debug detallado de cotizaciones
-                    console.log('🔍 WorkOrder clientId:', workOrder.clientId);
-                    console.log('🔍 All quotes detailed:', data.quotes.map(q => ({ 
+                    console.debug('🔍 WorkOrder clientId:', workOrder.clientId);
+                    console.debug('🔍 All quotes detailed:', data.quotes.map(q => ({ 
                         id: q.id, 
                         status: q.status, 
                         workOrderId: q.workOrderId,
@@ -397,13 +397,13 @@ const AppContent: React.FC = () => {
                         q.status?.trim().toUpperCase() === 'APROBADO' &&
                         !q.linkedInvoiceId,
                     );
-                    console.log('🔍 Client approved quotes (final):', clientQuotes);
+                    console.debug('🔍 Client approved quotes (final):', clientQuotes);
                     
                     // Buscar TODAS las cotizaciones del cliente (sin filtro de status)
                     const allClientQuotes = data.quotes.filter(q => 
                         q.clientId === workOrder.clientId,
                     );
-                    console.log('🔍 All client quotes (any status):', allClientQuotes);
+                    console.debug('🔍 All client quotes (any status):', allClientQuotes);
                     
                     // Buscar cotizaciones aprobadas y no facturadas
                     let quotesToInvoice = data.quotes.filter(q => 
@@ -412,7 +412,7 @@ const AppContent: React.FC = () => {
                         !q.linkedInvoiceId,
                     );
 
-                    console.log('🔍 Quotes to invoice:', quotesToInvoice);
+                    console.debug('🔍 Quotes to invoice:', quotesToInvoice);
 
                     if (quotesToInvoice.length === 0) {
                         // Buscar cotizaciones por workOrderId como alternativa
@@ -422,20 +422,20 @@ const AppContent: React.FC = () => {
                             !q.linkedInvoiceId,
                         );
                         
-                        console.log('🔍 Alternative quotes by workOrderId:', alternativeQuotes);
+                        console.debug('🔍 Alternative quotes by workOrderId:', alternativeQuotes);
                         
                         if (alternativeQuotes.length === 0) {
                             // Si no hay por workOrderId, usar las cotizaciones del cliente
                             if (clientQuotes.length > 0) {
-                                console.log('🔍 Using client quotes instead:', clientQuotes);
+                                console.debug('🔍 Using client quotes instead:', clientQuotes);
                                 quotesToInvoice = clientQuotes;
                             } else if (allClientQuotes.length > 0) {
                                 // Si hay cotizaciones del cliente pero no están aprobadas, mostrar info
-                                console.log('🔍 Client has quotes but none are approved:', allClientQuotes);
-                                alert(`El cliente tiene ${allClientQuotes.length} cotización(es), pero ninguna está aprobada.`);
+                                console.debug('🔍 Client has quotes but none are approved:', allClientQuotes);
+                                console.warn(`El cliente tiene ${allClientQuotes.length} cotización(es), pero ninguna está aprobada.`);
                                 return;
                             } else {
-                                alert('No hay cotizaciones aprobadas pendientes de facturar para esta orden.');
+                                console.warn('No hay cotizaciones aprobadas pendientes de facturar para esta orden.');
                                 return;
                             }
                         } else {
@@ -446,26 +446,26 @@ const AppContent: React.FC = () => {
                     
                     // Asegurar que tenemos cotizaciones para facturar
                     if (quotesToInvoice.length === 0) {
-                        console.log('🔍 No quotes to invoice, trying client quotes as fallback');
+                        console.debug('🔍 No quotes to invoice, trying client quotes as fallback');
                         if (clientQuotes.length > 0) {
                             quotesToInvoice = clientQuotes;
-                            console.log('🔍 Using client quotes as final fallback:', quotesToInvoice);
+                            console.debug('🔍 Using client quotes as final fallback:', quotesToInvoice);
                         } else {
-                            alert('No hay cotizaciones aprobadas pendientes de facturar para esta orden.');
+                            console.warn('No hay cotizaciones aprobadas pendientes de facturar para esta orden.');
                             return;
                         }
                     }
 
                     // Consolidar todos los ítems
                     const allItems = quotesToInvoice.flatMap(q => q.items);
-                    console.log('🔍 All items for invoice:', allItems);
+                    console.debug('🔍 All items for invoice:', allItems);
                     
                     const subtotal = allItems.reduce((sum, item) => {
                         const unitPrice = Number(item.unitPrice) || 0;
                         const quantity = Number(item.quantity) || 0;
                         const discount = Number(item.discount) || 0;
                         const itemTotal = (unitPrice * quantity) - discount;
-                        console.log(`🔍 Item calculation: ${item.description} - Price: ${unitPrice}, Qty: ${quantity}, Discount: ${discount}, Total: ${itemTotal}`);
+                        console.debug(`🔍 Item calculation: ${item.description} - Price: ${unitPrice}, Qty: ${quantity}, Discount: ${discount}, Total: ${itemTotal}`);
                         return sum + itemTotal;
                     }, 0);
                     
@@ -479,7 +479,7 @@ const AppContent: React.FC = () => {
                         return sum + itemTax;
                     }, 0);
                     
-                    console.log('🔍 Calculated values:', {
+                    console.debug('🔍 Calculated values:', {
                         subtotal,
                         taxAmount,
                         total: subtotal + taxAmount,
@@ -513,14 +513,14 @@ const AppContent: React.FC = () => {
                         updated_at: new Date().toISOString(),
                     };
 
-                    console.log('🔍 New invoice location_id:', {
+                    console.debug('🔍 New invoice location_id:', {
                         location_id: newInvoice.location_id,
                         workOrderLocationId: workOrder.locationId,
                         selectedLocationId: ui.selectedLocationId,
                     });
 
                     // Insertar factura usando el servicio existente
-                    console.log('🔍 Final newInvoice object before insertion:', {
+                    console.debug('🔍 Final newInvoice object before insertion:', {
                         id: newInvoice.id,
                         client_name: newInvoice.client_name,
                         vehicle_summary: newInvoice.vehicle_summary,
@@ -534,7 +534,7 @@ const AppContent: React.FC = () => {
                         first_item: newInvoice.items?.[0],
                     });
                     
-                    console.log('🔍 Invoice subtotal type and value:', {
+                    console.debug('🔍 Invoice subtotal type and value:', {
                         subtotal: newInvoice.subtotal,
                         subtotalType: typeof newInvoice.subtotal,
                         tax_amount: newInvoice.tax_amount,
@@ -545,7 +545,7 @@ const AppContent: React.FC = () => {
                     
                     try {
                         await data.handleCreateInvoice(newInvoice);
-                        console.log('✅ Invoice created successfully in database');
+                        console.debug('✅ Invoice created successfully in database');
                     } catch (dbError) {
                         console.error('❌ Database error details:', {
                             message: dbError.message,
@@ -570,7 +570,7 @@ const AppContent: React.FC = () => {
                         // Crear una copia local del workOrderId para evitar modificaciones
                         const localWorkOrderId = String(workOrderId);
                         
-                        console.log('🔍 About to update work order:', { 
+                        console.debug('🔍 About to update work order:', { 
                             originalWorkOrderId: workOrderId,
                             localWorkOrderId,
                             workOrderIdType: typeof workOrderId,
@@ -588,24 +588,24 @@ const AppContent: React.FC = () => {
                             status: 'FACTURADO',
                             stage: 'ENTREGADO',
                         });
-                        console.log('✅ Work order updated successfully');
+                        console.debug('✅ Work order updated successfully');
                     } catch (workOrderError) {
                         console.error('❌ Error updating work order (non-critical):', workOrderError);
                         // No lanzar error aquí, la factura ya se creó exitosamente
                     }
 
-                    alert(`¡Factura ${newInvoice.id} creada exitosamente!`);
+                    console.warn(`¡Factura ${newInvoice.id} creada exitosamente!`);
                     
                 } catch (error) {
                     console.error('Error creating invoice:', error);
-                    alert('Error al crear la factura. Por favor intente nuevamente.');
+                    console.warn('Error al crear la factura. Por favor intente nuevamente.');
                 }
             }}
             onViewQuote={(id) => setView('quote', id)}
             onEditQuote={(quote) => openModal('EDIT_QUOTE', quote)}
             onRegisterCosts={(workOrderId, costs) => {
-                console.log('🔍 App.tsx - onRegisterCosts called with:', { workOrderId, costs });
-                console.log('🔍 App.tsx - data.handleRegisterItemCosts:', data.handleRegisterItemCosts);
+                console.debug('🔍 App.tsx - onRegisterCosts called with:', { workOrderId, costs });
+                console.debug('🔍 App.tsx - data.handleRegisterItemCosts:', data.handleRegisterItemCosts);
                 return data.handleRegisterItemCosts(workOrderId, costs);
             }}
             suppliers={suppliers}
@@ -644,7 +644,7 @@ const AppContent: React.FC = () => {
             const vehicleForInvoice = workOrderForInvoice?.vehicleId ? vehicles.find(v => v.id === workOrderForInvoice.vehicleId) : undefined;
             const clientForInvoice = data.clients.find(c => c.id === enrichedInvoice.clientId);
             
-            console.log('🔍 Loading InvoiceDetailView with data:', {
+            console.debug('🔍 Loading InvoiceDetailView with data:', {
                 viewingInvoice: {
                     id: viewingInvoice.id,
                     workOrderId: viewingInvoice.workOrderId,
@@ -1304,8 +1304,8 @@ const ModalManager: React.FC = () => {
             </Modal>
              <Modal isOpen={type === 'APPROVE_QUOTE'} onClose={closeModal} title={`Revisar y Aprobar Cotización #${modalData?.id ? getQuoteDisplayId(modalData.id, modalData.issueDate, true, modalData.sequentialId) : ''}`} size="7xl">
                 {modalData && (() => {
-                    console.log('🚨 App.tsx - modalData para ApproveQuoteForm:', modalData);
-                    console.log('🚨 App.tsx - modalData.items:', modalData.items);
+                    console.debug('🚨 App.tsx - modalData para ApproveQuoteForm:', modalData);
+                    console.debug('🚨 App.tsx - modalData.items:', modalData.items);
                     return null;
                 })()}
                 {modalData && <ApproveQuoteForm 

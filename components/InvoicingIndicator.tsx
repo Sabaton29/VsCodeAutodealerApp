@@ -14,7 +14,7 @@ const InvoicingIndicator: React.FC<InvoicingIndicatorProps> = ({
     workOrderId, 
     invoices, 
     quotes, 
-    showDetails = false 
+    showDetails = false, 
 }) => {
     const status = getWorkOrderInvoicingStatus(workOrderId, invoices, quotes);
     
@@ -70,7 +70,7 @@ interface QuoteInvoicingIndicatorProps {
 export const QuoteInvoicingIndicator: React.FC<QuoteInvoicingIndicatorProps> = ({ 
     quoteId, 
     invoices, 
-    showDetails = false 
+    showDetails = false, 
 }) => {
     const summary = getQuoteInvoicingSummary(quoteId, invoices);
     

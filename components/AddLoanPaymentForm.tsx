@@ -29,7 +29,7 @@ const AddLoanPaymentForm: React.FC<AddLoanPaymentFormProps> = ({ onSave, onCance
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.loanId || formData.amount <= 0) {
-            alert('Por favor complete todos los campos con valores válidos.');
+            console.warn('Por favor complete todos los campos con valores válidos.');
             return;
         }
         onSave({ ...formData, isPayrollDeduction: false });

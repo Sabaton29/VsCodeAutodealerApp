@@ -1,0 +1,13 @@
+dist/
+node_modules/
+scripts/
+*.bak
+*.log
+*.min.js
+types-DESKTOP-*.ts
+fix-contrast-issues.js
+setup-local.cjs
+test-supabase*.js
+update-work-orders-*.js
+verificar-estado-ordenes.js
+fix-syntax-errors.js

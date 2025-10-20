@@ -49,6 +49,13 @@ const getInitialFormState = (initialData?: { clientId?: string; vehicleId?: stri
     },
     inventoryOtherText: '',
     documents: '',
+    // Added fields expected by handleSubmit and other call-sites
+    entryEvidenceUrls: [] as string[],
+    notes: '',
+    observations: '',
+    priority: '',
+    estimatedHours: '',
+    actualHours: '',
     comments: '',
     damages: {
         scratched: false, fogged: false, dented: false,
@@ -82,18 +89,18 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
     onAddNewVehicle,
     initialData,
 }) => {
-    console.log('🔄 CreateWorkOrderForm - Component rendered with clients:', clients.length, 'initialData:', initialData);
+    console.warn('🔄 CreateWorkOrderForm - Component rendered with clients:', clients.length, 'initialData:', initialData);
     const [formState, setFormState] = useState(getInitialFormState(initialData));
     
     // Forzar re-render cuando cambien los datos
     useEffect(() => {
-        console.log('🔄 CreateWorkOrderForm - Data changed, forcing re-render');
+        console.warn('🔄 CreateWorkOrderForm - Data changed, forcing re-render');
     }, [clients.length, vehicles.length]);
 
     // Actualizar formulario cuando cambien los datos iniciales
     useEffect(() => {
         if (initialData) {
-            console.log('🔄 CreateWorkOrderForm - Initial data changed, updating form:', initialData);
+            console.warn('🔄 CreateWorkOrderForm - Initial data changed, updating form:', initialData);
             setFormState(prev => ({
                 ...prev,
                 clientId: initialData.clientId || prev.clientId,
@@ -105,33 +112,33 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
     }, [initialData]);
 
     const clientsInLocation = useMemo(() => {
-        console.log('🔍 CreateWorkOrderForm - All clients:', clients);
-        console.log('🔍 CreateWorkOrderForm - selectedLocationId:', selectedLocationId);
+        console.warn('🔍 CreateWorkOrderForm - All clients:', clients);
+        console.warn('🔍 CreateWorkOrderForm - selectedLocationId:', selectedLocationId);
         
         // Debug: mostrar locationId de cada cliente
         clients.forEach((client, index) => {
-            console.log(`🔍 CreateWorkOrderForm - Client ${index}: ${client.name}, locationId: "${client.locationId}"`);
+            console.warn(`🔍 CreateWorkOrderForm - Client ${index}: ${client.name}, locationId: "${client.locationId}"`);
         });
         
         // If selectedLocationId is 'ALL_LOCATIONS' or empty, show all clients
         if (!selectedLocationId || selectedLocationId === 'ALL_LOCATIONS') {
-            console.log('🔍 CreateWorkOrderForm - Showing all clients (no filter)');
+            console.warn('🔍 CreateWorkOrderForm - Showing all clients (no filter)');
             return clients;
         }
         
         const filtered = clients.filter(c => {
-            console.log(`🔍 CreateWorkOrderForm - Comparing: client.locationId="${c.locationId}" === selectedLocationId="${selectedLocationId}"`);
+            console.warn(`🔍 CreateWorkOrderForm - Comparing: client.locationId="${c.locationId}" === selectedLocationId="${selectedLocationId}"`);
             // Incluir clientes que coincidan con la ubicación O que no tengan locationId asignado (undefined/null)
             return c.locationId === selectedLocationId || !c.locationId || c.locationId === 'undefined';
         });
-        console.log('🔍 CreateWorkOrderForm - Filtered clients:', filtered);
+        console.warn('🔍 CreateWorkOrderForm - Filtered clients:', filtered);
         return filtered;
     }, [clients, selectedLocationId]);
     const vehiclesForClient = useMemo(() => {
-        console.log('🔍 CreateWorkOrderForm - All vehicles:', vehicles);
-        console.log('🔍 CreateWorkOrderForm - formState.clientId:', formState.clientId);
+        console.warn('🔍 CreateWorkOrderForm - All vehicles:', vehicles);
+        console.warn('🔍 CreateWorkOrderForm - formState.clientId:', formState.clientId);
         const filtered = vehicles.filter(v => v.clientId === formState.clientId);
-        console.log('🔍 CreateWorkOrderForm - Filtered vehicles for client:', filtered);
+        console.warn('🔍 CreateWorkOrderForm - Filtered vehicles for client:', filtered);
         return filtered;
     }, [vehicles, formState.clientId]);
     const serviceAdvisors = useMemo(() => staffMembers.filter(s => s.locationId === selectedLocationId && s.role === UserRole.ASESOR_SERVICIO), [staffMembers, selectedLocationId]);
@@ -181,7 +188,7 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
     const handleSubmit = async(e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.clientId || !formState.vehicleId || !formState.serviceRequested) {
-            alert('Por favor, complete los campos de Cliente, Vehículo y Servicio Solicitado.');
+            console.warn('Por favor, complete los campos de Cliente, Vehículo y Servicio Solicitado.');
             return;
         }
         const client = clients.find(c => c.id === formState.clientId);

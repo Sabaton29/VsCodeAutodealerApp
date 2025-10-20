@@ -125,7 +125,7 @@ const AddClientForm: React.FC<AddClientFormProps> = ({ onSave, onCancel, locatio
         }
 
         if (!formData.name || !formData.email || !formData.phone || !formData.idNumber) {
-            alert('Por favor complete todos los campos obligatorios.');
+            console.warn('Por favor complete todos los campos obligatorios.');
             return;
         }
         

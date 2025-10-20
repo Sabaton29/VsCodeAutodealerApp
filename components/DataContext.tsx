@@ -58,7 +58,7 @@ const calculateDueDate = (issueDate: Date, terms?: PaymentTerms): Date => {
     if (terms.type === 'DAY_OF_WEEK') {
         const dayMap: Record<DayOfWeek, number> = {
             'Domingo': 0, 'Lunes': 1, 'Martes': 2, 'Miércoles': 3, 
-            'Jueves': 4, 'Viernes': 5, 'Sábado': 6
+            'Jueves': 4, 'Viernes': 5, 'Sábado': 6,
         };
         const targetDay = dayMap[terms.day];
         const currentDay = date.getDay();
@@ -85,7 +85,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
     const [operatingExpenses, setOperatingExpenses] = useState<OperatingExpense[]>([]);
     const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
-    const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
+    const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
     const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [loanPayments, setLoanPayments] = useState<LoanPayment[]>([]);
@@ -170,9 +170,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setNotifications(notificationsData);
                 setAppointments(appointmentsData);
 
-                // Set app settings (use first one or default)
-                if (Array.isArray(appSettingsData) && appSettingsData.length > 0) {
-                    const settings = appSettingsData[0];
+                // Set app settings (use returned settings or default)
+                if (appSettingsData && typeof appSettingsData === 'object') {
+                    const settings = appSettingsData as AppSettings;
                     
                     
                     // Ensure default categories are initialized if not present
@@ -209,7 +209,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setError(err instanceof Error ? err.message : 'Failed to load data');
                 
                 // Fallback to default data if Supabase fails
-                console.log('🔄 Falling back to default data...');
+                console.warn('🔄 Falling back to default data...');
                 setLocations(LOCATIONS_DATA);
                 setWorkOrders(WORK_ORDERS_DATA);
                 setClients(CLIENTS_DATA);
@@ -257,16 +257,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     (itemWithId as any).locationId = '550e8400-e29b-41d4-a716-446655440001'; // Default to Bogotá
                 }
                 
-                console.log(`🔍 createUpdater - Creating ${tableName}:`, itemWithId);
+                console.warn(`🔍 createUpdater - Creating ${tableName}:`, itemWithId);
                 const result = await supabaseService.insert(tableName, itemWithId);
-                console.log(`🔍 createUpdater - Result for ${tableName}:`, result);
+                console.warn(`🔍 createUpdater - Result for ${tableName}:`, result);
                 if (result) {
                     setter(prev => {
                         const newState = [...prev, result];
-                        console.log(`🔍 createUpdater - Updated state for ${tableName}, new count:`, newState.length);
+                        console.warn(`🔍 createUpdater - Updated state for ${tableName}, new count:`, newState.length);
                         return newState;
                     });
-                    console.log(`🔍 createUpdater - Updated state for ${tableName}`);
+                    console.warn(`🔍 createUpdater - Updated state for ${tableName}`);
                 } else {
                     console.error(`🔍 createUpdater - No result returned for ${tableName}`);
                 }
@@ -277,19 +277,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (error instanceof Error) {
                     if (error.message.includes('duplicate key value violates unique constraint')) {
                         if (tableName === 'vehicles') {
-                            alert('❌ Error: Ya existe un vehículo con esta placa. Por favor, usa una placa diferente.');
+                            console.warn('❌ Error: Ya existe un vehículo con esta placa. Por favor, usa una placa diferente.');
                         } else if (tableName === 'clients') {
-                            alert('❌ Error: Ya existe un cliente con este documento. Por favor, verifica los datos.');
+                            console.warn('❌ Error: Ya existe un cliente con este documento. Por favor, verifica los datos.');
                         } else {
-                            alert(`❌ Error: Ya existe un registro con estos datos. Por favor, verifica la información.`);
+                            console.warn(`❌ Error: Ya existe un registro con estos datos. Por favor, verifica la información.`);
                         }
                     } else {
-                        alert(`❌ Error al crear ${tableName}: ${error.message}`);
+                        console.warn(`❌ Error al crear ${tableName}: ${error.message}`);
                     }
                 }
                 
                 // No re-throw para evitar errores de promesa no manejados
-                return;
+                
             }
         };
     };
@@ -300,14 +300,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ) => {
         return async(updatedItem: T & { id: string }): Promise<void> => {
             try {
-                console.log(`🔍 createSaveHandler - Updating ${tableName}:`, updatedItem);
+                console.warn(`🔍 createSaveHandler - Updating ${tableName}:`, updatedItem);
                 const result = await supabaseService.update(tableName, updatedItem.id, updatedItem);
-                console.log(`🔍 createSaveHandler - Result for ${tableName}:`, result);
+                console.warn(`🔍 createSaveHandler - Result for ${tableName}:`, result);
                 if (result) {
                     setter(prev => prev.map(item => 
                         (item as any).id === updatedItem.id ? result : item,
                     ));
-                    console.log(`🔍 createSaveHandler - Updated state for ${tableName}`);
+                    console.warn(`🔍 createSaveHandler - Updated state for ${tableName}`);
                 } else {
                     console.error(`🔍 createSaveHandler - No result returned for ${tableName}`);
                 }
@@ -340,7 +340,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             // Skip notification if userId is empty (UUID fields can't be empty strings)
             if (!notification.userId || notification.userId.trim() === '') {
-                console.log('Skipping notification: userId is empty');
+                console.warn('Skipping notification: userId is empty');
                 return;
             }
 
@@ -363,7 +363,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleCreateWorkOrder = async(workOrderData: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<WorkOrder> => {
         try {
-            console.log('🔍 Creating work order with data:', {
+            console.warn('🔍 Creating work order with data:', {
                 clientId: workOrderData.client?.id,
                 vehicleId: workOrderData.vehicle?.id,
                 locationId: workOrderData.locationId,
@@ -406,7 +406,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 locationId: workOrderData.locationId || '550e8400-e29b-41d4-a716-446655440001', // Fallback to Bogotá if not specified
             };
             
-            console.log('🔍 Final work order before insertion:', {
+            console.warn('🔍 Final work order before insertion:', {
                 id: newWorkOrder.id,
                 locationId: newWorkOrder.locationId,
                 locationIdType: typeof newWorkOrder.locationId,
@@ -441,16 +441,29 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const handleSaveWorkOrder = async(workOrderData: { id: string; serviceRequested: string; advisorId?: string; staffMemberId?: string; comments?: string; }): Promise<void> => {
+    const handleSaveWorkOrder = async(idOrData: string | any, maybeData?: any): Promise<any> => {
         try {
-            const result = await supabaseService.updateWorkOrder(workOrderData.id, {
-                ...workOrderData,
-            });
+            let id: string;
+            let payload: any;
+            if (typeof idOrData === 'string') {
+                id = idOrData;
+                payload = maybeData || {};
+            } else if (idOrData && typeof idOrData === 'object') {
+                id = idOrData.id;
+                payload = { ...idOrData };
+                delete payload.id;
+            } else {
+                throw new Error('Invalid arguments to handleSaveWorkOrder');
+            }
+
+            // Cast payload to any to avoid strict Partial<WorkOrder> complaints for extra fields
+            const result = await supabaseService.updateWorkOrder(id, payload as any);
             if (result) {
                 setWorkOrders(prev => prev.map(wo => 
-                    wo.id === workOrderData.id ? result : wo,
+                    wo.id === id ? result : wo,
                 ));
             }
+            return result;
         } catch (error) {
             console.error('Error updating work order:', error);
             throw error;
@@ -481,8 +494,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             const updatedHistory = [...(currentWorkOrder.history || []), newHistoryEntry];
             
-            console.log(`🔍 DataContext - handleUpdateWorkOrderHistory - Actualizando solo historial para orden ${workOrderId}`);
-            console.log(`🔍 DataContext - handleUpdateWorkOrderHistory - NO tocando el stage: ${currentWorkOrder.stage}`);
+            console.warn(`🔍 DataContext - handleUpdateWorkOrderHistory - Actualizando solo historial para orden ${workOrderId}`);
+            console.warn(`🔍 DataContext - handleUpdateWorkOrderHistory - NO tocando el stage: ${currentWorkOrder.stage}`);
             
             const result = await supabaseService.updateWorkOrder(workOrderId, {
                 history: updatedHistory,
@@ -500,7 +513,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handlePostProgressUpdate = async(workOrderId: string, update: string, imageFiles?: File[]): Promise<void> => {
         try {
-            console.log('🔍 handlePostProgressUpdate - workOrderId:', workOrderId, 'update:', update);
+            console.warn('🔍 handlePostProgressUpdate - workOrderId:', workOrderId, 'update:', update);
             
             // Crear entrada de historial
             const historyEntry: WorkOrderHistoryEntry = {
@@ -513,7 +526,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             // Si hay imágenes, subirlas
             let imageUrls: string[] = [];
             if (imageFiles && imageFiles.length > 0) {
-                console.log('🔍 handlePostProgressUpdate - Subiendo imágenes:', imageFiles.length);
+                console.warn('🔍 handlePostProgressUpdate - Subiendo imágenes:', imageFiles.length);
                 const uploadPromises = imageFiles.map(async(file, index) => {
                     const fileName = `progress_${workOrderId}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
                     const path = `progress/${workOrderId}/${fileName}`;
@@ -522,7 +535,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 
                 const uploadedUrls = await Promise.all(uploadPromises);
                 imageUrls = uploadedUrls.filter(url => url !== null) as string[];
-                console.log('🔍 handlePostProgressUpdate - URLs subidas:', imageUrls);
+                console.warn('🔍 handlePostProgressUpdate - URLs subidas:', imageUrls);
             }
 
             // Actualizar la orden de trabajo
@@ -534,7 +547,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setWorkOrders(prev => prev.map(wo => 
                     wo.id === workOrderId ? result : wo,
                 ));
-                console.log('🔍 handlePostProgressUpdate - Actualización exitosa');
+                console.warn('🔍 handlePostProgressUpdate - Actualización exitosa');
             }
         } catch (error) {
             console.error('Error posting progress update:', error);
@@ -543,7 +556,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleToggleTaskCompleted = async(workOrderId: string, itemId: string, isCompleted: boolean, itemImageFiles?: File[]): Promise<void> => {
         try {
-            console.log('🔍 handleToggleTaskCompleted - workOrderId:', workOrderId, 'itemId:', itemId, 'isCompleted:', isCompleted, 'itemImageFiles:', itemImageFiles?.length);
+            console.warn('🔍 handleToggleTaskCompleted - workOrderId:', workOrderId, 'itemId:', itemId, 'isCompleted:', isCompleted, 'itemImageFiles:', itemImageFiles?.length);
             
             // Buscar la orden de trabajo
             const workOrder = workOrders.find(wo => wo.id === workOrderId);
@@ -561,20 +574,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
             let uploadedItemImageUrls: string[] = [];
             if (itemImageFiles && itemImageFiles.length > 0) {
-                console.log('🔍 handleToggleTaskCompleted - Subiendo imágenes para el ítem:', itemId, 'Cantidad:', itemImageFiles.length);
-                const uploadPromises = itemImageFiles.map(async (file, index) => {
+                console.warn('🔍 handleToggleTaskCompleted - Subiendo imágenes para el ítem:', itemId, 'Cantidad:', itemImageFiles.length);
+                const uploadPromises = itemImageFiles.map(async(file, index) => {
                     const fileName = `task_item_${workOrderId}_${itemId}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
                     const path = `progress-updates/${workOrderId}/${fileName}`;
                     return await supabaseService.uploadFileToStorage(file, 'progress-updates', path);
                 });
                 uploadedItemImageUrls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
-                console.log('🔍 handleToggleTaskCompleted - URLs subidas para el ítem:', uploadedItemImageUrls);
-                console.log('🔍 handleToggleTaskCompleted - URLs detalladas:', uploadedItemImageUrls.map((url, index) => ({
+                console.warn('🔍 handleToggleTaskCompleted - URLs subidas para el ítem:', uploadedItemImageUrls);
+                console.warn('🔍 handleToggleTaskCompleted - URLs detalladas:', uploadedItemImageUrls.map((url, index) => ({
                     index,
                     url,
                     length: url.length,
                     startsWithHttps: url.startsWith('https://'),
-                    endsWithPng: url.endsWith('.png')
+                    endsWithPng: url.endsWith('.png'),
                 })));
             }
 
@@ -583,12 +596,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 item.id === itemId ? {
                     ...item,
                     isCompleted,
-                    imageUrls: [...(item.imageUrls || []), ...uploadedItemImageUrls] // Añadir nuevas URLs
-                } : item
+                    imageUrls: [...(item.imageUrls || []), ...uploadedItemImageUrls], // Añadir nuevas URLs
+                } : item,
             );
             
-            console.log('🔍 handleToggleTaskCompleted - Item actualizado:', updatedItems.find(item => item.id === itemId));
-            console.log('🔍 handleToggleTaskCompleted - imageUrls del item:', updatedItems.find(item => item.id === itemId)?.imageUrls);
+            console.warn('🔍 handleToggleTaskCompleted - Item actualizado:', updatedItems.find(item => item.id === itemId));
+            console.warn('🔍 handleToggleTaskCompleted - imageUrls del item:', updatedItems.find(item => item.id === itemId)?.imageUrls);
 
             // Actualizar la cotización
             const result = await supabaseService.updateQuote(quote.id, {
@@ -599,9 +612,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setQuotes(prev => prev.map(q =>
                     q.id === quote.id ? result : q,
                 ));
-                console.log('🔍 handleToggleTaskCompleted - Tarea y fotos actualizadas exitosamente');
-                console.log('🔍 handleToggleTaskCompleted - Resultado de la base de datos:', result);
-                console.log('🔍 handleToggleTaskCompleted - imageUrls en el resultado:', result.items.find(item => item.id === itemId)?.imageUrls);
+                console.warn('🔍 handleToggleTaskCompleted - Tarea y fotos actualizadas exitosamente');
+                console.warn('🔍 handleToggleTaskCompleted - Resultado de la base de datos:', result);
+                console.warn('🔍 handleToggleTaskCompleted - imageUrls en el resultado:', result.items.find(item => item.id === itemId)?.imageUrls);
             }
         } catch (error) {
             console.error('Error toggling task completed:', error);
@@ -618,19 +631,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         customerConfirmed: boolean;
     }): Promise<void> => {
         try {
-            console.log('🔍 handleRegisterDelivery - workOrderId:', workOrderId, 'deliveryData:', deliveryData);
+            console.warn('🔍 handleRegisterDelivery - workOrderId:', workOrderId, 'deliveryData:', deliveryData);
             
             // Subir imágenes de evidencia si las hay
             let uploadedImageUrls: string[] = [];
             if (deliveryData.deliveryEvidenceFiles && deliveryData.deliveryEvidenceFiles.length > 0) {
-                console.log('🔍 handleRegisterDelivery - Subiendo imágenes de evidencia:', deliveryData.deliveryEvidenceFiles.length);
-                const uploadPromises = deliveryData.deliveryEvidenceFiles.map(async (file, index) => {
+                console.warn('🔍 handleRegisterDelivery - Subiendo imágenes de evidencia:', deliveryData.deliveryEvidenceFiles.length);
+                const uploadPromises = deliveryData.deliveryEvidenceFiles.map(async(file, index) => {
                     const fileName = `delivery_${workOrderId}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
                     const path = `delivery-evidence/${workOrderId}/${fileName}`;
                     return await supabaseService.uploadFileToStorage(file, 'progress-updates', path);
                 });
                 uploadedImageUrls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
-                console.log('🔍 handleRegisterDelivery - URLs subidas:', uploadedImageUrls);
+                console.warn('🔍 handleRegisterDelivery - URLs subidas:', uploadedImageUrls);
             }
 
             // Crear entrada de historial
@@ -658,12 +671,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setWorkOrders(prev => prev.map(wo => 
                     wo.id === workOrderId ? result : wo,
                 ));
-                console.log('✅ handleRegisterDelivery - Entrega registrada exitosamente');
+                console.warn('✅ handleRegisterDelivery - Entrega registrada exitosamente');
                 
                 // Forzar refresh de datos para sincronizar frontend
-                setTimeout(async () => {
+                setTimeout(async() => {
                     await refreshWorkOrders();
-                    console.log('✅ handleRegisterDelivery - Datos refrescados después de entrega');
+                    console.warn('✅ handleRegisterDelivery - Datos refrescados después de entrega');
                 }, 500);
             }
         } catch (error) {
@@ -677,7 +690,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             if ('id' in clientData) {
                 // Updating existing client
-                console.log(`🔍 handleSaveClient - Updating client:`, clientData);
+                console.warn(`🔍 handleSaveClient - Updating client:`, clientData);
                 const result = await supabaseService.update('clients', clientData.id, clientData);
                 if (result) {
                     setClients(prev => prev.map(c => c.id === clientData.id ? result : c));
@@ -688,9 +701,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     id: crypto.randomUUID(),
                     vehicleCount: 0,
                     registrationDate: new Date().toISOString().split('T')[0],
-                    ...clientData
+                    ...clientData,
                 };
-                console.log(`🔍 handleSaveClient - Creating client:`, newClient);
+                console.warn(`🔍 handleSaveClient - Creating client:`, newClient);
                 const result = await supabaseService.insert('clients', newClient);
                 if (result) {
                     setClients(prev => [...prev, result]);
@@ -704,15 +717,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleDeleteClient = createDeleteHandler(setClients, 'clients');
 
     // Función para migrar clientes existentes que no tienen registrationDate
-    const migrateClientsRegistrationDate = async (): Promise<void> => {
+    const migrateClientsRegistrationDate = async(): Promise<void> => {
         try {
-            console.log('🔍 MIGRACIÓN - Iniciando migración de registrationDate para clientes...');
+            console.warn('🔍 MIGRACIÓN - Iniciando migración de registrationDate para clientes...');
             
             const clientsWithoutRegistrationDate = clients.filter(c => !c.registrationDate);
-            console.log(`🔍 MIGRACIÓN - Clientes sin registrationDate: ${clientsWithoutRegistrationDate.length}`);
+            console.warn(`🔍 MIGRACIÓN - Clientes sin registrationDate: ${clientsWithoutRegistrationDate.length}`);
             
             if (clientsWithoutRegistrationDate.length === 0) {
-                console.log('✅ MIGRACIÓN - Todos los clientes ya tienen registrationDate');
+                console.warn('✅ MIGRACIÓN - Todos los clientes ya tienen registrationDate');
                 return;
             }
 
@@ -722,19 +735,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             for (const client of clientsWithoutRegistrationDate) {
                 const updatedClient = {
                     ...client,
-                    registrationDate: defaultRegistrationDate
+                    registrationDate: defaultRegistrationDate,
                 };
                 
-                console.log(`🔍 MIGRACIÓN - Actualizando cliente ${client.name} con registrationDate: ${defaultRegistrationDate}`);
+                console.warn(`🔍 MIGRACIÓN - Actualizando cliente ${client.name} con registrationDate: ${defaultRegistrationDate}`);
                 
                 const result = await supabaseService.update('clients', client.id, updatedClient);
                 if (result) {
                     setClients(prev => prev.map(c => c.id === client.id ? result : c));
-                    console.log(`✅ MIGRACIÓN - Cliente ${client.name} actualizado exitosamente`);
+                    console.warn(`✅ MIGRACIÓN - Cliente ${client.name} actualizado exitosamente`);
                 }
             }
             
-            console.log('✅ MIGRACIÓN - Migración completada exitosamente');
+            console.warn('✅ MIGRACIÓN - Migración completada exitosamente');
         } catch (error) {
             console.error('❌ MIGRACIÓN - Error durante la migración:', error);
             throw error;
@@ -752,15 +765,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleCreateService = createUpdater(setServices, 'services');
     const handleSaveService = async(serviceData: Service | Omit<Service, 'id'>): Promise<Service> => {
         try {
-            console.log(`🔍 handleSaveService - Updating service:`, serviceData);
+            console.warn(`🔍 handleSaveService - Updating service:`, serviceData);
             const serviceId = 'id' in serviceData ? serviceData.id : crypto.randomUUID();
             const result = await supabaseService.updateService(serviceId, serviceData);
-            console.log(`🔍 handleSaveService - Result:`, result);
+            console.warn(`🔍 handleSaveService - Result:`, result);
             if (result) {
                 setServices(prev => prev.map(service => 
                     service.id === serviceId ? result : service,
                 ));
-                console.log(`🔍 handleSaveService - Updated state for services`);
+                console.warn(`🔍 handleSaveService - Updated state for services`);
                 return result;
             } else {
                 console.error(`🔍 handleSaveService - No result returned`);
@@ -797,7 +810,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSaveSupplier = createSaveHandler(setSuppliers, 'suppliers');
     const handleDeleteSupplier = createDeleteHandler(setSuppliers, 'suppliers');
 
-    const handleCreatePettyCashTransaction = async (transactionData: Omit<PettyCashTransaction, 'id' | 'date'>): Promise<void> => {
+    const handleCreatePettyCashTransaction = async(transactionData: Omit<PettyCashTransaction, 'id' | 'date'>): Promise<void> => {
         try {
             const transaction: PettyCashTransaction = {
                 ...transactionData,
@@ -816,18 +829,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSavePettyCashTransaction = createSaveHandler(setPettyCashTransactions, 'petty_cash_transactions');
     const handleDeletePettyCashTransaction = createDeleteHandler(setPettyCashTransactions, 'petty_cash_transactions');
 
-    const handleCreateInvoice = async (invoiceData: Invoice): Promise<void> => {
+    const handleCreateInvoice = async(invoiceData: Invoice): Promise<void> => {
         try {
-            console.log('🔍 handleCreateInvoice - Creating invoice:', invoiceData);
+            console.warn('🔍 handleCreateInvoice - Creating invoice:', invoiceData);
             const result = await supabaseService.insertInvoice(invoiceData);
             
             if (result) {
                 setInvoices(prev => {
                     const newState = [...prev, result];
-                    console.log('🔍 handleCreateInvoice - Updated state, new count:', newState.length);
+                    console.warn('🔍 handleCreateInvoice - Updated state, new count:', newState.length);
                     return newState;
                 });
-                console.log('✅ handleCreateInvoice - Invoice created successfully');
+                console.warn('✅ handleCreateInvoice - Invoice created successfully');
             } else {
                 console.error('❌ handleCreateInvoice - No result returned');
             }
@@ -839,9 +852,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSaveInvoice = createSaveHandler(setInvoices, 'invoices');
     const handleDeleteInvoice = createDeleteHandler(setInvoices, 'invoices');
 
-    const handleCreateInvoiceFromWorkOrder = async (workOrderId: string): Promise<void> => {
+    const handleCreateInvoiceFromWorkOrder = async(workOrderId: string): Promise<void> => {
         try {
-            console.log('🔍 handleCreateInvoiceFromWorkOrder - Creating invoice from work order:', workOrderId);
+            console.warn('🔍 handleCreateInvoiceFromWorkOrder - Creating invoice from work order:', workOrderId);
             
             // Buscar la orden de trabajo
             const workOrder = workOrders.find(wo => wo.id === workOrderId);
@@ -849,14 +862,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 throw new Error('Orden de trabajo no encontrada');
             }
 
-            console.log('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder structure:', workOrder);
-            console.log('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder.client:', workOrder.client);
-            console.log('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder.clientId:', (workOrder as any).clientId);
+            console.warn('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder structure:', workOrder);
+            console.warn('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder.client:', workOrder.client);
+            console.warn('🔍 handleCreateInvoiceFromWorkOrder - WorkOrder.clientId:', (workOrder as any).clientId);
 
             // Buscar la cotización asociada (debe estar aprobada)
             const approvedQuote = quotes.find(q => 
                 q.workOrderId === workOrderId && 
-                q.status === QuoteStatus.APROBADO
+                q.status === QuoteStatus.APROBADO,
             );
             
             if (!approvedQuote) {
@@ -906,15 +919,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     unitPrice: item.unitPrice || 0, // Asegurar que el precio unitario esté definido
                 })) || [],
                 notes: approvedQuote.notes,
-                sequentialId: nextSequentialId
+                sequentialId: nextSequentialId,
             };
 
-            console.log('🔍 handleCreateInvoiceFromWorkOrder - Invoice data:', invoiceData);
+            console.warn('🔍 handleCreateInvoiceFromWorkOrder - Invoice data:', invoiceData);
 
             // Crear la factura usando la función existente
             await handleCreateInvoice(invoiceData);
 
-            console.log('✅ handleCreateInvoiceFromWorkOrder - Invoice created successfully');
+            console.warn('✅ handleCreateInvoiceFromWorkOrder - Invoice created successfully');
             
         } catch (error) {
             console.error('❌ handleCreateInvoiceFromWorkOrder - Error creating invoice:', error);
@@ -922,9 +935,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    const handleToggleInvoiceVat = async (invoiceId: string): Promise<void> => {
+    const handleToggleInvoiceVat = async(invoiceId: string): Promise<void> => {
         try {
-            console.log('🔍 handleToggleInvoiceVat - Toggling VAT for invoice:', invoiceId);
+            console.warn('🔍 handleToggleInvoiceVat - Toggling VAT for invoice:', invoiceId);
             
             const invoice = invoices.find(inv => inv.id === invoiceId);
             if (!invoice) {
@@ -939,15 +952,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const updateData = {
                 vatIncluded: newVatIncluded,
                 taxAmount: newTaxAmount,
-                total: newTotal
+                total: newTotal,
             };
 
-            console.log('🔍 handleToggleInvoiceVat - Update data:', updateData);
+            console.warn('🔍 handleToggleInvoiceVat - Update data:', updateData);
 
             // Actualizar la factura usando la función existente
             await handleSaveInvoice({ ...invoice, ...updateData });
 
-            console.log('✅ handleToggleInvoiceVat - Invoice VAT toggled successfully');
+            console.warn('✅ handleToggleInvoiceVat - Invoice VAT toggled successfully');
             
         } catch (error) {
             console.error('❌ handleToggleInvoiceVat - Error toggling invoice VAT:', error);
@@ -967,7 +980,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     return null;
                 }
                 
-                console.log('🔍 DataContext - handleCreateQuote - createdQuote after validation:', createdQuote);
+                console.warn('🔍 DataContext - handleCreateQuote - createdQuote after validation:', createdQuote);
                 
                 // Update linkedQuoteIds for the work order
                 const workOrder = workOrders.find(wo => wo.id === quoteData.workOrderId);
@@ -980,14 +993,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 
                 // If quote status is ENVIADO, update work order stage to "Esperando Aprobación"
                 // If quote status is BORRADOR, keep current stage (Pendiente Cotización)
-                console.log('🔍 DataContext - handleCreateQuote - createdQuote:', createdQuote);
-                console.log('🔍 DataContext - handleCreateQuote - createdQuote.status:', createdQuote.status);
-                console.log('🔍 DataContext - handleCreateQuote - QuoteStatus.ENVIADO:', QuoteStatus.ENVIADO);
-                console.log('🔍 DataContext - handleCreateQuote - comparison result:', createdQuote.status === QuoteStatus.ENVIADO);
-                console.log('🔍 DataContext - handleCreateQuote - typeof createdQuote.status:', typeof createdQuote.status);
-                console.log('🔍 DataContext - handleCreateQuote - typeof QuoteStatus.ENVIADO:', typeof QuoteStatus.ENVIADO);
-                console.log('🔍 DataContext - handleCreateQuote - JSON.stringify(createdQuote.status):', JSON.stringify(createdQuote.status));
-                console.log('🔍 DataContext - handleCreateQuote - JSON.stringify(QuoteStatus.ENVIADO):', JSON.stringify(QuoteStatus.ENVIADO));
+                console.warn('🔍 DataContext - handleCreateQuote - createdQuote:', createdQuote);
+                console.warn('🔍 DataContext - handleCreateQuote - createdQuote.status:', createdQuote.status);
+                console.warn('🔍 DataContext - handleCreateQuote - QuoteStatus.ENVIADO:', QuoteStatus.ENVIADO);
+                console.warn('🔍 DataContext - handleCreateQuote - comparison result:', createdQuote.status === QuoteStatus.ENVIADO);
+                console.warn('🔍 DataContext - handleCreateQuote - typeof createdQuote.status:', typeof createdQuote.status);
+                console.warn('🔍 DataContext - handleCreateQuote - typeof QuoteStatus.ENVIADO:', typeof QuoteStatus.ENVIADO);
+                console.warn('🔍 DataContext - handleCreateQuote - JSON.stringify(createdQuote.status):', JSON.stringify(createdQuote.status));
+                console.warn('🔍 DataContext - handleCreateQuote - JSON.stringify(QuoteStatus.ENVIADO):', JSON.stringify(QuoteStatus.ENVIADO));
                 
                 if (createdQuote.status === QuoteStatus.ENVIADO) {
                 const updateData = {
@@ -995,7 +1008,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         linkedQuoteIds: newLinkedQuoteIds,
                 };
                 
-                    console.log('🔍 DataContext - handleCreateQuote - Updating work order stage to Esperando Aprobación');
+                    console.warn('🔍 DataContext - handleCreateQuote - Updating work order stage to Esperando Aprobación');
                 await supabaseService.updateWorkOrder(quoteData.workOrderId, updateData);
                 
                 // Update local work orders state
@@ -1017,7 +1030,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         linkedQuoteIds: newLinkedQuoteIds,
                     };
                     
-                    console.log('🔍 DataContext - handleCreateQuote - Updating linkedQuoteIds for draft quote');
+                    console.warn('🔍 DataContext - handleCreateQuote - Updating linkedQuoteIds for draft quote');
                     await supabaseService.updateWorkOrder(quoteData.workOrderId, updateData);
                 }
                 
@@ -1025,11 +1038,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setQuotes(prev => [...prev, createdQuote]);
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleCreateQuote: Esperando a que Supabase procese la actualización...');
+                console.warn('🔄 handleCreateQuote: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleCreateQuote: Refrescando órdenes de trabajo después de crear cotización...');
+                console.warn('🔄 handleCreateQuote: Refrescando órdenes de trabajo después de crear cotización...');
                 await refreshWorkOrders();
             }
             return result || null;
@@ -1067,11 +1080,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 let historyEntry: WorkOrderHistoryEntry;
                 
                 // Crear entrada de historial simple para avance manual
-                console.log('🔍 DataContext - handleAdvanceStage - Checking stage transition:', { currentStage, nextStage });
+                console.warn('🔍 DataContext - handleAdvanceStage - Checking stage transition:', { currentStage, nextStage });
                 
                 if (nextStage === 'Control de Calidad') {
                     // Si se avanza a Control de Calidad, solo marcar que está listo para control de calidad
-                    console.log('🔍 DataContext - handleAdvanceStage - Advancing to Quality Control stage');
+                    console.warn('🔍 DataContext - handleAdvanceStage - Advancing to Quality Control stage');
                     historyEntry = {
                         stage: nextStage,
                         date: new Date().toISOString(),
@@ -1089,7 +1102,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
                 
                 await handleUpdateWorkOrderHistory(workOrderId, historyEntry);
-                console.log('🔍 DataContext - handleAdvanceStage - History entry saved:', historyEntry);
+                console.warn('🔍 DataContext - handleAdvanceStage - History entry saved:', historyEntry);
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
                 await new Promise(resolve => setTimeout(resolve, 500));
@@ -1110,7 +1123,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (currentIndex > 0) {
                 const previousStage = KANBAN_STAGES_ORDER[currentIndex - 1];
                 
-                console.log(`🔍 DataContext - handleRetreatStage - Retreating from ${currentStage} to ${previousStage}`);
+                console.warn(`🔍 DataContext - handleRetreatStage - Retreating from ${currentStage} to ${previousStage}`);
                 
                 const updateData = {
                     stage: previousStage,
@@ -1133,11 +1146,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 await handleUpdateWorkOrderHistory(workOrderId, historyEntry);
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleRetreatStage: Esperando a que Supabase procese la actualización...');
+                console.warn('🔄 handleRetreatStage: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleRetreatStage: Refrescando órdenes de trabajo después de retroceder etapa...');
+                console.warn('🔄 handleRetreatStage: Refrescando órdenes de trabajo después de retroceder etapa...');
                 await refreshWorkOrders();
                 
             }
@@ -1159,14 +1172,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleUpdateAllWorkOrderStages = async(): Promise<{ updated: number; skipped: number; errors: string[] }> => {
         try {
-            console.log('🚀 Iniciando actualización masiva de etapas de órdenes de trabajo...');
+            console.warn('🚀 Iniciando actualización masiva de etapas de órdenes de trabajo...');
             
             // Obtener todas las órdenes de trabajo y cotizaciones frescas de Supabase
             const [allWorkOrders, allQuotes] = await Promise.all([
                 supabaseService.getWorkOrders(),
                 supabaseService.getQuotes(),
             ]);
-            console.log(`📊 Encontradas ${allWorkOrders.length} órdenes de trabajo y ${allQuotes.length} cotizaciones`);
+            console.warn(`📊 Encontradas ${allWorkOrders.length} órdenes de trabajo y ${allQuotes.length} cotizaciones`);
             
             let updated = 0;
             let skipped = 0;
@@ -1176,12 +1189,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 try {
                     // Debug: mostrar información de la orden
                     const linkedQuotes = allQuotes.filter(q => workOrder.linkedQuoteIds?.includes(q.id));
-                    console.log(`🔍 OT ${workOrder.id}: stage=${workOrder.stage}, linkedQuotes=${workOrder.linkedQuoteIds?.length || 0}, quotesStatus=${linkedQuotes.map(q => q.status).join(',')}`);
+                    console.warn(`🔍 OT ${workOrder.id}: stage=${workOrder.stage}, linkedQuotes=${workOrder.linkedQuoteIds?.length || 0}, quotesStatus=${linkedQuotes.map(q => q.status).join(',')}`);
                     
                     const correctStage = determineCorrectStage(workOrder, allQuotes);
                     
                     if (correctStage !== workOrder.stage) {
-                        console.log(`✅ Actualizando OT ${workOrder.id}: ${workOrder.stage} → ${correctStage}`);
+                        console.warn(`✅ Actualizando OT ${workOrder.id}: ${workOrder.stage} → ${correctStage}`);
                         
                         // Actualizar en Supabase
                         const updateData = {
@@ -1206,7 +1219,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         
                         updated++;
                     } else {
-                        console.log(`⏭️ Saltando OT ${workOrder.id}: ya está en etapa correcta`);
+                        console.warn(`⏭️ Saltando OT ${workOrder.id}: ya está en etapa correcta`);
                         skipped++;
                     }
                 } catch (error) {
@@ -1216,7 +1229,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
             
-            console.log(`🎉 Actualización completada: ${updated} actualizadas, ${skipped} sin cambios, ${errors.length} errores`);
+            console.warn(`🎉 Actualización completada: ${updated} actualizadas, ${skipped} sin cambios, ${errors.length} errores`);
             
             return { updated, skipped, errors };
             
@@ -1229,7 +1242,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Función para restaurar órdenes que se marcaron incorrectamente como completadas
     const handleRestoreIncorrectlyCompletedOrders = async(): Promise<{ restored: number; errors: string[] }> => {
         try {
-            console.log('🔧 Iniciando restauración de órdenes marcadas incorrectamente como completadas...');
+            console.warn('🔧 Iniciando restauración de órdenes marcadas incorrectamente como completadas...');
             
             // Obtener todas las órdenes de trabajo y cotizaciones frescas de Supabase
             const [allWorkOrders, allQuotes] = await Promise.all([
@@ -1249,12 +1262,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return correctStage !== KanbanStage.ENTREGADO;
             });
             
-            console.log(`🔍 Encontradas ${incorrectlyCompletedOrders.length} órdenes marcadas incorrectamente como completadas`);
+            console.warn(`🔍 Encontradas ${incorrectlyCompletedOrders.length} órdenes marcadas incorrectamente como completadas`);
             
             for (const workOrder of incorrectlyCompletedOrders) {
                 try {
                     const correctStage = determineCorrectStage(workOrder, allQuotes);
-                    console.log(`🔧 Restaurando OT ${workOrder.id}: ${workOrder.stage} → ${correctStage}`);
+                    console.warn(`🔧 Restaurando OT ${workOrder.id}: ${workOrder.stage} → ${correctStage}`);
                     
                     // Actualizar en Supabase
                     const updateData = {
@@ -1285,7 +1298,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
             
-            console.log(`🎉 Restauración completada: ${restored} órdenes restauradas, ${errors.length} errores`);
+            console.warn(`🎉 Restauración completada: ${restored} órdenes restauradas, ${errors.length} errores`);
             
             return { restored, errors };
             
@@ -1301,7 +1314,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         let fixed = 0;
 
         try {
-            console.log('🔍 Checking for orders with quote stage mismatches...');
+            console.warn('🔍 Checking for orders with quote stage mismatches...');
 
             for (const workOrder of workOrders) {
                 try {
@@ -1352,7 +1365,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
 
                     if (needsUpdate) {
-                        console.log(`🔧 Fixing order ${workOrder.id}: ${workOrder.stage} → ${correctStage} (${updateReason})`);
+                        console.warn(`🔧 Fixing order ${workOrder.id}: ${workOrder.stage} → ${correctStage} (${updateReason})`);
                         
                         // Update linkedQuoteIds if missing
                         const missingQuoteIds = orderQuotes
@@ -1398,7 +1411,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
 
-            console.log(`✅ Successfully fixed ${fixed} orders with quote stage mismatches`);
+            console.warn(`✅ Successfully fixed ${fixed} orders with quote stage mismatches`);
             
             // Refresh data
             await loadAllData();
@@ -1415,7 +1428,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Función específica para corregir la orden #0068
     const handleFixSpecificOrder = async(workOrderId: string): Promise<{ success: boolean; message: string }> => {
         try {
-            console.log(`🔧 Fixing specific order ${workOrderId}...`);
+            console.warn(`🔧 Fixing specific order ${workOrderId}...`);
             
             // Obtener datos frescos de Supabase
             const [allWorkOrders, allQuotes] = await Promise.all([
@@ -1434,7 +1447,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 (workOrder.linkedQuoteIds && workOrder.linkedQuoteIds.includes(q.id)),
             );
             
-            console.log(`🔍 Orden ${workOrderId}: stage=${workOrder.stage}, quotes=${orderQuotes.length}, status=${orderQuotes.map(q => q.status).join(',')}`);
+            console.warn(`🔍 Orden ${workOrderId}: stage=${workOrder.stage}, quotes=${orderQuotes.length}, status=${orderQuotes.map(q => q.status).join(',')}`);
             
             if (orderQuotes.length === 0) {
                 return { success: false, message: `No se encontraron cotizaciones para la orden ${workOrderId}` };
@@ -1463,7 +1476,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             }
             
             if (correctStage !== workOrder.stage) {
-                console.log(`🔧 Actualizando orden ${workOrderId}: ${workOrder.stage} → ${correctStage}`);
+                console.warn(`🔧 Actualizando orden ${workOrderId}: ${workOrder.stage} → ${correctStage}`);
                 
                 // Actualizar linkedQuoteIds si faltan
                 const missingQuoteIds = orderQuotes
@@ -1529,7 +1542,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         // ⚠️ PROTECCIÓN CRÍTICA: NO tocar órdenes que ya están completadas
         if (workOrder.stage === KanbanStage.ENTREGADO) {
-            console.log(`🛡️ Protegiendo OT ${workOrder.id}: ya está ENTREGADO, no tocar`);
+            console.warn(`🛡️ Protegiendo OT ${workOrder.id}: ya está ENTREGADO, no tocar`);
             return workOrder.stage;
         }
         
@@ -1558,10 +1571,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Solo avanzar si está en una etapa anterior a EN_REPARACION
             if (currentStageIndex < enReparacionIndex) {
-                console.log(`✅ OT ${workOrder.id}: Avanzando de ${workOrder.stage} a EN_REPARACION (cotización aprobada)`);
+                console.warn(`✅ OT ${workOrder.id}: Avanzando de ${workOrder.stage} a EN_REPARACION (cotización aprobada)`);
                 return KanbanStage.EN_REPARACION;
             } else {
-                console.log(`🛡️ OT ${workOrder.id}: Manteniendo ${workOrder.stage} (ya en etapa correcta o posterior)`);
+                console.warn(`🛡️ OT ${workOrder.id}: Manteniendo ${workOrder.stage} (ya en etapa correcta o posterior)`);
                 return workOrder.stage; // Ya está en etapa correcta o posterior
             }
         } else if (hasRejectedQuote) {
@@ -1578,7 +1591,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSavePurchaseOrder = createSaveHandler(setPurchaseOrders, 'purchase_orders');
     const handleDeletePurchaseOrder = createDeleteHandler(setPurchaseOrders, 'purchase_orders');
 
-    const handleCreateOperatingExpense = async (expenseData: Omit<OperatingExpense, 'id' | 'date'>): Promise<void> => {
+    const handleCreateOperatingExpense = async(expenseData: Omit<OperatingExpense, 'id' | 'date'>): Promise<void> => {
         try {
             const expense: OperatingExpense = {
                 ...expenseData,
@@ -1597,7 +1610,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSaveOperatingExpense = createSaveHandler(setOperatingExpenses, 'operating_expenses');
     const handleDeleteOperatingExpense = createDeleteHandler(setOperatingExpenses, 'operating_expenses');
 
-    const handleCreateFinancialAccount = async (accountData: Omit<FinancialAccount, 'id'>): Promise<void> => {
+    const handleCreateFinancialAccount = async(accountData: Omit<FinancialAccount, 'id'>): Promise<void> => {
         try {
             const account: FinancialAccount = {
                 ...accountData,
@@ -1612,22 +1625,22 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             throw error;
         }
     };
-    const handleSaveFinancialAccount = async (accountData: FinancialAccount | Omit<FinancialAccount, 'id'>): Promise<void> => {
+    const handleSaveFinancialAccount = async(accountData: FinancialAccount | Omit<FinancialAccount, 'id'>): Promise<void> => {
         try {
-            console.log('🔍 handleSaveFinancialAccount - Processing account data:', accountData);
+            console.warn('🔍 handleSaveFinancialAccount - Processing account data:', accountData);
             
             if ('id' in accountData) {
                 // Es una actualización
-                console.log('🔍 handleSaveFinancialAccount - Updating existing account');
+                console.warn('🔍 handleSaveFinancialAccount - Updating existing account');
                 const result = await supabaseService.update('financial_accounts', accountData.id, accountData);
                 if (result) {
                     setFinancialAccounts(prev => prev.map(item => 
-                        item.id === accountData.id ? result : item
+                        item.id === accountData.id ? result : item,
                     ));
                 }
             } else {
                 // Es una creación
-                console.log('🔍 handleSaveFinancialAccount - Creating new account');
+                console.warn('🔍 handleSaveFinancialAccount - Creating new account');
                 const result = await supabaseService.insert('financial_accounts', accountData);
                 if (result) {
                     setFinancialAccounts(prev => [result, ...prev]);
@@ -1644,7 +1657,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSaveTimeClockEntry = createSaveHandler(setTimeClockEntries, 'time_clock_entries');
     const handleDeleteTimeClockEntry = createDeleteHandler(setTimeClockEntries, 'time_clock_entries');
 
-    const handleCreateLoan = async (loanData: Omit<Loan, 'id'>): Promise<void> => {
+    const handleCreateLoan = async(loanData: Omit<Loan, 'id'>): Promise<void> => {
         try {
             const loan: Loan = {
                 ...loanData,
@@ -1662,7 +1675,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleSaveLoan = createSaveHandler(setLoans, 'loans');
     const handleDeleteLoan = createDeleteHandler(setLoans, 'loans');
 
-    const handleCreateLoanPayment = async (paymentData: Omit<LoanPayment, 'id' | 'paymentDate'>): Promise<void> => {
+    const handleCreateLoanPayment = async(paymentData: Omit<LoanPayment, 'id' | 'paymentDate'>): Promise<void> => {
         try {
             const payment: LoanPayment = {
                 ...paymentData,
@@ -1686,7 +1699,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             if ('id' in appointmentData) {
                 // Updating existing appointment
-                console.log(`🔍 handleSaveAppointment - Updating appointment:`, appointmentData);
+                console.warn(`🔍 handleSaveAppointment - Updating appointment:`, appointmentData);
                 const result = await supabaseService.update('appointments', appointmentData.id, appointmentData);
                 if (result) {
                     setAppointments(prev => prev.map(a => a.id === appointmentData.id ? result : a));
@@ -1695,9 +1708,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 // Creating new appointment
                 const newAppointment: Appointment = {
                     id: crypto.randomUUID(),
-                    ...appointmentData
+                    ...appointmentData,
                 };
-                console.log(`🔍 handleSaveAppointment - Creating appointment:`, newAppointment);
+                console.warn(`🔍 handleSaveAppointment - Creating appointment:`, newAppointment);
                 const result = await supabaseService.insert('appointments', newAppointment);
                 if (result) {
                     setAppointments(prev => [...prev, result]);
@@ -1712,13 +1725,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleConfirmAppointment = async(appointmentId: string): Promise<void> => {
         try {
-            console.log(`🔍 handleConfirmAppointment - Confirming appointment:`, appointmentId);
+            console.warn(`🔍 handleConfirmAppointment - Confirming appointment:`, appointmentId);
             const result = await supabaseService.update('appointments', appointmentId, {
-                status: AppointmentStatus.CONFIRMADA
+                status: AppointmentStatus.CONFIRMADA,
             });
             if (result) {
                 setAppointments(prev => prev.map(a => a.id === appointmentId ? result : a));
-                console.log(`🔍 handleConfirmAppointment - Appointment confirmed successfully`);
+                console.warn(`🔍 handleConfirmAppointment - Appointment confirmed successfully`);
             }
         } catch (error) {
             console.error('Error confirming appointment:', error);
@@ -1728,13 +1741,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleCancelAppointment = async(appointmentId: string): Promise<void> => {
         try {
-            console.log(`🔍 handleCancelAppointment - Cancelling appointment:`, appointmentId);
+            console.warn(`🔍 handleCancelAppointment - Cancelling appointment:`, appointmentId);
             const result = await supabaseService.update('appointments', appointmentId, {
-                status: AppointmentStatus.CANCELADA
+                status: AppointmentStatus.CANCELADA,
             });
             if (result) {
                 setAppointments(prev => prev.map(a => a.id === appointmentId ? result : a));
-                console.log(`🔍 handleCancelAppointment - Appointment cancelled successfully`);
+                console.warn(`🔍 handleCancelAppointment - Appointment cancelled successfully`);
             }
         } catch (error) {
             console.error('Error cancelling appointment:', error);
@@ -1744,13 +1757,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleRescheduleAppointment = async(appointmentId: string, newDateTime: string): Promise<void> => {
         try {
-            console.log(`🔍 handleRescheduleAppointment - Rescheduling appointment:`, appointmentId, 'to:', newDateTime);
+            console.warn(`🔍 handleRescheduleAppointment - Rescheduling appointment:`, appointmentId, 'to:', newDateTime);
             const result = await supabaseService.update('appointments', appointmentId, {
-                appointmentDateTime: newDateTime
+                appointmentDateTime: newDateTime,
             });
             if (result) {
                 setAppointments(prev => prev.map(a => a.id === appointmentId ? result : a));
-                console.log(`🔍 handleRescheduleAppointment - Appointment rescheduled successfully`);
+                console.warn(`🔍 handleRescheduleAppointment - Appointment rescheduled successfully`);
             }
         } catch (error) {
             console.error('Error rescheduling appointment:', error);
@@ -1805,11 +1818,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 });
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleCancelOrder: Esperando a que Supabase procese la actualización...');
+                console.warn('🔄 handleCancelOrder: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleCancelOrder: Refrescando órdenes de trabajo después de cancelar orden...');
+                console.warn('🔄 handleCancelOrder: Refrescando órdenes de trabajo después de cancelar orden...');
                 await refreshWorkOrders();
             }
         } catch (error) {
@@ -1853,8 +1866,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 stage: KanbanStage.PENDIENTE_COTIZACION, // Avanza automáticamente a Pendiente Cotización
             };
             
-            console.log('🔍 DataContext - handleSaveDiagnostic - updateData:', updateData);
-            console.log('🔍 DataContext - handleSaveDiagnostic - diagnosticData:', diagnosticData);
+            console.warn('🔍 DataContext - handleSaveDiagnostic - updateData:', updateData);
+            console.warn('🔍 DataContext - handleSaveDiagnostic - diagnosticData:', diagnosticData);
             
             
             const result = await supabaseService.updateWorkOrder(workOrderId, updateData);
@@ -1873,11 +1886,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 });
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleSaveDiagnostic: Esperando a que Supabase procese la actualización...');
+                console.warn('🔄 handleSaveDiagnostic: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleSaveDiagnostic: Refrescando órdenes de trabajo después de completar diagnóstico...');
+                console.warn('🔄 handleSaveDiagnostic: Refrescando órdenes de trabajo después de completar diagnóstico...');
                 await refreshWorkOrders();
             }
         } catch (error) {
@@ -1902,7 +1915,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 if (workOrder) {
                     const newLinkedQuoteIds = [...new Set([...(workOrder.linkedQuoteIds || []), result.id])];
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating linkedQuoteIds:', newLinkedQuoteIds);
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating linkedQuoteIds:', newLinkedQuoteIds);
                     
                     // Update local work orders state with linkedQuoteIds
                     setWorkOrders(prev => prev.map(wo => 
@@ -1911,11 +1924,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
 
                 // Handle different quote status changes
-                console.log('🔍 DataContext - handleSaveQuote - result.status:', result.status);
-                console.log('🔍 DataContext - handleSaveQuote - QuoteStatus.ENVIADO:', QuoteStatus.ENVIADO);
-                console.log('🔍 DataContext - handleSaveQuote - comparison result:', result.status === QuoteStatus.ENVIADO);
-                console.log('🔍 DataContext - handleSaveQuote - typeof result.status:', typeof result.status);
-                console.log('🔍 DataContext - handleSaveQuote - typeof QuoteStatus.ENVIADO:', typeof QuoteStatus.ENVIADO);
+                console.warn('🔍 DataContext - handleSaveQuote - result.status:', result.status);
+                console.warn('🔍 DataContext - handleSaveQuote - QuoteStatus.ENVIADO:', QuoteStatus.ENVIADO);
+                console.warn('🔍 DataContext - handleSaveQuote - comparison result:', result.status === QuoteStatus.ENVIADO);
+                console.warn('🔍 DataContext - handleSaveQuote - typeof result.status:', typeof result.status);
+                console.warn('🔍 DataContext - handleSaveQuote - typeof QuoteStatus.ENVIADO:', typeof QuoteStatus.ENVIADO);
                 
                 if (result.status === QuoteStatus.ENVIADO) {
                     // Quote sent - move to "Esperando Aprobación"
@@ -1927,7 +1940,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         linkedQuoteIds: newLinkedQuoteIds,
                     };
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating work order stage to Esperando Aprobación');
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating work order stage to Esperando Aprobación');
                     await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                     
                     // Update local work orders state
@@ -1953,7 +1966,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         linkedQuoteIds: newLinkedQuoteIds,
                     };
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating work order stage to En Reparación');
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating work order stage to En Reparación');
                     await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                     
                     // Update local work orders state
@@ -1988,7 +2001,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         linkedQuoteIds: newLinkedQuoteIds,
                     };
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating work order stage to Atención Requerida');
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating work order stage to Atención Requerida');
                     await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                     
                     // Update local work orders state
@@ -2025,11 +2038,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 });
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleSaveQuote: Esperando a que Supabase procese la actualización...');
+                console.warn('🔄 handleSaveQuote: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleSaveQuote: Refrescando órdenes de trabajo después de guardar cotización...');
+                console.warn('🔄 handleSaveQuote: Refrescando órdenes de trabajo después de guardar cotización...');
                 await refreshWorkOrders();
             }
         } catch (error) {
@@ -2054,12 +2067,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     stage: KanbanStage.EN_REPARACION,
                 };
                 
-                console.log('🔍 DataContext - handleApproveQuote - Updating work order stage to En Reparación');
-                console.log('🔍 DataContext - handleApproveQuote - updateData:', updateData);
-                console.log('🔍 DataContext - handleApproveQuote - result.workOrderId:', result.workOrderId);
+                console.warn('🔍 DataContext - handleApproveQuote - Updating work order stage to En Reparación');
+                console.warn('🔍 DataContext - handleApproveQuote - updateData:', updateData);
+                console.warn('🔍 DataContext - handleApproveQuote - result.workOrderId:', result.workOrderId);
                 
                 const workOrderUpdateResult = await supabaseService.updateWorkOrder(result.workOrderId, updateData);
-                console.log('🔍 DataContext - handleApproveQuote - workOrderUpdateResult:', workOrderUpdateResult);
+                console.warn('🔍 DataContext - handleApproveQuote - workOrderUpdateResult:', workOrderUpdateResult);
                 
                 if (!workOrderUpdateResult) {
                     console.error('❌ DataContext - handleApproveQuote - updateWorkOrder returned null!');
@@ -2085,18 +2098,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 try {
                     // Solo crear notificación si tenemos un staff member válido
                     // Por ahora, saltamos la notificación para evitar errores de foreign key
-                    console.log('🔍 handleApproveQuote - Skipping notification creation to avoid foreign key errors');
+                    console.warn('🔍 handleApproveQuote - Skipping notification creation to avoid foreign key errors');
                 } catch (notificationError) {
-                    console.log('🔍 handleApproveQuote - Notification creation failed, continuing without notification:', notificationError);
+                    console.warn('🔍 handleApproveQuote - Notification creation failed, continuing without notification:', notificationError);
                     // Continue without failing the entire process
                 }
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleApproveQuote: Esperando a que Supabase procese la actualización...');
+                console.warn('🔄 handleApproveQuote: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleApproveQuote: Refrescando órdenes de trabajo después de aprobar cotización...');
+                console.warn('🔄 handleApproveQuote: Refrescando órdenes de trabajo después de aprobar cotización...');
                 await refreshWorkOrders();
             }
         } catch (error) {
@@ -2121,7 +2134,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     stage: KanbanStage.ATENCION_REQUERIDA,
                 };
                 
-                console.log('🔍 DataContext - handleRejectQuote - Updating work order stage to Atención Requerida');
+                console.warn('🔍 DataContext - handleRejectQuote - Updating work order stage to Atención Requerida');
                 await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                 
                 // Update local work orders state
@@ -2149,11 +2162,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 });
                 
                 // Esperar un momento para que Supabase procese la actualización completamente
-                console.log('🔄 handleRejectQuote: Esperando a que Supabase procese la actualización...');
+                console.warn('🔄 handleRejectQuote: Esperando a que Supabase procese la actualización...');
                 await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Refrescar solo órdenes de trabajo para optimizar rendimiento
-                console.log('🔄 handleRejectQuote: Refrescando órdenes de trabajo después de rechazar cotización...');
+                console.warn('🔄 handleRejectQuote: Refrescando órdenes de trabajo después de rechazar cotización...');
                 await refreshWorkOrders();
             }
         } catch (error) {
@@ -2493,49 +2506,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleRegisterItemCosts = async(workOrderId: string, costs: { itemId: string; costPrice: number; supplierId: string }[]): Promise<void> => {
         try {
-            console.log('🔍 DataContext - handleRegisterItemCosts called');
-            console.log('🔍 DataContext - workOrderId:', workOrderId);
-            console.log('🔍 DataContext - costs:', costs);
+            console.warn('🔍 DataContext - handleRegisterItemCosts called');
+            console.warn('🔍 DataContext - workOrderId:', workOrderId);
+            console.warn('🔍 DataContext - costs:', costs);
             
             let workOrder = workOrders.find(wo => wo.id === workOrderId);
-            console.log('🔍 DataContext - workOrder found:', workOrder);
+            console.warn('🔍 DataContext - workOrder found:', workOrder);
             
-            console.log('🔍 DataContext - workOrder.linkedQuoteIds:', workOrder?.linkedQuoteIds);
-            console.log('🔍 DataContext - linkedQuoteIds length:', (workOrder?.linkedQuoteIds || []).length);
+            console.warn('🔍 DataContext - workOrder.linkedQuoteIds:', workOrder?.linkedQuoteIds);
+            console.warn('🔍 DataContext - linkedQuoteIds length:', (workOrder?.linkedQuoteIds || []).length);
             
             if (!workOrder) {
-                console.log('❌ DataContext - Work order not found');
-                alert('No se encontró la orden de trabajo.');
+                console.warn('❌ DataContext - Work order not found');
+                console.warn('No se encontró la orden de trabajo.');
                 return;
             }
 
             // If no linked quotes, try to fix them automatically
             if ((workOrder.linkedQuoteIds || []).length === 0) {
-                console.log('🔧 DataContext - No linked quotes found, attempting to fix...');
+                console.warn('🔧 DataContext - No linked quotes found, attempting to fix...');
                 const fixedLinkedQuoteIds = await fixLinkedQuoteIds(workOrderId);
                 
                 if (fixedLinkedQuoteIds.length === 0) {
-                    console.log('❌ DataContext - Still no linked quotes after fix attempt');
-                    alert('No se encontraron cotizaciones vinculadas para esta orden de trabajo. Por favor verifica que la cotización esté correctamente asociada.');
+                    console.warn('❌ DataContext - Still no linked quotes after fix attempt');
+                    console.warn('No se encontraron cotizaciones vinculadas para esta orden de trabajo. Por favor verifica que la cotización esté correctamente asociada.');
                     return;
                 }
                 
                 // Use the fixed quote IDs directly
                 workOrder = { ...workOrder, linkedQuoteIds: fixedLinkedQuoteIds };
-                console.log('✅ DataContext - Using fixed linked quote IDs:', fixedLinkedQuoteIds);
+                console.warn('✅ DataContext - Using fixed linked quote IDs:', fixedLinkedQuoteIds);
             }
             
             const relevantQuoteIds = new Set<string>(workOrder.linkedQuoteIds);
-            console.log('🔍 DataContext - relevantQuoteIds:', relevantQuoteIds);
+            console.warn('🔍 DataContext - relevantQuoteIds:', relevantQuoteIds);
 
             for (const quoteId of relevantQuoteIds) {
                 const quote = quotes.find(q => q.id === quoteId);
                 if (quote) {
-                    console.log('🔍 DataContext - Updating quote:', quoteId);
+                    console.warn('🔍 DataContext - Updating quote:', quoteId);
                     const newItems = quote.items.map(item => {
                         const costInfo = costs.find(c => c.itemId === item.id);
                         if (costInfo) {
-                            console.log(`🔍 DataContext - Updating item ${item.id} with cost ${costInfo.costPrice}`);
+                            console.warn(`🔍 DataContext - Updating item ${item.id} with cost ${costInfo.costPrice}`);
                             return { ...item, costPrice: costInfo.costPrice, supplierId: costInfo.supplierId };
                         }
                         return item;
@@ -2549,10 +2562,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
             
-            alert('Costos guardados exitosamente.');
+            console.warn('Costos guardados exitosamente.');
         } catch (error) {
             console.error('Error registering item costs:', error);
-            alert(`Error al guardar los costos: ${error.message}`);
+            console.warn(`Error al guardar los costos: ${error.message}`);
             throw error;
         }
     };
@@ -2562,7 +2575,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             const workOrder = workOrders.find(wo => wo.id === workOrderId);
             if (!workOrder) {
-                console.log('❌ DataContext - Work order not found');
+                console.warn('❌ DataContext - Work order not found');
                 return [];
             }
 
@@ -2646,7 +2659,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLoading(true);
             setError(null);
             
-            console.log('🔄 Loading all data from Supabase...');
+            console.warn('🔄 Loading all data from Supabase...');
             
             // Load all data from Supabase
             const [
@@ -2730,12 +2743,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setOperatingExpenses(operatingExpensesData);
             
             // Set invoices with proper status mapping
-            console.log('🔍 DataContext - Raw invoices data from Supabase:', invoicesData);
+            console.warn('🔍 DataContext - Raw invoices data from Supabase:', invoicesData);
             const mappedInvoices = invoicesData.map(inv => ({
                 ...inv,
                 status: inv.status as InvoiceStatus,
             }));
-            console.log('🔍 DataContext - Mapped invoices:', mappedInvoices);
+            console.warn('🔍 DataContext - Mapped invoices:', mappedInvoices);
             setInvoices(mappedInvoices);
             
             // Set quotes with proper status mapping
@@ -2755,7 +2768,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Set app settings (use first one or default)
             if (Array.isArray(appSettingsData) && appSettingsData.length > 0) {
-                console.log('🔧 App settings data from DB:', appSettingsData[0]);
+                console.warn('🔧 App settings data from DB:', appSettingsData[0]);
                 const settings = appSettingsData[0];
                 
                 // Ensure default categories are initialized if not present
@@ -2807,7 +2820,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setError(err instanceof Error ? err.message : 'Failed to load data');
             
             // Fallback to default data if Supabase fails
-            console.log('🔄 Falling back to default data...');
+            console.warn('🔄 Falling back to default data...');
             
             setLocations(LOCATIONS_DATA);
             setWorkOrders(WORK_ORDERS_DATA);
@@ -3020,15 +3033,15 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         createNotification,
         
         // Missing functions (temporary implementations)
-        handleMarkNotificationAsRead: async (notificationId: string) => {
+        handleMarkNotificationAsRead: async(notificationId: string) => {
             console.warn('handleMarkNotificationAsRead not implemented');
         },
-        handleMarkAllNotificationsAsRead: async () => {
+        handleMarkAllNotificationsAsRead: async() => {
             console.warn('handleMarkAllNotificationsAsRead not implemented');
         },
-        handleCreateWorkOrderFromAppointment: async (appointmentId: string) => {
+        handleCreateWorkOrderFromAppointment: async(appointmentId: string) => {
             try {
-                console.log(`🔍 handleCreateWorkOrderFromAppointment - Preparing to open work order form for appointment:`, appointmentId);
+                console.warn(`🔍 handleCreateWorkOrderFromAppointment - Preparing to open work order form for appointment:`, appointmentId);
                 
                 // Buscar la cita
                 const appointment = appointments.find(a => a.id === appointmentId);
@@ -3036,7 +3049,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     throw new Error('Cita no encontrada');
                 }
                 
-                console.log('🔍 Found appointment:', appointment);
+                console.warn('🔍 Found appointment:', appointment);
                 
                 // Preparar datos iniciales para el formulario
                 const initialData = {
@@ -3046,7 +3059,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     advisorId: appointment.advisorId,
                 };
                 
-                console.log('🔍 Initial data for work order form:', initialData);
+                console.warn('🔍 Initial data for work order form:', initialData);
                 
                 // Esta función ahora solo prepara los datos, el modal se abrirá desde el componente padre
                 // que llamará a openModal con estos datos
@@ -3057,7 +3070,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 throw error;
             }
         },
-        handleAddTransaction: async (transactionData: any) => {
+        handleAddTransaction: async(transactionData: any) => {
             console.warn('handleAddTransaction not implemented');
         },
         
@@ -3069,42 +3082,42 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     React.useEffect(() => {
         return; // Sistema automático deshabilitado
         
-        console.log('🚀 SISTEMA AUTOMÁTICO INICIADO - useEffect ejecutado');
-        console.log('🚀 SISTEMA AUTOMÁTICO - workOrders.length:', workOrders.length);
-        console.log('🚀 SISTEMA AUTOMÁTICO - quotes.length:', quotes.length);
+        console.warn('🚀 SISTEMA AUTOMÁTICO INICIADO - useEffect ejecutado');
+        console.warn('🚀 SISTEMA AUTOMÁTICO - workOrders.length:', workOrders.length);
+        console.warn('🚀 SISTEMA AUTOMÁTICO - quotes.length:', quotes.length);
         
         const autoFixAllStages = async() => {
             try {
-                console.log('🔧 SISTEMA AUTOMÁTICO: Iniciando corrección de etapas...');
-                console.log('🔧 SISTEMA AUTOMÁTICO: Estado actual - workOrders:', workOrders.length, 'quotes:', quotes.length);
-                console.log('🔧 SISTEMA AUTOMÁTICO: Contexto disponible:', { supabaseService: !!supabaseService, handleUpdateWorkOrderHistory: !!handleUpdateWorkOrderHistory });
+                console.warn('🔧 SISTEMA AUTOMÁTICO: Iniciando corrección de etapas...');
+                console.warn('🔧 SISTEMA AUTOMÁTICO: Estado actual - workOrders:', workOrders.length, 'quotes:', quotes.length);
+                console.warn('🔧 SISTEMA AUTOMÁTICO: Contexto disponible:', { supabaseService: !!supabaseService, handleUpdateWorkOrderHistory: !!handleUpdateWorkOrderHistory });
                 
                 // Obtener datos frescos directamente de Supabase
-                console.log('📡 Obteniendo datos de Supabase...');
+                console.warn('📡 Obteniendo datos de Supabase...');
                 const [allWorkOrders, allQuotes] = await Promise.all([
                     supabaseService.getWorkOrders(),
                     supabaseService.getQuotes(),
                 ]);
                 
-                console.log(`📊 Datos obtenidos: ${allWorkOrders.length} órdenes, ${allQuotes.length} cotizaciones`);
-                console.log('📊 Primeras 3 órdenes:', allWorkOrders.slice(0, 3).map(wo => ({ id: wo.id, stage: wo.stage, linkedQuoteIds: wo.linkedQuoteIds })));
-                console.log('📊 Primeras 3 cotizaciones:', allQuotes.slice(0, 3).map(q => ({ id: q.id, status: q.status, workOrderId: q.workOrderId })));
+                console.warn(`📊 Datos obtenidos: ${allWorkOrders.length} órdenes, ${allQuotes.length} cotizaciones`);
+                console.warn('📊 Primeras 3 órdenes:', allWorkOrders.slice(0, 3).map(wo => ({ id: wo.id, stage: wo.stage, linkedQuoteIds: wo.linkedQuoteIds })));
+                console.warn('📊 Primeras 3 cotizaciones:', allQuotes.slice(0, 3).map(q => ({ id: q.id, status: q.status, workOrderId: q.workOrderId })));
                 
                 // Buscar específicamente la orden #0081
                 const order0081 = allWorkOrders.find(wo => wo.id === '0081');
                 if (order0081) {
-                    console.log('🔍 SISTEMA AUTOMÁTICO: ¡Encontrada orden #0081 en la base de datos!', {
+                    console.warn('🔍 SISTEMA AUTOMÁTICO: ¡Encontrada orden #0081 en la base de datos!', {
                         id: order0081.id,
                         stage: order0081.stage,
                         linkedQuoteIds: order0081.linkedQuoteIds,
                     });
                 } else {
-                    console.log('❌ SISTEMA AUTOMÁTICO: ¡Orden #0081 NO encontrada en la base de datos!');
-                    console.log('📊 IDs de órdenes disponibles:', allWorkOrders.map(wo => wo.id));
+                    console.warn('❌ SISTEMA AUTOMÁTICO: ¡Orden #0081 NO encontrada en la base de datos!');
+                    console.warn('📊 IDs de órdenes disponibles:', allWorkOrders.map(wo => wo.id));
                 }
                 
                 if (allWorkOrders.length === 0 || allQuotes.length === 0) {
-                    console.log('⏳ SISTEMA AUTOMÁTICO: No hay datos suficientes, reintentando en 3 segundos...');
+                    console.warn('⏳ SISTEMA AUTOMÁTICO: No hay datos suficientes, reintentando en 3 segundos...');
                     setTimeout(autoFixAllStages, 3000);
                     return;
                 }
@@ -3112,18 +3125,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 let fixedCount = 0;
                 const errors: string[] = [];
                 
-                console.log('🔍 SISTEMA AUTOMÁTICO: Analizando todas las órdenes...');
+                console.warn('🔍 SISTEMA AUTOMÁTICO: Analizando todas las órdenes...');
                 
                 // El bucle general manejará TODAS las órdenes automáticamente
                 
                 // Verificar cada orden de trabajo
-                console.log('🔍 SISTEMA AUTOMÁTICO: Iniciando bucle general para todas las órdenes...');
+                console.warn('🔍 SISTEMA AUTOMÁTICO: Iniciando bucle general para todas las órdenes...');
                 for (const workOrder of allWorkOrders) {
-                    console.log(`🔍 SISTEMA AUTOMÁTICO: Procesando orden ${workOrder.id} (stage: ${workOrder.stage})`);
+                    console.warn(`🔍 SISTEMA AUTOMÁTICO: Procesando orden ${workOrder.id} (stage: ${workOrder.stage})`);
                     try {
                         // Saltar órdenes completadas o canceladas
                         if (workOrder.stage === KanbanStage.ENTREGADO || workOrder.stage === KanbanStage.CANCELADO) {
-                            console.log(`⏩ SISTEMA AUTOMÁTICO: Saltando orden ${workOrder.id} (stage: ${workOrder.stage})`);
+                            console.warn(`⏩ SISTEMA AUTOMÁTICO: Saltando orden ${workOrder.id} (stage: ${workOrder.stage})`);
                             continue;
                         }
                         
@@ -3134,12 +3147,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         );
                         
                         if (orderQuotes.length === 0) {
-                            console.log(`⏩ SISTEMA AUTOMÁTICO: Saltando orden ${workOrder.id} (no tiene cotizaciones)`);
+                            console.warn(`⏩ SISTEMA AUTOMÁTICO: Saltando orden ${workOrder.id} (no tiene cotizaciones)`);
                             continue; // No hay cotizaciones
                         }
                         
-                        console.log(`🔍 Analizando orden ${workOrder.id}: stage=${workOrder.stage}, quotes=${orderQuotes.length}`);
-                        console.log(`📋 Cotizaciones:`, orderQuotes.map(q => ({ id: q.id, status: q.status })));
+                        console.warn(`🔍 Analizando orden ${workOrder.id}: stage=${workOrder.stage}, quotes=${orderQuotes.length}`);
+                        console.warn(`📋 Cotizaciones:`, orderQuotes.map(q => ({ id: q.id, status: q.status })));
                         
                         // Analizar estado de las cotizaciones
                         const approvedQuotes = orderQuotes.filter(q => q.status === QuoteStatus.APROBADO);
@@ -3165,11 +3178,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                             updateReason = `Solo cotizaciones en borrador - debe estar en Pendiente Cotización`;
                         }
                         
-                        console.log(`🔧 Etapa correcta para ${workOrder.id}: ${correctStage} (actual: ${workOrder.stage})`);
+                        console.warn(`🔧 Etapa correcta para ${workOrder.id}: ${correctStage} (actual: ${workOrder.stage})`);
                         
                         // Actualizar si es necesario
                         if (correctStage !== workOrder.stage) {
-                            console.log(`🔧 CORRIGIENDO: Orden ${workOrder.id} - ${workOrder.stage} → ${correctStage} (${updateReason})`);
+                            console.warn(`🔧 CORRIGIENDO: Orden ${workOrder.id} - ${workOrder.stage} → ${correctStage} (${updateReason})`);
                             
                             // Actualizar linkedQuoteIds si faltan
                             const missingQuoteIds = orderQuotes
@@ -3186,7 +3199,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 linkedQuoteIds: newLinkedQuoteIds,
                             };
                             
-                            console.log(`💾 Actualizando orden ${workOrder.id} en Supabase...`);
+                            console.warn(`💾 Actualizando orden ${workOrder.id} en Supabase...`);
                             await supabaseService.updateWorkOrder(workOrder.id, updateData);
                             
                             // Actualizar estado local
@@ -3205,13 +3218,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                                 user: 'Sistema Automático',
                                 notes: updateReason,
                             };
-                            console.log(`📝 Añadiendo entrada al historial para orden ${workOrder.id}...`);
+                            console.warn(`📝 Añadiendo entrada al historial para orden ${workOrder.id}...`);
                             await handleUpdateWorkOrderHistory(workOrder.id, historyEntry);
                             
                             fixedCount++;
-                            console.log(`✅ Orden ${workOrder.id} corregida exitosamente`);
+                            console.warn(`✅ Orden ${workOrder.id} corregida exitosamente`);
                         } else {
-                            console.log(`✅ Orden ${workOrder.id} ya está en la etapa correcta`);
+                            console.warn(`✅ Orden ${workOrder.id} ya está en la etapa correcta`);
                         }
                         
                     } catch (error) {
@@ -3221,17 +3234,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                 }
                 
-                console.log(`🎯 SISTEMA AUTOMÁTICO: Bucle completado. Procesadas ${allWorkOrders.length} órdenes, corregidas ${fixedCount}, errores ${errors.length}`);
+                console.warn(`🎯 SISTEMA AUTOMÁTICO: Bucle completado. Procesadas ${allWorkOrders.length} órdenes, corregidas ${fixedCount}, errores ${errors.length}`);
                 
                 if (fixedCount > 0) {
-                    console.log(`✅ SISTEMA AUTOMÁTICO: Corregidas ${fixedCount} órdenes`);
-                    console.log(`❌ Errores: ${errors.length}`);
+                    console.warn(`✅ SISTEMA AUTOMÁTICO: Corregidas ${fixedCount} órdenes`);
+                    console.warn(`❌ Errores: ${errors.length}`);
                     
                     // Recargar datos para mostrar cambios
-                    console.log('🔄 Recargando datos para mostrar cambios...');
+                    console.warn('🔄 Recargando datos para mostrar cambios...');
                     await loadAllData();
                 } else {
-                    console.log('✅ SISTEMA AUTOMÁTICO: Todas las etapas están correctas');
+                    console.warn('✅ SISTEMA AUTOMÁTICO: Todas las etapas están correctas');
                 }
                 
             } catch (error) {
@@ -3240,16 +3253,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         };
         
         // Ejecutar solo una vez al cargar la aplicación
-        console.log('⏰ SISTEMA AUTOMÁTICO: Programando ejecución única...');
+        console.warn('⏰ SISTEMA AUTOMÁTICO: Programando ejecución única...');
         const timer = setTimeout(() => {
-            console.log('⏰ SISTEMA AUTOMÁTICO: Timer ejecutado, iniciando corrección...');
+            console.warn('⏰ SISTEMA AUTOMÁTICO: Timer ejecutado, iniciando corrección...');
             autoFixAllStages().catch(error => {
                 console.error('❌ SISTEMA AUTOMÁTICO: Error en autoFixAllStages:', error);
             });
         }, 1000);
 
         return () => {
-            console.log('🧹 SISTEMA AUTOMÁTICO: Limpiando timer...');
+            console.warn('🧹 SISTEMA AUTOMÁTICO: Limpiando timer...');
             clearTimeout(timer);
         };
     }, []); // Se ejecuta solo una vez al montar el componente

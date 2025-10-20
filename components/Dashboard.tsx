@@ -33,28 +33,28 @@ interface DashboardProps {
 
 const UpcomingAppointments: React.FC<{ appointments: Appointment[] }> = ({ appointments }) => {
     const upcoming = useMemo(() => {
-        console.log('🔍 Dashboard - Total appointments:', appointments.length);
-        console.log('🔍 Dashboard - Appointments data:', appointments);
+        console.warn('🔍 Dashboard - Total appointments:', appointments.length);
+        console.warn('🔍 Dashboard - Appointments data:', appointments);
         
         const now = new Date();
         now.setHours(0, 0, 0, 0); // Reset to start of day
         
         const filtered = appointments
             .filter(a => {
-                console.log('🔍 Checking appointment:', a.id, 'Status:', a.status, 'Date:', a.appointmentDateTime);
+                console.warn('🔍 Checking appointment:', a.id, 'Status:', a.status, 'Date:', a.appointmentDateTime);
                 return a.status === AppointmentStatus.PROGRAMADA || a.status === AppointmentStatus.CONFIRMADA;
             })
             .filter(a => {
                 const appointmentDate = new Date(a.appointmentDateTime);
                 appointmentDate.setHours(0, 0, 0, 0);
                 const isUpcoming = appointmentDate >= now;
-                console.log('🔍 Date comparison:', appointmentDate, '>=', now, '=', isUpcoming);
+                console.warn('🔍 Date comparison:', appointmentDate, '>=', now, '=', isUpcoming);
                 return isUpcoming;
             })
             .sort((a, b) => new Date(a.appointmentDateTime).getTime() - new Date(b.appointmentDateTime).getTime())
             .slice(0, 5);
             
-        console.log('🔍 Dashboard - Filtered upcoming appointments:', filtered);
+        console.warn('🔍 Dashboard - Filtered upcoming appointments:', filtered);
         return filtered;
     }, [appointments]);
 

@@ -5,7 +5,7 @@ type ImageType = 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico';
 interface ImageSource {
     src: string;
     type: ImageType;
-    timestamp: string;
+    timestamp: string | Date;
     notes?: string;
 }
 

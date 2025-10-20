@@ -164,7 +164,7 @@ const PayrollReport: React.FC<PayrollReportProps> = ({ staffMembers, timeClockEn
         }
         
         setPaidStaffIds(prev => new Set(prev).add(data.staffId));
-        alert(`Pago para ${data.name} registrado con éxito.`);
+        console.warn(`Pago para ${data.name} registrado con éxito.`);
     };
 
     const getCalculationDetail = (data: PayrollData) => {

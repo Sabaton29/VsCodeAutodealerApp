@@ -41,7 +41,7 @@ const QUALITY_CATEGORIES: QualityCategory[] = [
             { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería', category: 'exterior', status: 'unset' },
             { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante', category: 'exterior', status: 'unset' },
             { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar', category: 'exterior', status: 'unset' },
-        ]
+        ],
     },
     {
         id: 'funcionalidad',
@@ -54,7 +54,7 @@ const QUALITY_CATEGORIES: QualityCategory[] = [
             { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto', category: 'funcionalidad', status: 'unset' },
             { id: 'func-5', description: 'El sistema de A/C y calefacción funciona', category: 'funcionalidad', status: 'unset' },
             { id: 'func-6', description: 'Los frenos responden adecuadamente', category: 'funcionalidad', status: 'unset' },
-        ]
+        ],
     },
     {
         id: 'verificacion',
@@ -65,7 +65,7 @@ const QUALITY_CATEGORIES: QualityCategory[] = [
             { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)', category: 'verificacion', status: 'unset' },
             { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)', category: 'verificacion', status: 'unset' },
             { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos', category: 'verificacion', status: 'unset' },
-        ]
+        ],
     },
     {
         id: 'documentacion',
@@ -75,8 +75,8 @@ const QUALITY_CATEGORIES: QualityCategory[] = [
             { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados', category: 'documentacion', status: 'unset' },
             { id: 'doc-2', description: 'La orden de trabajo está completamente documentada', category: 'documentacion', status: 'unset' },
             { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento', category: 'documentacion', status: 'unset' },
-        ]
-    }
+        ],
+    },
 ];
 
 const QualityControlView: React.FC<QualityControlViewProps> = ({ 
@@ -88,13 +88,13 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
     onBack,
     onClose,
     staffMembers,
-    isModal = true
+    isModal = true,
 }) => {
     const data = useContext(DataContext);
     const ui = useContext(UIContext);
     
     const [qualityChecks, setQualityChecks] = useState<QualityCheckItem[]>(() => 
-        QUALITY_CATEGORIES.flatMap(category => category.items)
+        QUALITY_CATEGORIES.flatMap(category => category.items),
     );
     const [finalNotes, setFinalNotes] = useState('');
     const [selectedInspector, setSelectedInspector] = useState<string>('');
@@ -111,19 +111,19 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
     useEffect(() => {
         if (staffMembers.length > 0 && !selectedInspector) {
             const defaultInspector = staffMembers.find(member => 
-                member.role === UserRole.ADMINISTRADOR || member.name.toLowerCase().includes('admin')
+                member.role === UserRole.ADMINISTRADOR || member.name.toLowerCase().includes('admin'),
             ) || staffMembers[0];
             setSelectedInspector(defaultInspector.id);
         }
     }, [staffMembers, selectedInspector]);
 
     const handleStatusChange = (itemId: string, status: 'ok' | 'no-ok' | 'na') => {
-        console.log('🔍 QualityControlView - handleStatusChange:', { itemId, status });
+        console.warn('🔍 QualityControlView - handleStatusChange:', { itemId, status });
         setQualityChecks(prev => {
             const updated = prev.map(item => 
-                item.id === itemId ? { ...item, status } : item
+                item.id === itemId ? { ...item, status } : item,
             );
-            console.log('🔍 QualityControlView - qualityChecks updated:', updated.find(item => item.id === itemId));
+            console.warn('🔍 QualityControlView - qualityChecks updated:', updated.find(item => item.id === itemId));
             return updated;
         });
     };
@@ -176,7 +176,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
         return overall.completed === overall.total && hasNotes && hasInspector && categoriesCompleted;
     };
 
-    const handleSubmit = async (approved: boolean) => {
+    const handleSubmit = async(approved: boolean) => {
         if (!canApprove() && approved) {
             (ui as any).showNotification?.('warning', 'Debes completar todas las verificaciones, seleccionar inspector y agregar observaciones');
             return;
@@ -194,11 +194,11 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                 description: item.description,
                 category: item.category,
                 status: item.status,
-                notes: item.notes
+                notes: item.notes,
             }));
             
             const checklistSummary = qualityChecksData.map(item => 
-                `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
+                `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`,
             ).join('|');
             
             const historyEntry = {
@@ -212,7 +212,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                 staffMemberId: selectedInspector,
                 // Guardar información detallada del checklist
                 qualityChecksData: qualityChecksData,
-                checklistSummary: checklistSummary
+                checklistSummary: checklistSummary,
             };
 
             // Avanzar o retroceder según el resultado y actualizar historial
@@ -240,7 +240,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
             setFinalResult({
                 isApproved: approved,
                 inspectorName,
-                inspectionDate: new Date().toLocaleDateString('es-CO')
+                inspectionDate: new Date().toLocaleDateString('es-CO'),
             });
 
             // Marcar como completado
@@ -367,7 +367,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                     <button
                         onClick={() => {
                             // Mostrar mensaje de confirmación antes de salir
-                            if (confirm('¿Está seguro de que desea salir del control de calidad? Los cambios no guardados se perderán.')) {
+                            if (window.window.confirm('¿Está seguro de que desea salir del control de calidad? Los cambios no guardados se perderán.')) {
                                 if (onClose) {
                                     onClose();
                                 } else {
@@ -481,7 +481,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                         <button
                             onClick={() => {
                                 // Aquí podrías agregar lógica adicional para guardar las observaciones
-                                console.log('Guardando observaciones:', finalNotes);
+                                console.warn('Guardando observaciones:', finalNotes);
                             }}
                             className="absolute bottom-3 right-3 p-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                             title="Guardar observaciones"
@@ -575,7 +575,7 @@ const QualityControlView: React.FC<QualityControlViewProps> = ({
                                     inspectionDate={new Date().toISOString()}
                                     isApproved={finalResult.isApproved}
                                     notes={`${finalNotes} checklistSummary: ${qualityChecks.map(item => 
-                                        `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`
+                                        `${item.id}:${item.status}${item.notes ? `:${item.notes}` : ''}`,
                                     ).join('|')}`}
                                     companyInfo={data.appSettings?.companyInfo || undefined}
                                 />

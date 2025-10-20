@@ -2,6 +2,7 @@
 import React, { useMemo } from 'react';
 import { Invoice, InvoiceStatus } from '../types';
 import { Icon } from './Icon';
+import { formatDate } from '../utils/format';
 import MetricCard from './MetricCard';
 
 interface AccountsReceivableReportProps {
@@ -20,7 +21,6 @@ type ReceivableData = {
 };
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
-const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('es-CO', { day: '2-digit', month: 'short', year: 'numeric' });
 
 const AccountsReceivableReport: React.FC<AccountsReceivableReportProps> = ({ invoices, selectedLocationId, onViewInvoiceDetails }) => {
 

@@ -10,13 +10,13 @@ const filesToClean = [
   'update-work-orders-simple.js',
   'update-work-orders-stages.js',
   'verificar-estado-ordenes.js',
-  'setup-local.cjs'
+  'setup-local.cjs',
 ];
 
 function cleanConsoleLogs(filePath) {
   try {
     if (!fs.existsSync(filePath)) {
-      console.log(`Archivo no encontrado: ${filePath}`);
+      console.debug(`Archivo no encontrado: ${filePath}`);
       return;
     }
 
@@ -32,19 +32,19 @@ function cleanConsoleLogs(filePath) {
 
     if (content !== originalContent) {
       fs.writeFileSync(filePath, content, 'utf8');
-      console.log(`✅ Limpiado: ${filePath}`);
+      console.debug(`✅ Limpiado: ${filePath}`);
     } else {
-      console.log(`ℹ️  Sin cambios: ${filePath}`);
+      console.debug(`ℹ️  Sin cambios: ${filePath}`);
     }
   } catch (error) {
     console.error(`❌ Error procesando ${filePath}:`, error.message);
   }
 }
 
-console.log('🧹 Iniciando limpieza de console.log...\n');
+console.debug('🧹 Iniciando limpieza de console.log...\n');
 
 filesToClean.forEach(file => {
   cleanConsoleLogs(file);
 });
 
-console.log('\n✨ Limpieza completada!');
+console.debug('\n✨ Limpieza completada!');

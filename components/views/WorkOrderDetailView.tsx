@@ -1,6 +1,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { renderToString } from 'react-dom/server.browser';
 import { Icon } from '../Icon';
+import { formatDateTime } from '../../utils/format';
 import { WorkOrder, Client, Vehicle, ChecklistStatus, Permission, DiagnosticData, Quote, QuoteStatus, KanbanStage, Supplier, AppSettings, CompanyInfo, StaffMember, DiagnosticType, UnforeseenIssue } from '../../types';
 import PrintableDiagnosticReport from '../PrintableDiagnosticReport';
 import PrintableReceptionReport from '../PrintableReceptionReport';
@@ -223,8 +224,8 @@ const CostManagementSection: React.FC<{
     };
 
     const handleSaveCosts = () => {
-        console.log('🔍 CostManagementSection - handleSaveCosts called');
-        console.log('🔍 CostManagementSection - costs state:', costs);
+        console.warn('🔍 CostManagementSection - handleSaveCosts called');
+        console.warn('🔍 CostManagementSection - costs state:', costs);
         
         const costsToSave = Object.entries(costs)
             .filter(([_, value]) => value.costPrice && parseFloat(value.costPrice) > 0)
@@ -234,20 +235,20 @@ const CostManagementSection: React.FC<{
                 supplierId: value.supplierId,
             }));
         
-        console.log('🔍 CostManagementSection - costsToSave:', costsToSave);
-        console.log('🔍 CostManagementSection - onSave function:', onSave);
+        console.warn('🔍 CostManagementSection - costsToSave:', costsToSave);
+        console.warn('🔍 CostManagementSection - onSave function:', onSave);
         
         if (costsToSave.length === 0) {
-            alert('No hay costos válidos para guardar. Por favor ingresa al menos un costo mayor a 0.');
+            console.warn('No hay costos válidos para guardar. Por favor ingresa al menos un costo mayor a 0.');
             return;
         }
         
         try {
             onSave(costsToSave);
-            console.log('✅ CostManagementSection - onSave called successfully');
+            console.warn('✅ CostManagementSection - onSave called successfully');
         } catch (error) {
             console.error('❌ CostManagementSection - Error calling onSave:', error);
-            alert('Error al guardar los costos. Por favor intenta nuevamente.');
+            console.warn('Error al guardar los costos. Por favor intenta nuevamente.');
         }
     };
 
@@ -305,7 +306,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
     const [isQualityControlExpanded, setIsQualityControlExpanded] = useState(false);
     
     const galleryImages = useMemo(() => {
-        const allImages: { src: string; type: 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico'; timestamp: string; notes?: string; }[] = [];
+        const allImages: { src: string; type: 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico'; timestamp: string | Date; notes?: string; }[] = [];
 
         (workOrder.entryEvidenceImageUrls || []).forEach(url => {
             allImages.push({ src: url, type: 'Ingreso', timestamp: (workOrder as any).createdAt || new Date().toISOString(), notes: 'Evidencia de Ingreso' });
@@ -345,7 +346,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                 src: url,
                                 type: 'Avance',
                                 timestamp: (workOrder as any).updatedAt || (workOrder as any).createdAt || new Date().toISOString(),
-                                notes: `Tarea: ${item.description}`
+                                notes: `Tarea: ${item.description}`,
                             });
                         });
                     }
@@ -361,7 +362,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                         src: url,
                         type: 'Diagnóstico', // Usar tipo Diagnóstico para imprevistos
                         timestamp: issue.timestamp,
-                        notes: `Imprevisto: ${issue.description}`
+                        notes: `Imprevisto: ${issue.description}`,
                     });
                 });
             }
@@ -376,7 +377,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
 
     const handlePrint = async(type: 'diagnostic' | 'reception') => {
         if (!client || !vehicle) {
-            alert('Faltan datos de cliente o vehículo para generar el reporte.');
+            console.warn('Faltan datos de cliente o vehículo para generar el reporte.');
             return;
         }
 
@@ -389,7 +390,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
 
         if (type === 'diagnostic') {
             if (!workOrder.diagnosticData) {
-                alert('No hay datos de diagnóstico para generar el reporte.');
+                console.warn('No hay datos de diagnóstico para generar el reporte.');
                 return;
             }
             reportElement = <PrintableDiagnosticReport workOrder={workOrder} client={client} vehicle={vehicle} companyInfo={companyInfo} />;
@@ -442,14 +443,14 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
             printWindow.document.write(fullHtml);
             printWindow.document.close();
         } else {
-            alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
+            console.warn('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
         }
     };
 
     // Función para imprimir reporte de imprevisto
     const handlePrintUnforeseenIssue = async(issue: any) => {
         if (!client || !vehicle) {
-            alert('Faltan datos de cliente o vehículo para generar el reporte.');
+            console.warn('Faltan datos de cliente o vehículo para generar el reporte.');
             return;
         }
 
@@ -626,7 +627,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
             printWindow.document.write(reportHtml);
             printWindow.document.close();
         } else {
-            alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
+            console.warn('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
         }
     };
 
@@ -674,7 +675,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
         }
         
         if (quoteItems.length === 0) {
-            alert('No hay servicios o repuestos en este imprevisto para crear una cotización.');
+            console.warn('No hay servicios o repuestos en este imprevisto para crear una cotización.');
             return;
         }
         
@@ -689,7 +690,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
             status: 'PENDIENTE_COTIZACION' as any,
             notes: `Cotización generada desde imprevisto: ${issue.description}`,
             createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         };
         
         // Llamar a la función de crear cotización
@@ -746,16 +747,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
     }, [workOrder.diagnosticData]);
 
 
-    const formatDateTime = (dateString: string) => {
-        return new Date(dateString).toLocaleString('es-CO', {
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: true,
-        });
-    };
+    // using shared formatDateTime from utils/format
 
     // Function to convert technical names to user-friendly names
     const getFriendlyName = (technicalName: string): string => {
@@ -1003,11 +995,11 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                     {(workOrder.stage === KanbanStage.LISTO_ENTREGA || workOrder.stage === KanbanStage.ENTREGADO) && quotes.length > 0 && (() => {
                         
                         // Debug: mostrar todas las entradas del historial para investigar
-                        console.log('🔍 DEBUG - Todas las entradas del historial:', workOrder.history?.map(h => ({
+                        console.warn('🔍 DEBUG - Todas las entradas del historial:', workOrder.history?.map(h => ({
                             stage: h.stage,
                             user: h.user,
-                            notes: h.notes?.substring(0, 100) + '...',
-                            date: h.date
+                            notes: `${h.notes?.substring(0, 100)}...`,
+                            date: h.date,
                         })));
                         
                         // Buscar la entrada de historial del control de calidad completado
@@ -1015,28 +1007,28 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                         let qualityControlEntry = workOrder.history?.find(entry => 
                             (entry.notes?.includes('Control de Calidad APROBADO') || 
                              entry.notes?.includes('Control de Calidad RECHAZADO')) &&
-                            entry.user !== 'Sistema' // Solo entradas completadas por usuarios reales, no por el sistema
+                            entry.user !== 'Sistema', // Solo entradas completadas por usuarios reales, no por el sistema
                         );
                         
                         // Si no se encuentra una entrada específica, buscar cualquier entrada de control de calidad
                         if (!qualityControlEntry) {
                             qualityControlEntry = workOrder.history?.find(entry => 
                                 entry.notes?.includes('Control de Calidad') && 
-                                (entry.notes?.includes('APROBADO') || entry.notes?.includes('RECHAZADO'))
+                                (entry.notes?.includes('APROBADO') || entry.notes?.includes('RECHAZADO')),
                             );
                         }
                         
-                        console.log('🔍 DEBUG - qualityControlEntry encontrada:', qualityControlEntry);
+                        console.warn('🔍 DEBUG - qualityControlEntry encontrada:', qualityControlEntry);
                         
                         // Función para manejar la impresión del reporte
                         const handlePrintReport = () => {
                             try {
-                                console.log('🔍 DEBUG - Iniciando generación de reporte imprimible');
-                                console.log('🔍 DEBUG - qualityControlEntry:', qualityControlEntry);
+                                console.warn('🔍 DEBUG - Iniciando generación de reporte imprimible');
+                                console.warn('🔍 DEBUG - qualityControlEntry:', qualityControlEntry);
                                 
                                 // Verificar que tenemos los datos necesarios
                                 if (!qualityControlEntry) {
-                                    alert('No se encontraron datos del control de calidad para imprimir.');
+                                    console.warn('No se encontraron datos del control de calidad para imprimir.');
                                     return;
                                 }
                                 
@@ -1045,7 +1037,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                  qualityControlEntry.notes?.includes('Listo para Entrega') ||
                                                  workOrder.stage === 'Listo para Entrega';
                                 
-                                console.log('🔍 DEBUG - isApproved:', isApproved);
+                                console.warn('🔍 DEBUG - isApproved:', isApproved);
                                 
                                 // Crear el reporte imprimible del control de calidad
                                 const reportHtml = renderToString(
@@ -1060,10 +1052,10 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                         companyInfo={appSettings?.companyInfo}
                                         qualityChecksData={qualityControlEntry.qualityChecksData || []}
                                         checklistSummary={qualityControlEntry.checklistSummary || ''}
-                                    />
+                                    />,
                                 );
                                 
-                                console.log('🔍 DEBUG - reportHtml generado:', reportHtml.length, 'caracteres');
+                                console.warn('🔍 DEBUG - reportHtml generado:', reportHtml.length, 'caracteres');
                                 
                                 const fullHtml = `
                                     <!DOCTYPE html>
@@ -1094,24 +1086,24 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                     </html>
                                 `;
 
-                                console.log('🔍 DEBUG - Abriendo ventana de impresión...');
+                                console.warn('🔍 DEBUG - Abriendo ventana de impresión...');
                                 const printWindow = window.open('', '_blank');
                                 if (printWindow) {
                                     printWindow.document.write(fullHtml);
                                     printWindow.document.close();
-                                    console.log('🔍 DEBUG - Ventana de impresión abierta, programando impresión...');
+                                    console.warn('🔍 DEBUG - Ventana de impresión abierta, programando impresión...');
                                     // Esperar a que el contenido se cargue antes de imprimir
                                     setTimeout(() => {
-                                        console.log('🔍 DEBUG - Ejecutando impresión...');
+                                        console.warn('🔍 DEBUG - Ejecutando impresión...');
                                         printWindow.print();
                                     }, 1000);
                                 } else {
                                     console.error('❌ DEBUG - No se pudo abrir la ventana de impresión');
-                                    alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
+                                    console.warn('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
                                 }
                             } catch (error) {
                                 console.error('❌ DEBUG - Error generando reporte imprimible:', error);
-                                alert('Error al generar el reporte imprimible: ' + error.message);
+                                console.warn(`Error al generar el reporte imprimible: ${error.message}`);
                             }
                         };
                         
@@ -1204,8 +1196,8 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             items: [
                                                                 { id: 'exterior-1', description: 'No hay manchas de grasa en tapicería o latonería' },
                                                                 { id: 'exterior-2', description: 'Se retiraron plásticos protectores de asientos/volante' },
-                                                                { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar' }
-                                                            ]
+                                                                { id: 'exterior-3', description: 'Los elementos personales del cliente están en su lugar' },
+                                                            ],
                                                         },
                                                         {
                                                             id: 'funcionalidad',
@@ -1217,8 +1209,8 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                 { id: 'func-3', description: 'El motor funciona sin ruidos anormales' },
                                                                 { id: 'func-4', description: 'Se realizó prueba de ruta y el manejo es correcto' },
                                                                 { id: 'func-5', description: 'El sistema de A/C y calefacción funciona' },
-                                                                { id: 'func-6', description: 'Los frenos responden adecuadamente' }
-                                                            ]
+                                                                { id: 'func-6', description: 'Los frenos responden adecuadamente' },
+                                                            ],
                                                         },
                                                         {
                                                             id: 'verificacion',
@@ -1228,8 +1220,8 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                 { id: 'verif-1', description: 'Se completaron todos los trabajos aprobados en la cotización' },
                                                                 { id: 'verif-2', description: 'Los repuestos reemplazados están guardados para el cliente (si aplica)' },
                                                                 { id: 'verif-3', description: 'Se verificaron los niveles de fluidos (aceite, refrigerante, frenos)' },
-                                                                { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos' }
-                                                            ]
+                                                                { id: 'verif-4', description: 'Se ajustó la presión de los neumáticos' },
+                                                            ],
                                                         },
                                                         {
                                                             id: 'documentacion',
@@ -1238,9 +1230,9 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             items: [
                                                                 { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados' },
                                                                 { id: 'doc-2', description: 'La orden de trabajo está completamente documentada' },
-                                                                { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento' }
-                                                            ]
-                                                        }
+                                                                { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento' },
+                                                            ],
+                                                        },
                                                     ];
                                                     
                                                     // Función para obtener el estado de un elemento
@@ -1288,7 +1280,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                                     description,
                                                                     category: category as 'exterior' | 'funcionalidad' | 'verificacion' | 'documentacion',
                                                                     status: (status || 'ok') as 'ok' | 'no-ok' | 'na' | 'unset',
-                                                                    notes: notes || ''
+                                                                    notes: notes || '',
                                                                 };
                                                             }).filter(item => item.id && item.description);
                                                             
@@ -1413,7 +1405,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                                             // Documentación
                                                             { id: 'doc-1', description: 'La factura corresponde con los trabajos realizados', category: 'documentacion', status: 'ok' },
                                                             { id: 'doc-2', description: 'La orden de trabajo está completamente documentada', category: 'documentacion', status: 'ok' },
-                                                            { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento', category: 'documentacion', status: 'ok' }
+                                                            { id: 'doc-3', description: 'Se ha preparado la recomendación de próximo mantenimiento', category: 'documentacion', status: 'ok' },
                                                         ];
                                                         
                                                         return (
@@ -1823,7 +1815,7 @@ const WorkOrderDetailView: React.FC<WorkOrderDetailViewProps> = ({ workOrder, qu
                                     .map((quote, index) => {
                                     // Usar función centralizada para generar ID consistente
                                     const displayId = getQuoteDisplayId(quote.id, quote.issueDate, true, quote.sequentialId);
-                                    console.log('🔍 Quote status debug:', { id: quote.id, status: quote.status, hasConfig: !!QUOTE_STATUS_DISPLAY_CONFIG[quote.status] });
+                                    console.warn('🔍 Quote status debug:', { id: quote.id, status: quote.status, hasConfig: !!QUOTE_STATUS_DISPLAY_CONFIG[quote.status] });
                                     
                                     return (
                                         <div key={quote.id} className="bg-black dark:bg-gray-900/20 p-3 rounded-md">

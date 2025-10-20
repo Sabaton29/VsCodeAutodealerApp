@@ -197,12 +197,12 @@ const DiagnosticChecklistModal: React.FC<DiagnosticChecklistModalProps> = ({ onC
             setIsSaving(true);
             setUploadProgress(0);
             
-            console.log('🔍 DIAGNOSTIC DEBUG - Original diagnosticData:', diagnosticData);
+            console.warn('🔍 DIAGNOSTIC DEBUG - Original diagnosticData:', diagnosticData);
             
             // Validar que se completen los campos requeridos
             const validationErrors = validateDiagnosticData(diagnosticData);
             if (validationErrors.length > 0) {
-                alert(`Por favor completa los campos requeridos:\n${validationErrors.join('\n')}`);
+                console.warn(`Por favor completa los campos requeridos:\n${validationErrors.join('\n')}`);
                 setIsSaving(false);
                 return;
             }
@@ -212,11 +212,11 @@ const DiagnosticChecklistModal: React.FC<DiagnosticChecklistModalProps> = ({ onC
             
             for (const sectionKey in processedDiagnosticData) {
                 const sectionData = processedDiagnosticData[sectionKey];
-                console.log(`🔍 DIAGNOSTIC DEBUG - Processing section ${sectionKey}:`, sectionData);
-                console.log(`🔍 DIAGNOSTIC DEBUG - Custom items in ${sectionKey}:`, (sectionData as any).customItems);
+                console.warn(`🔍 DIAGNOSTIC DEBUG - Processing section ${sectionKey}:`, sectionData);
+                console.warn(`🔍 DIAGNOSTIC DEBUG - Custom items in ${sectionKey}:`, (sectionData as any).customItems);
                 
                 if (sectionData && (sectionData as any).imageFiles && (sectionData as any).imageFiles.length > 0) {
-                    console.log(`🔍 DIAGNOSTIC DEBUG - Found ${(sectionData as any).imageFiles.length} files in section ${sectionKey}`);
+                    console.warn(`🔍 DIAGNOSTIC DEBUG - Found ${(sectionData as any).imageFiles.length} files in section ${sectionKey}`);
                     
                     // Comprimir y subir archivos a Supabase Storage
                     const uploadPromises = (sectionData as any).imageFiles.map(async(file: File, index: number) => {
@@ -226,12 +226,12 @@ const DiagnosticChecklistModal: React.FC<DiagnosticChecklistModalProps> = ({ onC
                             const fileName = `diagnostic_${workOrder.id}_${sectionKey.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}_${index}.jpg`;
                             const path = `diagnostics/${workOrder.id}/${fileName}`;
                             
-                            console.log(`🔍 DIAGNOSTIC DEBUG - Uploading compressed file: ${fileName} to path: ${path}`);
-                            console.log(`🔍 DIAGNOSTIC DEBUG - Original size: ${file.size} bytes, Compressed size: ${compressedFile.size} bytes`);
+                            console.warn(`🔍 DIAGNOSTIC DEBUG - Uploading compressed file: ${fileName} to path: ${path}`);
+                            console.warn(`🔍 DIAGNOSTIC DEBUG - Original size: ${file.size} bytes, Compressed size: ${compressedFile.size} bytes`);
                             
                             const url = await uploadFileToStorage(compressedFile, 'diagnostic-images', path);
                             if (url) {
-                                console.log(`🔍 DIAGNOSTIC DEBUG - File uploaded successfully: ${url}`);
+                                console.warn(`🔍 DIAGNOSTIC DEBUG - File uploaded successfully: ${url}`);
                                 return url;
                             } else {
                                 console.error(`🔍 DIAGNOSTIC DEBUG - Failed to upload file: ${fileName}`);
@@ -246,24 +246,24 @@ const DiagnosticChecklistModal: React.FC<DiagnosticChecklistModalProps> = ({ onC
                     const uploadedUrls = await Promise.all(uploadPromises);
                     const validUrls = uploadedUrls.filter(url => url !== null);
                     
-                    console.log(`🔍 DIAGNOSTIC DEBUG - Uploaded ${validUrls.length} files to storage:`, validUrls);
+                    console.warn(`🔍 DIAGNOSTIC DEBUG - Uploaded ${validUrls.length} files to storage:`, validUrls);
                     
                     // Add uploaded URLs to existing imageUrls
                     const existingUrls = (sectionData as any).imageUrls || [];
                     (sectionData as any).imageUrls = [...existingUrls, ...validUrls];
                     (sectionData as any).imageFiles = []; // Clear files after upload
                     
-                    console.log(`🔍 DIAGNOSTIC DEBUG - Final imageUrls for section ${sectionKey}:`, (sectionData as any).imageUrls);
+                    console.warn(`🔍 DIAGNOSTIC DEBUG - Final imageUrls for section ${sectionKey}:`, (sectionData as any).imageUrls);
                 }
             }
             
-            console.log('🔍 DIAGNOSTIC DEBUG - Final processedDiagnosticData:', processedDiagnosticData);
+            console.warn('🔍 DIAGNOSTIC DEBUG - Final processedDiagnosticData:', processedDiagnosticData);
             
             await onSave(workOrder.id, processedDiagnosticData, { advisorId: selectedAdvisorId, mechanicId: selectedMechanicId }, recommendedItems, diagnosticType);
             // The modal will be closed by the parent component after successful save
         } catch (error) {
             console.error('Error saving diagnostic:', error);
-            alert('Error al guardar el diagnóstico. Por favor, inténtalo de nuevo.');
+            console.warn('Error al guardar el diagnóstico. Por favor, inténtalo de nuevo.');
         } finally {
             setIsSaving(false);
             setUploadProgress(0);
@@ -599,7 +599,7 @@ const DiagnosticChecklistModal: React.FC<DiagnosticChecklistModalProps> = ({ onC
         </thead>
     );
 
-    console.log('🔍 DiagnosticChecklistModal - Rendering with recommendedItems:', recommendedItems.length);
+    console.warn('🔍 DiagnosticChecklistModal - Rendering with recommendedItems:', recommendedItems.length);
 
     return (
         <div className="space-y-6">

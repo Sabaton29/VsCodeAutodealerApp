@@ -16,7 +16,7 @@ const LocationsSettings: React.FC<LocationsSettingsProps> = ({ locations, onAdd,
     const [editingLocation, setEditingLocation] = useState<Location | null>(null);
     
     const handleDelete = (location: Location) => {
-        if (confirm(`¿Está seguro de que desea eliminar la sede "${location.name}"? Esta acción no se puede deshacer.`)) {
+        if (window.window.confirm(`¿Está seguro de que desea eliminar la sede "${location.name}"? Esta acción no se puede deshacer.`)) {
             onDelete(location.id);
         }
     };

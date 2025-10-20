@@ -18,7 +18,7 @@ const PrintableRepairReport: React.FC<PrintableRepairReportProps> = ({
     quote, 
     client, 
     vehicle, 
-    companyInfo 
+    companyInfo, 
 }) => {
     
     const InfoField = ({ label, value }: { label: string, value?: string | number }) => (
@@ -58,7 +58,7 @@ const PrintableRepairReport: React.FC<PrintableRepairReportProps> = ({
                                 alt="AUTO DEALER" 
                                 style={{ height: '150px', width: 'auto', display: 'block', maxWidth: '100%', objectFit: 'contain' }}
                                 onError={(e) => {
-                                    console.log('Error loading logo:', companyInfo?.logoUrl);
+                                    console.warn('Error loading logo:', companyInfo?.logoUrl);
                                     e.currentTarget.style.display = 'none';
                                     e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                 }} 

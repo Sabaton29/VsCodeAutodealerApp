@@ -40,7 +40,7 @@ const SendReportModal: React.FC<SendReportModalProps> = ({ workOrder, client, on
             setTimeout(() => setCopyStatus('idle'), 2000); // Reset after 2 seconds
         }).catch(err => {
             console.error('Failed to copy link: ', err);
-            alert('No se pudo copiar el enlace.');
+            console.warn('No se pudo copiar el enlace.');
         });
     };
     

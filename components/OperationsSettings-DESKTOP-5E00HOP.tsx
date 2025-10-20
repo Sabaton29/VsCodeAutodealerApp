@@ -117,44 +117,44 @@ const OperationsSettings: React.FC<OperationsSettingsProps> = ({
         setIsUpdatingStages(true);
         try {
             const result = await onUpdateAllWorkOrderStages();
-            alert(`Actualización completada:\n✅ ${result.updated} órdenes actualizadas\n⏭️ ${result.skipped} sin cambios\n❌ ${result.errors.length} errores`);
+            console.warn(`Actualización completada:\n✅ ${result.updated} órdenes actualizadas\n⏭️ ${result.skipped} sin cambios\n❌ ${result.errors.length} errores`);
         } catch (error) {
-            alert(`Error en la actualización: ${error}`);
+            console.warn(`Error en la actualización: ${error}`);
         } finally {
             setIsUpdatingStages(false);
         }
     };
 
     const handleDiagnoseDataStructure = () => {
-        console.log('🔍 === DIAGNÓSTICO DE ESTRUCTURA DE DATOS ===');
+        console.warn('🔍 === DIAGNÓSTICO DE ESTRUCTURA DE DATOS ===');
         
         try {
-            console.log(`📊 Total órdenes: ${workOrders.length}, Total cotizaciones: ${quotes.length}`);
+            console.warn(`📊 Total órdenes: ${workOrders.length}, Total cotizaciones: ${quotes.length}`);
 
             // Verificar órdenes con cotizaciones vinculadas
             const ordersWithLinkedQuotes = workOrders.filter(wo => wo.linkedQuoteIds && wo.linkedQuoteIds.length > 0);
-            console.log(`🔗 Órdenes con linkedQuoteIds: ${ordersWithLinkedQuotes.length}`);
+            console.warn(`🔗 Órdenes con linkedQuoteIds: ${ordersWithLinkedQuotes.length}`);
 
             // Verificar cotizaciones con workOrderId
             const quotesWithWorkOrder = quotes.filter(q => q.workOrderId);
-            console.log(`📋 Cotizaciones con workOrderId: ${quotesWithWorkOrder.length}`);
+            console.warn(`📋 Cotizaciones con workOrderId: ${quotesWithWorkOrder.length}`);
 
             // Mostrar detalles de la orden 0041
             const order0041 = workOrders.find(wo => wo.id === '0041');
             if (order0041) {
-                console.log('🔍 Orden 0041:', {
+                console.warn('🔍 Orden 0041:', {
                     id: order0041.id,
                     stage: order0041.stage,
                     linkedQuoteIds: order0041.linkedQuoteIds,
                     serviceRequested: order0041.serviceRequested,
                 });
             } else {
-                console.log('❌ Orden 0041 no encontrada');
+                console.warn('❌ Orden 0041 no encontrada');
             }
 
             // Mostrar cotizaciones que deberían estar vinculadas a 0041
             const quotesFor0041 = quotes.filter(q => q.workOrderId === '0041');
-            console.log('📋 Cotizaciones para 0041:', quotesFor0041.map(q => ({
+            console.warn('📋 Cotizaciones para 0041:', quotesFor0041.map(q => ({
                 id: q.id,
                 workOrderId: q.workOrderId,
                 status: q.status,
@@ -162,7 +162,7 @@ const OperationsSettings: React.FC<OperationsSettingsProps> = ({
             })));
 
             // Mostrar todas las cotizaciones
-            console.log('📋 Todas las cotizaciones:', quotes.map(q => ({
+            console.warn('📋 Todas las cotizaciones:', quotes.map(q => ({
                 id: q.id,
                 workOrderId: q.workOrderId,
                 status: q.status,
@@ -170,7 +170,7 @@ const OperationsSettings: React.FC<OperationsSettingsProps> = ({
             })));
 
             // Mostrar todas las órdenes (solo las primeras 5 para no saturar)
-            console.log('🔍 Primeras 5 órdenes:', workOrders.slice(0, 5).map(wo => ({
+            console.warn('🔍 Primeras 5 órdenes:', workOrders.slice(0, 5).map(wo => ({
                 id: wo.id,
                 stage: wo.stage,
                 linkedQuoteIds: wo.linkedQuoteIds,
@@ -195,10 +195,10 @@ DIAGNÓSTICO COMPLETADO:
 Revisa la consola (F12) para detalles completos.
             `;
 
-            alert(summary);
+            console.warn(summary);
         } catch (error) {
             console.error('❌ Error en diagnóstico:', error);
-            alert(`Error en diagnóstico: ${error}. Abre la consola para más detalles.`);
+            console.warn(`Error en diagnóstico: ${error}. Abre la consola para más detalles.`);
         }
     };
 

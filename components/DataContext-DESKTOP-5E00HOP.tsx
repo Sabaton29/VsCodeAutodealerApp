@@ -75,7 +75,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrder[]>([]);
     const [operatingExpenses, setOperatingExpenses] = useState<OperatingExpense[]>([]);
     const [financialAccounts, setFinancialAccounts] = useState<FinancialAccount[]>([]);
-    const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
+    const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
     const [timeClockEntries, setTimeClockEntries] = useState<TimeClockEntry[]>([]);
     const [loans, setLoans] = useState<Loan[]>([]);
     const [loanPayments, setLoanPayments] = useState<LoanPayment[]>([]);
@@ -93,7 +93,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setIsLoading(true);
                 setError(null);
 
-                console.log('🔄 Loading data from Supabase...');
+                console.warn('🔄 Loading data from Supabase...');
 
                 // Load all data in parallel
                 const [
@@ -163,8 +163,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAppointments(appointmentsData);
 
                 // Set app settings (use first one or default)
-                if (appSettingsData.length > 0) {
-                    const settings = appSettingsData[0];
+                const settings = Array.isArray(appSettingsData) ? (appSettingsData.length > 0 ? appSettingsData[0] : null) : appSettingsData || null;
+                if (settings) {
                     
                     
                     // Ensure default categories are initialized if not present
@@ -184,7 +184,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     
                     setAppSettings(settings);
                 } else {
-                    console.log('⚠️ No app settings found in DB, using default');
+                    console.warn('⚠️ No app settings found in DB, using default');
                     // Ensure default categories are set in default settings
                     const defaultSettings = {
                         ...DEFAULT_APP_SETTINGS,
@@ -202,7 +202,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setError(err instanceof Error ? err.message : 'Failed to load data');
                 
                 // Fallback to default data if Supabase fails
-                console.log('🔄 Falling back to default data...');
+                console.warn('🔄 Falling back to default data...');
                 setLocations(LOCATIONS_DATA);
                 setWorkOrders(WORK_ORDERS_DATA);
                 setClients(CLIENTS_DATA);
@@ -250,16 +250,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     (itemWithId as any).locationId = '550e8400-e29b-41d4-a716-446655440001'; // Default to Bogotá
                 }
                 
-                console.log(`🔍 createUpdater - Creating ${tableName}:`, itemWithId);
+                console.warn(`🔍 createUpdater - Creating ${tableName}:`, itemWithId);
                 const result = await supabaseService.insert(tableName, itemWithId);
-                console.log(`🔍 createUpdater - Result for ${tableName}:`, result);
+                console.warn(`🔍 createUpdater - Result for ${tableName}:`, result);
                 if (result.length > 0) {
                     setter(prev => {
                         const newState = [...prev, ...result];
-                        console.log(`🔍 createUpdater - Updated state for ${tableName}, new count:`, newState.length);
+                        console.warn(`🔍 createUpdater - Updated state for ${tableName}, new count:`, newState.length);
                         return newState;
                     });
-                    console.log(`🔍 createUpdater - Updated state for ${tableName}`);
+                    console.warn(`🔍 createUpdater - Updated state for ${tableName}`);
                 } else {
                     console.error(`🔍 createUpdater - No result returned for ${tableName}`);
                 }
@@ -276,14 +276,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ) => {
         return async(updatedItem: T & { id: string }): Promise<void> => {
             try {
-                console.log(`🔍 createSaveHandler - Updating ${tableName}:`, updatedItem);
+                console.warn(`🔍 createSaveHandler - Updating ${tableName}:`, updatedItem);
                 const result = await supabaseService.update(tableName, updatedItem.id, updatedItem);
-                console.log(`🔍 createSaveHandler - Result for ${tableName}:`, result);
+                console.warn(`🔍 createSaveHandler - Result for ${tableName}:`, result);
                 if (result) {
                     setter(prev => prev.map(item => 
                         (item as any).id === updatedItem.id ? result : item,
                     ));
-                    console.log(`🔍 createSaveHandler - Updated state for ${tableName}`);
+                    console.warn(`🔍 createSaveHandler - Updated state for ${tableName}`);
                 } else {
                     console.error(`🔍 createSaveHandler - No result returned for ${tableName}`);
                 }
@@ -316,7 +316,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         try {
             // Skip notification if userId is empty (UUID fields can't be empty strings)
             if (!notification.userId || notification.userId.trim() === '') {
-                console.log('Skipping notification: userId is empty');
+                console.warn('Skipping notification: userId is empty');
                 return;
             }
 
@@ -339,7 +339,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleCreateWorkOrder = async(workOrderData: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<void> => {
         try {
-            console.log('🔍 Creating work order with data:', {
+            console.warn('🔍 Creating work order with data:', {
                 clientId: workOrderData.clientId,
                 vehicleId: workOrderData.vehicleId,
                 locationId: workOrderData.locationId,
@@ -373,7 +373,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 locationId: workOrderData.locationId || '550e8400-e29b-41d4-a716-446655440001', // Fallback to Bogotá if not specified
             };
             
-            console.log('🔍 Final work order before insertion:', {
+            console.warn('🔍 Final work order before insertion:', {
                 id: newWorkOrder.id,
                 locationId: newWorkOrder.locationId,
                 locationIdType: typeof newWorkOrder.locationId,
@@ -471,14 +471,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleCreateService = createUpdater(setServices, 'services');
     const handleSaveService = async(updatedService: Service): Promise<void> => {
         try {
-            console.log(`🔍 handleSaveService - Updating service:`, updatedService);
+            console.warn(`🔍 handleSaveService - Updating service:`, updatedService);
             const result = await supabaseService.updateService(updatedService.id, updatedService);
-            console.log(`🔍 handleSaveService - Result:`, result);
+            console.warn(`🔍 handleSaveService - Result:`, result);
             if (result) {
                 setServices(prev => prev.map(service => 
                     service.id === updatedService.id ? result : service,
                 ));
-                console.log(`🔍 handleSaveService - Updated state for services`);
+                console.warn(`🔍 handleSaveService - Updated state for services`);
             } else {
                 console.error(`🔍 handleSaveService - No result returned`);
             }
@@ -517,7 +517,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         updatedAt: new Date(),
                     };
                     
-                    console.log('🔍 DataContext - handleCreateQuote - Updating work order stage to Esperando Aprobación');
+                    console.warn('🔍 DataContext - handleCreateQuote - Updating work order stage to Esperando Aprobación');
                     await supabaseService.updateWorkOrder(quoteData.workOrderId, updateData);
                     
                     // Update local work orders state
@@ -549,7 +549,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (currentIndex < KANBAN_STAGES_ORDER.length - 1) {
                 const nextStage = KANBAN_STAGES_ORDER[currentIndex + 1];
                 
-                console.log(`🔍 DataContext - handleAdvanceStage - Advancing from ${currentStage} to ${nextStage}`);
+                console.warn(`🔍 DataContext - handleAdvanceStage - Advancing from ${currentStage} to ${nextStage}`);
                 
                 const updateData = {
                     stage: nextStage,
@@ -585,7 +585,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (currentIndex > 0) {
                 const previousStage = KANBAN_STAGES_ORDER[currentIndex - 1];
                 
-                console.log(`🔍 DataContext - handleRetreatStage - Retreating from ${currentStage} to ${previousStage}`);
+                console.warn(`🔍 DataContext - handleRetreatStage - Retreating from ${currentStage} to ${previousStage}`);
                 
                 const updateData = {
                     stage: previousStage,
@@ -627,14 +627,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleUpdateAllWorkOrderStages = async(): Promise<{ updated: number; skipped: number; errors: string[] }> => {
         try {
-            console.log('🚀 Iniciando actualización masiva de etapas de órdenes de trabajo...');
+            console.warn('🚀 Iniciando actualización masiva de etapas de órdenes de trabajo...');
             
             // Obtener todas las órdenes de trabajo y cotizaciones frescas de Supabase
             const [allWorkOrders, allQuotes] = await Promise.all([
                 supabaseService.getWorkOrders(),
                 supabaseService.getQuotes(),
             ]);
-            console.log(`📊 Encontradas ${allWorkOrders.length} órdenes de trabajo y ${allQuotes.length} cotizaciones`);
+            console.warn(`📊 Encontradas ${allWorkOrders.length} órdenes de trabajo y ${allQuotes.length} cotizaciones`);
             
             let updated = 0;
             let skipped = 0;
@@ -644,12 +644,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 try {
                     // Debug: mostrar información de la orden
                     const linkedQuotes = allQuotes.filter(q => workOrder.linkedQuoteIds?.includes(q.id));
-                    console.log(`🔍 OT ${workOrder.id}: stage=${workOrder.stage}, linkedQuotes=${workOrder.linkedQuoteIds?.length || 0}, quotesStatus=${linkedQuotes.map(q => q.status).join(',')}`);
+                    console.warn(`🔍 OT ${workOrder.id}: stage=${workOrder.stage}, linkedQuotes=${workOrder.linkedQuoteIds?.length || 0}, quotesStatus=${linkedQuotes.map(q => q.status).join(',')}`);
                     
                     const correctStage = determineCorrectStage(workOrder, allQuotes);
                     
                     if (correctStage !== workOrder.stage) {
-                        console.log(`✅ Actualizando OT ${workOrder.id}: ${workOrder.stage} → ${correctStage}`);
+                        console.warn(`✅ Actualizando OT ${workOrder.id}: ${workOrder.stage} → ${correctStage}`);
                         
                         // Actualizar en Supabase
                         const updateData = {
@@ -675,7 +675,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         
                         updated++;
                     } else {
-                        console.log(`⏭️ Saltando OT ${workOrder.id}: ya está en etapa correcta`);
+                        console.warn(`⏭️ Saltando OT ${workOrder.id}: ya está en etapa correcta`);
                         skipped++;
                     }
                 } catch (error) {
@@ -685,7 +685,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
             
-            console.log(`🎉 Actualización completada: ${updated} actualizadas, ${skipped} sin cambios, ${errors.length} errores`);
+            console.warn(`🎉 Actualización completada: ${updated} actualizadas, ${skipped} sin cambios, ${errors.length} errores`);
             
             return { updated, skipped, errors };
             
@@ -858,8 +858,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 updatedAt: new Date(),
             };
             
-            console.log('🔍 DataContext - handleSaveDiagnostic - updateData:', updateData);
-            console.log('🔍 DataContext - handleSaveDiagnostic - diagnosticData:', diagnosticData);
+            console.warn('🔍 DataContext - handleSaveDiagnostic - updateData:', updateData);
+            console.warn('🔍 DataContext - handleSaveDiagnostic - diagnosticData:', diagnosticData);
             
             
             const result = await supabaseService.updateWorkOrder(workOrderId, updateData);
@@ -903,7 +903,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         updatedAt: new Date(),
                     };
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating linkedQuoteIds:', newLinkedQuoteIds);
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating linkedQuoteIds:', newLinkedQuoteIds);
                     await supabaseService.updateWorkOrder(result.workOrderId, updateLinkedQuotesData);
                     
                     // Update local work orders state with linkedQuoteIds
@@ -920,7 +920,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         updatedAt: new Date(),
                     };
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating work order stage to Esperando Aprobación');
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating work order stage to Esperando Aprobación');
                     await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                     
                     // Update local work orders state
@@ -943,7 +943,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         updatedAt: new Date(),
                     };
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating work order stage to En Reparación');
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating work order stage to En Reparación');
                     await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                     
                     // Update local work orders state
@@ -966,7 +966,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         updatedAt: new Date(),
                     };
                     
-                    console.log('🔍 DataContext - handleSaveQuote - Updating work order stage to Atención Requerida');
+                    console.warn('🔍 DataContext - handleSaveQuote - Updating work order stage to Atención Requerida');
                     await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                     
                     // Update local work orders state
@@ -1026,7 +1026,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     updatedAt: new Date(),
                 };
                 
-                console.log('🔍 DataContext - handleApproveQuote - Updating work order stage to En Reparación');
+                console.warn('🔍 DataContext - handleApproveQuote - Updating work order stage to En Reparación');
                 await supabaseService.updateWorkOrder(result.workOrderId, updateData);
                 
                 // Update local work orders state
@@ -1117,18 +1117,16 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 
                 // If we have an existing ID, update the existing record
                 if (appSettings.id) {
-                    result = await supabaseService.updateAppSettings(appSettings.id, dbData);
+                    result = await supabaseService.updateAppSettings({ ...appSettings, ...dbData });
                 } else {
-                    // If no ID exists, create a new record
-                    result = await supabaseService.createAppSettings(dbData);
+                    // If no ID exists, create/update via updateAppSettings which does upsert
+                    result = await supabaseService.updateAppSettings({ ...DEFAULT_APP_SETTINGS, ...dbData });
                 }
                 
                 if (result) {
                     // Reload the settings to get the updated data
-                    const updatedSettingsData = await supabaseService.getAppSettings();
-                    if (updatedSettingsData.length > 0) {
-                        setAppSettings(updatedSettingsData[0]);
-                    }
+                    const updatedSettings = await supabaseService.getAppSettings();
+                    if (updatedSettings) setAppSettings(updatedSettings);
                 }
             } else {
                 // If it's a complete settings object (from other tabs)
@@ -1154,18 +1152,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 
                 // If we have an existing ID, update the existing record
                 if (appSettings.id) {
-                    result = await supabaseService.updateAppSettings(appSettings.id, dbData);
+                    result = await supabaseService.updateAppSettings({ ...appSettings, ...dbData });
                 } else {
-                    // If no ID exists, create a new record
-                    result = await supabaseService.createAppSettings(dbData);
+                    result = await supabaseService.updateAppSettings({ ...DEFAULT_APP_SETTINGS, ...dbData });
                 }
-                
+
                 if (result) {
-                    // Reload the settings to get the updated data
-                    const updatedSettingsData = await supabaseService.getAppSettings();
-                    if (updatedSettingsData.length > 0) {
-                        setAppSettings(updatedSettingsData[0]);
-                    }
+                    const updatedSettings = await supabaseService.getAppSettings();
+                    if (updatedSettings) setAppSettings(updatedSettings);
                 }
             }
         } catch (error) {
@@ -1213,9 +1207,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Save to Supabase
             if (appSettings.id) {
-                await supabaseService.updateAppSettings(appSettings.id, {
-                    operations_settings: updatedSettings.operationsSettings,
-                });
+                await supabaseService.updateAppSettings({ ...appSettings, operationsSettings: updatedSettings.operationsSettings });
             }
             
         } catch (error) {
@@ -1240,9 +1232,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Save to Supabase
             if (appSettings.id) {
-                await supabaseService.updateAppSettings(appSettings.id, {
-                    operations_settings: updatedSettings.operationsSettings,
-                });
+                await supabaseService.updateAppSettings({ ...appSettings, operationsSettings: updatedSettings.operationsSettings });
             }
             
         } catch (error) {
@@ -1288,9 +1278,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Save to Supabase
             if (appSettings.id) {
-                await supabaseService.updateAppSettings(appSettings.id, {
-                    operations_settings: updatedSettings.operationsSettings,
-                });
+                await supabaseService.updateAppSettings({ ...appSettings, operationsSettings: updatedSettings.operationsSettings });
             }
             
         } catch (error) {
@@ -1315,9 +1303,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             
             // Save to Supabase
             if (appSettings.id) {
-                await supabaseService.updateAppSettings(appSettings.id, {
-                    operations_settings: updatedSettings.operationsSettings,
-                });
+                await supabaseService.updateAppSettings({ ...appSettings, operationsSettings: updatedSettings.operationsSettings });
             }
             
         } catch (error) {
@@ -1401,49 +1387,49 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const handleRegisterItemCosts = async(workOrderId: string, costs: { itemId: string; costPrice: number; supplierId: string }[]): Promise<void> => {
         try {
-            console.log('🔍 DataContext - handleRegisterItemCosts called');
-            console.log('🔍 DataContext - workOrderId:', workOrderId);
-            console.log('🔍 DataContext - costs:', costs);
+            console.warn('🔍 DataContext - handleRegisterItemCosts called');
+            console.warn('🔍 DataContext - workOrderId:', workOrderId);
+            console.warn('🔍 DataContext - costs:', costs);
             
             let workOrder = workOrders.find(wo => wo.id === workOrderId);
-            console.log('🔍 DataContext - workOrder found:', workOrder);
+            console.warn('🔍 DataContext - workOrder found:', workOrder);
             
-            console.log('🔍 DataContext - workOrder.linkedQuoteIds:', workOrder?.linkedQuoteIds);
-            console.log('🔍 DataContext - linkedQuoteIds length:', (workOrder?.linkedQuoteIds || []).length);
+            console.warn('🔍 DataContext - workOrder.linkedQuoteIds:', workOrder?.linkedQuoteIds);
+            console.warn('🔍 DataContext - linkedQuoteIds length:', (workOrder?.linkedQuoteIds || []).length);
             
             if (!workOrder) {
-                console.log('❌ DataContext - Work order not found');
-                alert('No se encontró la orden de trabajo.');
+                console.warn('❌ DataContext - Work order not found');
+                console.warn('No se encontró la orden de trabajo.');
                 return;
             }
 
             // If no linked quotes, try to fix them automatically
             if ((workOrder.linkedQuoteIds || []).length === 0) {
-                console.log('🔧 DataContext - No linked quotes found, attempting to fix...');
+                console.warn('🔧 DataContext - No linked quotes found, attempting to fix...');
                 const fixedLinkedQuoteIds = await fixLinkedQuoteIds(workOrderId);
                 
                 if (fixedLinkedQuoteIds.length === 0) {
-                    console.log('❌ DataContext - Still no linked quotes after fix attempt');
-                    alert('No se encontraron cotizaciones vinculadas para esta orden de trabajo. Por favor verifica que la cotización esté correctamente asociada.');
+                    console.warn('❌ DataContext - Still no linked quotes after fix attempt');
+                    console.warn('No se encontraron cotizaciones vinculadas para esta orden de trabajo. Por favor verifica que la cotización esté correctamente asociada.');
                     return;
                 }
                 
                 // Use the fixed quote IDs directly
                 workOrder = { ...workOrder, linkedQuoteIds: fixedLinkedQuoteIds };
-                console.log('✅ DataContext - Using fixed linked quote IDs:', fixedLinkedQuoteIds);
+                console.warn('✅ DataContext - Using fixed linked quote IDs:', fixedLinkedQuoteIds);
             }
             
             const relevantQuoteIds = new Set<string>(workOrder.linkedQuoteIds);
-            console.log('🔍 DataContext - relevantQuoteIds:', relevantQuoteIds);
+            console.warn('🔍 DataContext - relevantQuoteIds:', relevantQuoteIds);
 
             for (const quoteId of relevantQuoteIds) {
                 const quote = quotes.find(q => q.id === quoteId);
                 if (quote) {
-                    console.log('🔍 DataContext - Updating quote:', quoteId);
+                    console.warn('🔍 DataContext - Updating quote:', quoteId);
                     const newItems = quote.items.map(item => {
                         const costInfo = costs.find(c => c.itemId === item.id);
                         if (costInfo) {
-                            console.log(`🔍 DataContext - Updating item ${item.id} with cost ${costInfo.costPrice}`);
+                            console.warn(`🔍 DataContext - Updating item ${item.id} with cost ${costInfo.costPrice}`);
                             return { ...item, costPrice: costInfo.costPrice, supplierId: costInfo.supplierId };
                         }
                         return item;
@@ -1457,27 +1443,27 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 }
             }
             
-            alert('Costos guardados exitosamente.');
+            console.warn('Costos guardados exitosamente.');
         } catch (error) {
             console.error('Error registering item costs:', error);
-            alert(`Error al guardar los costos: ${error.message}`);
+            console.warn(`Error al guardar los costos: ${error.message}`);
             throw error;
         }
     };
 
     const fixLinkedQuoteIds = async(workOrderId: string): Promise<string[]> => {
         try {
-            console.log('🔧 DataContext - fixLinkedQuoteIds called for workOrderId:', workOrderId);
+            console.warn('🔧 DataContext - fixLinkedQuoteIds called for workOrderId:', workOrderId);
             
             const workOrder = workOrders.find(wo => wo.id === workOrderId);
             if (!workOrder) {
-                console.log('❌ DataContext - Work order not found');
+                console.warn('❌ DataContext - Work order not found');
                 return [];
             }
 
             // Find all quotes for this work order
             const quotesForWorkOrder = quotes.filter(q => q.workOrderId === workOrderId);
-            console.log('🔧 DataContext - Found quotes for work order:', quotesForWorkOrder.map(q => q.id));
+            console.warn('🔧 DataContext - Found quotes for work order:', quotesForWorkOrder.map(q => q.id));
 
             if (quotesForWorkOrder.length > 0) {
                 const newLinkedQuoteIds = quotesForWorkOrder.map(q => q.id);
@@ -1486,7 +1472,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     updatedAt: new Date(),
                 };
 
-                console.log('🔧 DataContext - Updating linkedQuoteIds:', newLinkedQuoteIds);
+                console.warn('🔧 DataContext - Updating linkedQuoteIds:', newLinkedQuoteIds);
                 const updatedWorkOrder = await supabaseService.updateWorkOrder(workOrderId, updateData);
                 
                 // Update local state with the returned data
@@ -1557,7 +1543,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setIsLoading(true);
             setError(null);
             
-            console.log('🔄 Loading all data from Supabase...');
+            console.warn('🔄 Loading all data from Supabase...');
             
             // Load all data from Supabase
             const [
@@ -1663,9 +1649,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setFinancialAccounts(financialAccountsData);
             
             // Set app settings (use first one or default)
-            if (appSettingsData.length > 0) {
-                console.log('🔧 App settings data from DB:', appSettingsData[0]);
-                const settings = appSettingsData[0];
+            const settings = Array.isArray(appSettingsData) ? (appSettingsData.length > 0 ? appSettingsData[0] : null) : appSettingsData || null;
+            if (settings) {
+                console.warn('🔧 App settings data from DB:', settings);
                 
                 // Ensure default categories are initialized if not present
                 if (!settings.operationsSettings?.serviceCategories || settings.operationsSettings.serviceCategories.length === 0) {
@@ -1684,7 +1670,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 
                 setAppSettings(settings);
             } else {
-                console.log('⚠️ No app settings found in DB, using default');
+                console.warn('⚠️ No app settings found in DB, using default');
                 // Ensure default categories are set in default settings
                 const defaultSettings = {
                     ...DEFAULT_APP_SETTINGS,
@@ -1717,7 +1703,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setError(err instanceof Error ? err.message : 'Failed to load data');
             
             // Fallback to default data if Supabase fails
-            console.log('🔄 Falling back to default data...');
+            console.warn('🔄 Falling back to default data...');
             
             setLocations(LOCATIONS_DATA);
             setWorkOrders(WORK_ORDERS_DATA);

@@ -8,7 +8,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function cleanAppSettings() {
     try {
-        console.log('🔍 Verificando registros en app_settings...');
+        console.debug('🔍 Verificando registros en app_settings...');
         
         // Obtener todos los registros
         const { data: allSettings, error: fetchError } = await supabase
@@ -21,10 +21,10 @@ async function cleanAppSettings() {
             return;
         }
         
-        console.log(`📊 Encontrados ${allSettings.length} registros en app_settings`);
+        console.debug(`📊 Encontrados ${allSettings.length} registros en app_settings`);
         
         if (allSettings.length <= 1) {
-            console.log('✅ No hay duplicados, todo está bien');
+            console.debug('✅ No hay duplicados, todo está bien');
             return;
         }
         
@@ -32,7 +32,7 @@ async function cleanAppSettings() {
         const keepRecord = allSettings[0];
         const deleteRecords = allSettings.slice(1);
         
-        console.log('🗑️ Eliminando registros duplicados...');
+        console.debug('🗑️ Eliminando registros duplicados...');
         
         // Eliminar registros duplicados
         for (const record of deleteRecords) {
@@ -44,11 +44,11 @@ async function cleanAppSettings() {
             if (deleteError) {
                 console.error(`❌ Error eliminando registro ${record.id}:`, deleteError);
             } else {
-                console.log(`✅ Registro ${record.id} eliminado`);
+                console.debug(`✅ Registro ${record.id} eliminado`);
             }
         }
         
-        console.log('✅ Limpieza completada');
+        console.debug('✅ Limpieza completada');
         
         // Verificar resultado
         const { data: finalSettings, error: finalError } = await supabase
@@ -58,7 +58,7 @@ async function cleanAppSettings() {
         if (finalError) {
             console.error('❌ Error verificando resultado:', finalError);
         } else {
-            console.log(`📊 Registros restantes: ${finalSettings.length}`);
+            console.debug(`📊 Registros restantes: ${finalSettings.length}`);
         }
         
     } catch (error) {

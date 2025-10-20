@@ -82,7 +82,7 @@ const AddInventoryItemForm: React.FC<InventoryItemFormProps> = ({ onSave, onCanc
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name || !formData.sku) {
-            alert('Por favor complete el nombre y el SKU del artículo.');
+            console.warn('Por favor complete el nombre y el SKU del artículo.');
             return;
         }
         // Clean up data before saving

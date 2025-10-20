@@ -15,6 +15,7 @@ import {
 import { UIContext } from './components/UIContext';
 
 const DEFAULT_APP_SETTINGS: AppSettings = {
+    id: 'default',
     companyInfo: {
         name: 'Autodealer Taller SAS',
         nit: '900.123.456-7',
@@ -29,6 +30,11 @@ const DEFAULT_APP_SETTINGS: AppSettings = {
     operationsSettings: {
         serviceCategories: DEFAULT_SERVICE_CATEGORIES,
         inventoryCategories: DEFAULT_INVENTORY_CATEGORIES,
+    },
+    diagnosticSettings: {
+        basic: [],
+        intermediate: [],
+        advanced: [],
     },
 };
 
@@ -155,9 +161,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setAppointments(appointmentsData);
 
                 // Set app settings (use first one or default)
-                if (appSettingsData.length > 0) {
-                    setAppSettings(appSettingsData[0]);
-                }
+                const settings = Array.isArray(appSettingsData) ? (appSettingsData.length > 0 ? appSettingsData[0] : null) : appSettingsData || null;
+                if (settings) setAppSettings(settings);
 
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -372,7 +377,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const handleDeleteAppointment = createDeleteHandler(setAppointments, 'appointments');
     
     const handleConfirmAppointment = async(appointmentId: string): Promise<void> => {
-        console.log('🔍 handleConfirmAppointment called with ID:', appointmentId);
+        console.debug('🔍 handleConfirmAppointment called with ID:', appointmentId);
         
         try {
             const appointment = appointments.find(a => a.id === appointmentId);
@@ -381,19 +386,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return;
             }
             
-            console.log('🔍 Found appointment:', appointment);
+            console.debug('🔍 Found appointment:', appointment);
             
             // Actualizar el estado local primero para feedback inmediato
             const updatedAppointment = { ...appointment, status: AppointmentStatus.CONFIRMADA };
             setAppointments(prev => prev.map(a => a.id === appointmentId ? updatedAppointment : a));
-            console.log('🔍 Appointment status updated in local state');
+            console.debug('🔍 Appointment status updated in local state');
             
             // Luego actualizar en Supabase
             try {
                 const result = await supabaseService.update('appointments', appointmentId, { 
-                    status: AppointmentStatus.CONFIRMADA 
+                    status: AppointmentStatus.CONFIRMADA, 
                 });
-                console.log('🔍 Supabase update result:', result);
+                console.debug('🔍 Supabase update result:', result);
             } catch (supabaseError) {
                 console.error('Supabase update failed, reverting local state:', supabaseError);
                 // Revertir el estado local si falla la actualización en Supabase
@@ -407,7 +412,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
     
     const handleCancelAppointment = async(appointmentId: string): Promise<void> => {
-        console.log('🔍 handleCancelAppointment called with ID:', appointmentId);
+        console.debug('🔍 handleCancelAppointment called with ID:', appointmentId);
         
         try {
             const appointment = appointments.find(a => a.id === appointmentId);
@@ -416,19 +421,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 return;
             }
             
-            console.log('🔍 Found appointment for cancellation:', appointment);
+            console.debug('🔍 Found appointment for cancellation:', appointment);
             
             // Actualizar el estado local primero para feedback inmediato
             const updatedAppointment = { ...appointment, status: AppointmentStatus.CANCELADA };
             setAppointments(prev => prev.map(a => a.id === appointmentId ? updatedAppointment : a));
-            console.log('🔍 Appointment cancelled in local state');
+            console.debug('🔍 Appointment cancelled in local state');
             
             // Luego actualizar en Supabase
             try {
                 const result = await supabaseService.update('appointments', appointmentId, { 
-                    status: AppointmentStatus.CANCELADA 
+                    status: AppointmentStatus.CANCELADA, 
                 });
-                console.log('🔍 Supabase cancel result:', result);
+                console.debug('🔍 Supabase cancel result:', result);
             } catch (supabaseError) {
                 console.error('Supabase cancel failed, reverting local state:', supabaseError);
                 // Revertir el estado local si falla la actualización en Supabase

@@ -12,7 +12,7 @@ interface FinancialSettingsProps {
 const FinancialSettings: React.FC<FinancialSettingsProps> = ({ accounts, onAdd, onEdit, onDelete }) => {
     
     const handleDelete = (account: FinancialAccount) => {
-        if (confirm(`¿Está seguro de que desea eliminar la cuenta "${account.name}"? Esta acción no se puede deshacer.`)) {
+        if (window.window.confirm(`¿Está seguro de que desea eliminar la cuenta "${account.name}"? Esta acción no se puede deshacer.`)) {
             onDelete(account.id);
         }
     };

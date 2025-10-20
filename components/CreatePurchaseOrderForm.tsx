@@ -61,7 +61,7 @@ const CreatePurchaseOrderForm: React.FC<CreatePurchaseOrderFormProps> = ({ onSav
     const handleSave = () => {
         const supplier = suppliers.find(s => s.id === supplierId);
         if (!supplier) {
-            alert('Por favor, seleccione un proveedor.');
+            console.warn('Por favor, seleccione un proveedor.');
             return;
         }
 

@@ -45,21 +45,21 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
     const placeholderItems = items.filter(item => item.type === 'placeholder');
 
     useEffect(() => {
-        console.log('🔍 CreateQuoteForm - useEffect - isEditing:', isEditing);
-        console.log('🔍 CreateQuoteForm - useEffect - initialData:', initialData);
-        console.log('🔍 CreateQuoteForm - useEffect - initialItems:', initialItems);
-        console.log('🔍 CreateQuoteForm - useEffect - locations:', locations);
-        console.log('🔍 CreateQuoteForm - useEffect - services:', services);
-        console.log('🔍 CreateQuoteForm - useEffect - workOrder.locationId:', workOrder.locationId);
+        console.warn('🔍 CreateQuoteForm - useEffect - isEditing:', isEditing);
+        console.warn('🔍 CreateQuoteForm - useEffect - initialData:', initialData);
+        console.warn('🔍 CreateQuoteForm - useEffect - initialItems:', initialItems);
+        console.warn('🔍 CreateQuoteForm - useEffect - locations:', locations);
+        console.warn('🔍 CreateQuoteForm - useEffect - services:', services);
+        console.warn('🔍 CreateQuoteForm - useEffect - workOrder.locationId:', workOrder.locationId);
         
         // Don't process items until both locations and services are available
         if (!locations || locations.length === 0 || !services || services.length === 0) {
-            console.log('🔍 CreateQuoteForm - useEffect - Waiting for locations and services to be available');
+            console.warn('🔍 CreateQuoteForm - useEffect - Waiting for locations and services to be available');
             return;
         }
         
         const itemsToLoad = isEditing ? initialData.items : (initialItems || []);
-        console.log('🔍 CreateQuoteForm - useEffect - itemsToLoad:', itemsToLoad);
+        console.warn('🔍 CreateQuoteForm - useEffect - itemsToLoad:', itemsToLoad);
         
         // PRESERVAR EXACTAMENTE los precios del JSONB - NO modificar a menos que sea explícitamente null/undefined
         const normalizedItems = itemsToLoad.map(item => {
@@ -72,13 +72,13 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
             // Si el ítem viene del diagnóstico y ya tiene un precio válido, preservarlo
             const isFromDiagnostic = !isEditing && initialItems?.some(initItem => initItem.id === item.id);
             if (isFromDiagnostic && unitPrice > 0) {
-                console.log(`🔍 CreateQuoteForm - Preserving diagnostic price for ${item.description}: ${unitPrice}`);
+                console.warn(`🔍 CreateQuoteForm - Preserving diagnostic price for ${item.description}: ${unitPrice}`);
                 // No hacer nada, mantener el precio original
             } else if (isFromDiagnostic && unitPrice === 0) {
-                console.log(`🔍 CreateQuoteForm - Diagnostic item with 0 price, attempting recalculation for ${item.description}`);
+                console.warn(`🔍 CreateQuoteForm - Diagnostic item with 0 price, attempting recalculation for ${item.description}`);
             }
             
-            console.log(`🔍 CreateQuoteForm - Processing item ${item.description}:`, {
+            console.warn(`🔍 CreateQuoteForm - Processing item ${item.description}:`, {
                 type: item.type,
                 originalUnitPrice: item.unitPrice,
                 currentUnitPrice: unitPrice,
@@ -96,7 +96,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
                 const hourlyRate = location?.hourlyRate || 95000;
                 const service = services.find(s => s.id === item.id);
                 
-                console.log(`🔍 CreateQuoteForm - Location calculation for ${item.description}:`, {
+                console.warn(`🔍 CreateQuoteForm - Location calculation for ${item.description}:`, {
                     location: location?.name,
                     hourlyRate,
                     service: service?.name,
@@ -106,7 +106,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
                 if (service && service.durationHours) {
                     // Modelo de Tarifa Plana: TODOS los servicios se calculan como duración × tarifa
                     unitPrice = Math.round(hourlyRate * service.durationHours);
-                    console.log(`🔍 CreateQuoteForm - Tarifa Plana for service ${item.description}:`, {
+                    console.warn(`🔍 CreateQuoteForm - Tarifa Plana for service ${item.description}:`, {
                         hourlyRate,
                         durationHours: service.durationHours,
                         calculatedPrice: unitPrice,
@@ -115,7 +115,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
                         originalPrice: item.unitPrice,
                     });
                 } else {
-                    console.log(`🔍 CreateQuoteForm - Cannot recalculate price for ${item.description}:`, {
+                    console.warn(`🔍 CreateQuoteForm - Cannot recalculate price for ${item.description}:`, {
                         serviceFound: !!service,
                         hasDurationHours: service?.durationHours,
                     });
@@ -124,11 +124,11 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
             
             // Para ítems de inventario que vienen del diagnóstico, preservar el precio si es válido
             if (item.type === 'inventory' && isFromDiagnostic && unitPrice === 0) {
-                console.log(`🔍 CreateQuoteForm - Diagnostic inventory item with 0 price, looking up salePrice for ${item.description}`);
+                console.warn(`🔍 CreateQuoteForm - Diagnostic inventory item with 0 price, looking up salePrice for ${item.description}`);
                 const inventoryItem = inventoryItems.find(i => i.id === item.id);
                 if (inventoryItem && inventoryItem.salePrice > 0) {
                     unitPrice = inventoryItem.salePrice;
-                    console.log(`🔍 CreateQuoteForm - Updated inventory price from salePrice: ${unitPrice}`);
+                    console.warn(`🔍 CreateQuoteForm - Updated inventory price from salePrice: ${unitPrice}`);
                 }
             }
             
@@ -139,7 +139,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
                 taxRate: item.taxRate || 19,
             };
             
-            console.log(`🔍 CreateQuoteForm - Final item ${item.description}:`, {
+            console.warn(`🔍 CreateQuoteForm - Final item ${item.description}:`, {
                 originalUnitPrice: item.unitPrice,
                 finalUnitPrice: finalItem.unitPrice,
                 originalQuantity: item.quantity,
@@ -151,7 +151,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
             return finalItem;
         });
         
-        console.log('🔍 CreateQuoteForm - useEffect - normalizedItems:', normalizedItems);
+        console.warn('🔍 CreateQuoteForm - useEffect - normalizedItems:', normalizedItems);
         setItems(normalizedItems);
         setNotes(isEditing ? initialData.notes || '' : '');
         
@@ -198,13 +198,13 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
     }, [workOrder.diagnosticData]);
 
     const searchableItems = useMemo<SearchableItem[]>(() => {
-        console.log('🔍 CreateQuoteForm - searchableItems - services:', services);
-        console.log('🔍 CreateQuoteForm - searchableItems - locations:', locations);
-        console.log('🔍 CreateQuoteForm - searchableItems - workOrder.locationId:', workOrder.locationId);
+        console.warn('🔍 CreateQuoteForm - searchableItems - services:', services);
+        console.warn('🔍 CreateQuoteForm - searchableItems - locations:', locations);
+        console.warn('🔍 CreateQuoteForm - searchableItems - workOrder.locationId:', workOrder.locationId);
         
         // Early return if locations is not available yet
         if (!locations || locations.length === 0) {
-            console.log('🔍 CreateQuoteForm - locations not available yet, returning empty array');
+            console.warn('🔍 CreateQuoteForm - locations not available yet, returning empty array');
             return [];
         }
         
@@ -216,7 +216,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
             // Modelo de Tarifa Plana: TODOS los servicios se calculan como duración × tarifa
             const calculatedPrice = Math.round(hourlyRate * s.durationHours);
             
-            console.log(`🔍 CreateQuoteForm - service ${s.name} (Tarifa Plana):`, {
+            console.warn(`🔍 CreateQuoteForm - service ${s.name} (Tarifa Plana):`, {
                 durationHours: s.durationHours,
                 hourlyRate: hourlyRate,
                 calculatedPrice: calculatedPrice,
@@ -287,7 +287,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
             suppliedByClient: false,
         };
         
-        console.log(`🚨 handleAddItem - NUEVO ITEM CREADO:`, newItem);
+        console.warn(`🚨 handleAddItem - NUEVO ITEM CREADO:`, newItem);
         setItems(prev => [...prev, newItem]);
         setSearchTerm('');
     };
@@ -297,7 +297,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
     };
     
     const handleItemChange = (itemId: string, field: 'quantity' | 'unitPrice', value: number) => {
-        console.log(`🚨 CreateQuoteForm - handleItemChange:`, {
+        console.warn(`🚨 CreateQuoteForm - handleItemChange:`, {
             itemId,
             field,
             value,
@@ -321,8 +321,8 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
     };
 
     const handleSave = (status: QuoteStatus) => {
-        console.log('🔍 CreateQuoteForm - handleSave - items:', items);
-        console.log('🔍 CreateQuoteForm - handleSave - totals:', totals);
+        console.warn('🔍 CreateQuoteForm - handleSave - items:', items);
+        console.warn('🔍 CreateQuoteForm - handleSave - totals:', totals);
         
         // 🚨 SOLUCIÓN CRÍTICA: Asegurar que unitPrice SIEMPRE se guarde
         const sanitizedItems = items.map(item => {
@@ -337,7 +337,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
                 suppliedByClient: Boolean(item.suppliedByClient),
             };
             
-            console.log(`🚨 CreateQuoteForm - SANITIZANDO ITEM ${item.description}:`, {
+            console.warn(`🚨 CreateQuoteForm - SANITIZANDO ITEM ${item.description}:`, {
                 original: item,
                 sanitized: sanitizedItem,
             });
@@ -345,7 +345,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
             return sanitizedItem;
         });
         
-        console.log('🚨🚨🚨 CreateQuoteForm - ANTES DE GUARDAR:', {
+        console.warn('🚨🚨🚨 CreateQuoteForm - ANTES DE GUARDAR:', {
             itemsOriginales: items,
             sanitizedItems: sanitizedItems,
             sanitizedItemsDETAILED: sanitizedItems.map(item => ({
@@ -388,7 +388,7 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
             notes: notes,
         };
         
-        console.log('🔍 CreateQuoteForm - handleSave - quotePayload:', quotePayload);
+        console.warn('🔍 CreateQuoteForm - handleSave - quotePayload:', quotePayload);
         
         if (isEditing) {
             const finalQuote = {
@@ -398,14 +398,14 @@ const CreateQuoteForm: React.FC<CreateQuoteFormProps> = ({ workOrder, client, ve
                 expiryDate: initialData.expiryDate,
                 status: status,
             };
-            console.log('🔍 CreateQuoteForm - handleSave - finalQuote (editing):', finalQuote);
+            console.warn('🔍 CreateQuoteForm - handleSave - finalQuote (editing):', finalQuote);
             onSave(finalQuote);
         } else {
             const finalQuote = {
                 ...quotePayload,
                 status: status,
             };
-            console.log('🔍 CreateQuoteForm - handleSave - finalQuote (new):', finalQuote);
+            console.warn('🔍 CreateQuoteForm - handleSave - finalQuote (new):', finalQuote);
             onSave(finalQuote);
         }
     };

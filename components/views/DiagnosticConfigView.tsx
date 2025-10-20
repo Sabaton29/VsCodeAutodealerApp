@@ -177,7 +177,7 @@ const DiagnosticConfigView: React.FC<DiagnosticConfigViewProps> = ({ onSave, ini
         });
         
         if (hasEmptyComponents) {
-            alert(`No se puede guardar la configuración. Hay componentes con nombres vacíos:\n\n${emptyComponents.join('\n')}\n\nPor favor completa todos los campos o elimina los componentes vacíos.`);
+            console.warn(`No se puede guardar la configuración. Hay componentes con nombres vacíos:\n\n${emptyComponents.join('\n')}\n\nPor favor completa todos los campos o elimina los componentes vacíos.`);
             return;
         }
         
@@ -202,7 +202,7 @@ const DiagnosticConfigView: React.FC<DiagnosticConfigViewProps> = ({ onSave, ini
 
         // Validar que el elemento tenga nombre y descripción
         if (!editingItem.name.trim() || !editingItem.description.trim() || !editingItem.category.trim()) {
-            alert('Por favor completa todos los campos requeridos (nombre, descripción y categoría).');
+            console.warn('Por favor completa todos los campos requeridos (nombre, descripción y categoría).');
             return;
         }
 

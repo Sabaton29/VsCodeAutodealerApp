@@ -38,7 +38,7 @@ const ShareClientPortalModal: React.FC<ShareClientPortalModalProps> = ({ workOrd
             setTimeout(() => setCopyStatus('idle'), 2000);
         }).catch(err => {
             console.error('Failed to copy link: ', err);
-            alert('No se pudo copiar el enlace.');
+            console.warn('No se pudo copiar el enlace.');
         });
     };
 

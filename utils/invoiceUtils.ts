@@ -57,11 +57,11 @@ export function getWorkOrderInvoicingStatus(workOrderId: string, invoices: Invoi
         .filter(Boolean) as string[];
     
     const pendingQuotes = workOrderQuotes.filter(quote => 
-        quote.status === 'Aprobado' && !invoicedQuoteIds.includes(quote.id)
+        quote.status === 'Aprobado' && !invoicedQuoteIds.includes(quote.id),
     );
     
     const invoicedQuotes = workOrderQuotes.filter(quote => 
-        invoicedQuoteIds.includes(quote.id)
+        invoicedQuoteIds.includes(quote.id),
     );
     
     const totalInvoiced = workOrderInvoices.reduce((sum, invoice) => sum + invoice.total, 0);
@@ -71,7 +71,7 @@ export function getWorkOrderInvoicingStatus(workOrderId: string, invoices: Invoi
         invoiceCount: workOrderInvoices.length,
         totalInvoiced,
         pendingQuotes,
-        invoicedQuotes
+        invoicedQuotes,
     };
 }
 
@@ -89,6 +89,6 @@ export function getQuoteInvoicingSummary(quoteId: string, invoices: Invoice[]): 
     return {
         invoiceCount: quoteInvoices.length,
         totalInvoiced,
-        invoices: quoteInvoices
+        invoices: quoteInvoices,
     };
 }

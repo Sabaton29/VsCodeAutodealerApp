@@ -41,7 +41,7 @@ const AddLocationForm: React.FC<AddLocationFormProps> = ({ onSave, onCancel, ini
         e.preventDefault();
         const { name, city, address, phone, hourlyRate } = formData;
         if (!name || !city || !address || !phone || !hourlyRate) {
-            alert('Por favor complete todos los campos.');
+            console.warn('Por favor complete todos los campos.');
             return;
         }
         

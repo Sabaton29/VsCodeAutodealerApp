@@ -7,7 +7,7 @@ interface AddVehicleFormProps {
     onCancel: () => void;
     clients: Client[];
     preselectedClientId?: string;
-    initialData?: Vehicle;
+    initialData?: Partial<Vehicle>;
 }
 
 const inputClasses = "w-full px-3 py-2 border rounded-lg bg-gray-50 dark:bg-gray-900/50 focus:outline-none focus:ring-2 focus:ring-brand-red text-light-text dark:text-dark-text";
@@ -101,7 +101,7 @@ const AddVehicleForm: React.FC<AddVehicleFormProps> = ({ onSave, onCancel, clien
         const finalModel = selectedModel === 'Otros' ? otherModel : selectedModel;
 
         if (!formData.clientId || !finalMake || !finalModel) {
-            alert('Por favor complete todos los campos obligatorios.');
+            console.warn('Por favor complete todos los campos obligatorios.');
             return;
         }
         

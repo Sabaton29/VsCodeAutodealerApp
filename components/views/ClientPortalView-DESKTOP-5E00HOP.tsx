@@ -112,7 +112,7 @@ const ClientPortalView: React.FC<ClientPortalViewProps> = ({ workOrderId, token 
     
     const galleryImages = useMemo(() => {
         if (!workOrder) return [];
-        const allImages: { src: string; type: 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico'; timestamp: string; notes?: string }[] = [];
+    const allImages: { src: string; type: 'Ingreso' | 'Avance' | 'Entrega' | 'Diagnóstico'; timestamp: string | Date; notes?: string }[] = [];
 
         (workOrder.entryEvidenceImageUrls || []).forEach(url => {
             allImages.push({ src: url, type: 'Ingreso', timestamp: workOrder.createdAt, notes: 'Evidencia de Ingreso' });
@@ -159,7 +159,7 @@ const ClientPortalView: React.FC<ClientPortalViewProps> = ({ workOrderId, token 
     
     const handlePrintInvoice = () => {
         if (!invoice || !client || !vehicle) {
-            alert('Faltan datos para generar la factura.');
+            console.warn('Faltan datos para generar la factura.');
             return;
         }
 

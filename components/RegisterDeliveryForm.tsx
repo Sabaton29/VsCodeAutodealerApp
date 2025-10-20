@@ -70,7 +70,7 @@ const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.customerConfirmed) {
-            alert('El cliente debe confirmar la recepción del vehículo.');
+            console.warn('El cliente debe confirmar la recepción del vehículo.');
             return;
         }
         onSave(workOrder.id, { ...formData, deliveryEvidenceFiles });
@@ -88,7 +88,7 @@ const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, 
                     color: #9CA3AF !important;
                 }
             `}</style>
-            <form onSubmit={handleSubmit} className="space-y-6 delivery-form" style={{color: 'white'}}>
+            <form onSubmit={handleSubmit} className="space-y-6 delivery-form" style={{ color: 'white' }}>
             <div className="bg-blue-900/30 dark:bg-blue-900/20 p-4 rounded-lg border border-blue-700/50">
                 <p className="text-sm text-gray-300 dark:text-gray-300 font-medium">Cliente: <span className="font-bold text-white">{client?.name || 'Cliente no encontrado'}</span></p>
                 <p className="text-sm text-gray-300 dark:text-gray-300 font-medium">Vehículo: <span className="font-bold text-white">{`${vehicle?.make || 'N/A'} ${vehicle?.model || 'N/A'} (${vehicle?.plate || 'N/A'})`}</span></p>
@@ -127,15 +127,15 @@ const RegisterDeliveryForm: React.FC<RegisterDeliveryFormProps> = ({ workOrder, 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div>
                         <label htmlFor="nextMaintenanceDate" className={labelClasses}>Fecha Sugerida</label>
-                        <input type="date" id="nextMaintenanceDate" name="nextMaintenanceDate" value={formData.nextMaintenanceDate} onChange={handleChange} className={inputClasses} style={{color: 'white'}} />
+                        <input type="date" id="nextMaintenanceDate" name="nextMaintenanceDate" value={formData.nextMaintenanceDate} onChange={handleChange} className={inputClasses} style={{ color: 'white' }} />
                     </div>
                     <div>
                         <label htmlFor="nextMaintenanceMileage" className={labelClasses}>Kilometraje Sugerido</label>
-                        <input type="text" id="nextMaintenanceMileage" name="nextMaintenanceMileage" value={formData.nextMaintenanceMileage} onChange={handleChange} className={inputClasses} placeholder="Ej: 95.000 km" style={{color: 'white'}} />
+                        <input type="text" id="nextMaintenanceMileage" name="nextMaintenanceMileage" value={formData.nextMaintenanceMileage} onChange={handleChange} className={inputClasses} placeholder="Ej: 95.000 km" style={{ color: 'white' }} />
                     </div>
                     <div className="md:col-span-2">
                         <label htmlFor="nextMaintenanceNotes" className={labelClasses}>Notas / Servicios Sugeridos</label>
-                        <textarea id="nextMaintenanceNotes" name="nextMaintenanceNotes" value={formData.nextMaintenanceNotes} onChange={handleChange} rows={2} className={inputClasses} placeholder="Ej: Próximo cambio de aceite y filtro. Revisar pastillas de freno." style={{color: 'white'}}></textarea>
+                        <textarea id="nextMaintenanceNotes" name="nextMaintenanceNotes" value={formData.nextMaintenanceNotes} onChange={handleChange} rows={2} className={inputClasses} placeholder="Ej: Próximo cambio de aceite y filtro. Revisar pastillas de freno." style={{ color: 'white' }}></textarea>
                     </div>
                 </div>
             </div>

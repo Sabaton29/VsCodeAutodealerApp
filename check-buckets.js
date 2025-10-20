@@ -7,7 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 
 async function checkBuckets() {
     try {
-        console.log('🔍 Verificando buckets disponibles...');
+        console.debug('🔍 Verificando buckets disponibles...');
         
         const { data: buckets, error } = await supabase.storage.listBuckets();
         
@@ -16,29 +16,29 @@ async function checkBuckets() {
             return;
         }
         
-        console.log('✅ Buckets disponibles:');
+        console.debug('✅ Buckets disponibles:');
         buckets.forEach(bucket => {
-            console.log(`- ${bucket.name} (${bucket.public ? 'Público' : 'Privado'})`);
+            console.debug(`- ${bucket.name} (${bucket.public ? 'Público' : 'Privado'})`);
         });
         
         // Verificar si existe el bucket work-order-images
         const workOrderImagesBucket = buckets.find(b => b.name === 'work-order-images');
         if (workOrderImagesBucket) {
-            console.log('✅ Bucket work-order-images existe');
+            console.debug('✅ Bucket work-order-images existe');
         } else {
-            console.log('❌ Bucket work-order-images NO existe');
-            console.log('🔧 Creando bucket work-order-images...');
+            console.debug('❌ Bucket work-order-images NO existe');
+            console.debug('🔧 Creando bucket work-order-images...');
             
             const { data, error: createError } = await supabase.storage.createBucket('work-order-images', {
                 public: true,
                 allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp'],
-                fileSizeLimit: 10485760 // 10MB
+                fileSizeLimit: 10485760, // 10MB
             });
             
             if (createError) {
                 console.error('❌ Error al crear bucket:', createError);
             } else {
-                console.log('✅ Bucket work-order-images creado exitosamente');
+                console.debug('✅ Bucket work-order-images creado exitosamente');
             }
         }
         

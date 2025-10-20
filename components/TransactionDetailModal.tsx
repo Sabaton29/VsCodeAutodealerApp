@@ -1,6 +1,7 @@
 import React from 'react';
 import { PettyCashTransaction, OperatingExpense, FinancialAccount, StaffMember, Supplier } from '../types';
 import { Icon } from './Icon';
+import { formatDateTime } from '../utils/format';
 
 type UnifiedTransaction = (PettyCashTransaction | OperatingExpense) & { transactionType: 'pettyCash' | 'operatingExpense' };
 
@@ -12,7 +13,6 @@ interface TransactionDetailModalProps {
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
-const formatDateTime = (dateString: string) => new Date(dateString).toLocaleString('es-CO', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
 
 const DetailItem: React.FC<{ label: string; value?: string; children?: React.ReactNode }> = ({ label, value, children }) => (
     <div>

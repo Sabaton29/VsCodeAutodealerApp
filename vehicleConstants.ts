@@ -75,5 +75,5 @@ export const COLOMBIAN_CAR_MAKES: { [make: string]: string[] } = {
     'Scania Bus': ['Citywide', 'Interlink', 'Fencer'],
     'MAN Bus': ['Lion\'s City', 'Lion\'s Intercity', 'Lion\'s Coach'],
     'DAF Bus': ['LF', 'CF', 'XF'],
-    'Renault Bus': ['Master', 'Master ZE', 'Citybus']
+    'Renault Bus': ['Master', 'Master ZE', 'Citybus'],
 };

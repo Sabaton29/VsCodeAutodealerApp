@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import type { Loan, LoanPayment, StaffMember, Permission } from '../types';
 import { Icon } from './Icon';
+import { formatDate } from '../utils/format';
 
 interface LoansViewProps {
     loans: Loan[];
@@ -12,7 +13,6 @@ interface LoansViewProps {
 }
 
 const formatCurrency = (value: number) => new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', minimumFractionDigits: 0 }).format(value);
-const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('es-CO');
 
 const LoansView: React.FC<LoansViewProps> = ({ loans, loanPayments, staffMembers, onAddLoan, onAddLoanPayment, hasPermission }) => {
     

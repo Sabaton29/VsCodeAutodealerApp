@@ -98,7 +98,7 @@ const AddServiceForm: React.FC<AddServiceFormProps> = ({ onSave, onCancel, initi
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name || !formData.category || formData.durationHours <= 0) {
-            alert('Por favor complete todos los campos correctamente.');
+            console.warn('Por favor complete todos los campos correctamente.');
             return;
         }
         if (isEditing) {

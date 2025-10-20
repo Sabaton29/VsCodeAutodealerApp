@@ -3,19 +3,14 @@
 import React, { useMemo, useState } from 'react';
 import { TimeClockEntry, StaffMember } from '../types';
 import { Icon } from './Icon';
+import { formatDateTime } from '../utils/format';
 
 interface TimeClockViewProps {
     timeClockEntries: TimeClockEntry[];
     staffMembers: StaffMember[];
 }
 
-const formatDateTime = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleString('es-CO', {
-        day: '2-digit', month: 'short', year: 'numeric',
-        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true,
-    });
-};
+// using shared formatDateTime from utils/format
 
 const TimeClockView: React.FC<TimeClockViewProps> = ({ timeClockEntries, staffMembers }) => {
     const [selectedStaffId, setSelectedStaffId] = useState('all');

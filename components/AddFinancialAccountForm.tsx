@@ -66,22 +66,22 @@ const AddFinancialAccountForm: React.FC<AddFinancialAccountFormProps> = ({ onSav
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name) {
-            alert('Por favor, ingrese un nombre para la cuenta.');
+            console.warn('Por favor, ingrese un nombre para la cuenta.');
             return;
         }
         if (!formData.locationId) {
-            alert('Por favor, seleccione una sede.');
+            console.warn('Por favor, seleccione una sede.');
             return;
         }
         
         // Filtrar valores undefined del array assignedUserIds
         const cleanFormData = {
             ...formData,
-            assignedUserIds: formData.assignedUserIds.filter(id => id && id !== 'undefined' && id !== undefined)
+            assignedUserIds: formData.assignedUserIds.filter(id => id && id !== 'undefined' && id !== undefined),
         };
         
-        console.log('🔍 AddFinancialAccountForm - Form data before sending:', cleanFormData);
-        console.log('🔍 AddFinancialAccountForm - assignedUserIds:', cleanFormData.assignedUserIds);
+        console.warn('🔍 AddFinancialAccountForm - Form data before sending:', cleanFormData);
+        console.warn('🔍 AddFinancialAccountForm - assignedUserIds:', cleanFormData.assignedUserIds);
         
         if (isEditing) {
             onSave({ ...initialData!, ...cleanFormData });

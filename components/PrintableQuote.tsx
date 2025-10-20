@@ -63,7 +63,7 @@ const PrintableQuote: React.FC<PrintableQuoteProps> = ({ quote, client, vehicle,
                                 alt="AUTO DEALER" 
                                 style={{ height: '150px', width: 'auto', display: 'block', maxWidth: '100%', objectFit: 'contain' }}
                                 onError={(e) => {
-                                    console.log('Error loading logo:', companyInfo?.logoUrl);
+                                    console.warn('Error loading logo:', companyInfo?.logoUrl);
                                     e.currentTarget.style.display = 'none';
                                     e.currentTarget.nextElementSibling?.classList.remove('hidden');
                                 }} 

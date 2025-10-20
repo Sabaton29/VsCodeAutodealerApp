@@ -38,7 +38,7 @@ const MaintenanceReminders: React.FC<MaintenanceRemindersProps> = ({ workOrders,
         const client = clientMap.get(clientId);
         const vehicle = vehicleMap.get(vehicleId);
         if (!client || !vehicle || !client.phone) {
-            alert('No se puede contactar al cliente, falta información de contacto.');
+            console.warn('No se puede contactar al cliente, falta información de contacto.');
             return;
         }
 

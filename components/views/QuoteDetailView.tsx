@@ -42,23 +42,23 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
     useEffect(() => {
         // Solo cargar datos si no tenemos items o si los items están vacíos
         if (!enrichedQuote.items || enrichedQuote.items.length === 0) {
-            console.log('🔍 QuoteDetailView - Loading quote with negotiated prices...');
+            console.warn('🔍 QuoteDetailView - Loading quote with negotiated prices...');
             getQuoteWithItems(quote.id).then(enrichedQuote => {
                 if (enrichedQuote && enrichedQuote.items && enrichedQuote.items.length > 0) {
                     // Verificar que los items tengan unitPrice válidos antes de sobrescribir
                     const hasValidPrices = enrichedQuote.items.some(item => 
-                        item.unitPrice && item.unitPrice > 0
+                        item.unitPrice && item.unitPrice > 0,
                     );
                     
                     if (hasValidPrices) {
-                        console.log('🔍 QuoteDetailView - Quote enriched with valid prices:', enrichedQuote);
+                        console.warn('🔍 QuoteDetailView - Quote enriched with valid prices:', enrichedQuote);
                         setEnrichedQuote(enrichedQuote);
                     } else {
-                        console.log('🔍 QuoteDetailView - Enriched quote has no valid prices, keeping original');
+                        console.warn('🔍 QuoteDetailView - Enriched quote has no valid prices, keeping original');
                         // NO sobrescribir si no hay precios válidos
                     }
                 } else {
-                    console.log('🔍 QuoteDetailView - No items found, keeping original quote');
+                    console.warn('🔍 QuoteDetailView - No items found, keeping original quote');
                     // NO sobrescribir si no hay items
                 }
             }).catch(error => {
@@ -66,19 +66,19 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
                 // NO sobrescribir en caso de error
             });
         } else {
-            console.log('🔍 QuoteDetailView - Quote already has items, skipping reload');
+            console.warn('🔍 QuoteDetailView - Quote already has items, skipping reload');
         }
     }, [quote, getQuoteWithItems]);
 
     const statusConfig = QUOTE_STATUS_DISPLAY_CONFIG[enrichedQuote.status] || { bg: 'bg-gray-200 dark:bg-gray-700', text: 'text-gray-800 dark:text-gray-200' };
-    console.log('🔍 QuoteDetailView status debug:', { id: enrichedQuote.id, status: enrichedQuote.status, hasConfig: !!QUOTE_STATUS_DISPLAY_CONFIG[enrichedQuote.status] });
+    console.warn('🔍 QuoteDetailView status debug:', { id: enrichedQuote.id, status: enrichedQuote.status, hasConfig: !!QUOTE_STATUS_DISPLAY_CONFIG[enrichedQuote.status] });
     const canReview = hasPermission('review:quote') && (enrichedQuote.status === QuoteStatus.ENVIADO);
     const canApprove = hasPermission('approve:quote') && (enrichedQuote.status === QuoteStatus.REVISADO);
     const canTakeAction = canReview || canApprove;
 
     // Función de revisión (mostrar formulario de aprobación)
     const handleReview = () => {
-        console.log('🔍 QuoteDetailView - Mostrando formulario de revisión y aprobación');
+        console.warn('🔍 QuoteDetailView - Mostrando formulario de revisión y aprobación');
         setShowApproveForm(true);
     };
 
@@ -90,11 +90,11 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
         }
         
         try {
-            console.log('🔍 QuoteDetailView - Guardando cotización desde formulario de aprobación:', finalQuoteData);
+            console.warn('🔍 QuoteDetailView - Guardando cotización desde formulario de aprobación:', finalQuoteData);
             await (dataContext as any).handleSaveQuote(finalQuoteData);
             setEnrichedQuote(finalQuoteData);
             setShowApproveForm(false);
-            console.log('🔍 QuoteDetailView - Cotización guardada exitosamente');
+            console.warn('🔍 QuoteDetailView - Cotización guardada exitosamente');
         } catch (error) {
             console.error('Error saving quote from approve form:', error);
         }
@@ -102,7 +102,7 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
 
     // Función para cancelar el formulario de aprobación
     const handleCancelApproveForm = () => {
-        console.log('🔍 QuoteDetailView - Cancelando formulario de aprobación');
+        console.warn('🔍 QuoteDetailView - Cancelando formulario de aprobación');
         setShowApproveForm(false);
     };
 
@@ -113,12 +113,12 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
             return;
         }
         
-        console.log('🚨 QuoteDetailView: Aprobando cotización directamente...');
+        console.warn('🚨 QuoteDetailView: Aprobando cotización directamente...');
         try {
             await (dataContext as any).handleApproveQuote(enrichedQuote.id);
-            console.log('🚨 QuoteDetailView: Aprobación completada, recargando datos...');
+            console.warn('🚨 QuoteDetailView: Aprobación completada, recargando datos...');
             await dataContext.loadAllData();
-            console.log('🚨 QuoteDetailView: Datos recargados exitosamente');
+            console.warn('🚨 QuoteDetailView: Datos recargados exitosamente');
         } catch (error) {
             console.error('❌ QuoteDetailView: Error aprobando cotización:', error);
         }
@@ -152,14 +152,14 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
 
     // Recalculate totals to ensure IVA is correct
     const recalculatedTotals = useMemo(() => {
-        console.log('🔍 QuoteDetailView - Recalculating totals for items:', enrichedQuote.items);
-        console.log('🔍 QuoteDetailView - totalDiscount:', enrichedQuote.totalDiscount);
+        console.warn('🔍 QuoteDetailView - Recalculating totals for items:', enrichedQuote.items);
+        console.warn('🔍 QuoteDetailView - totalDiscount:', enrichedQuote.totalDiscount);
         
         const subtotal = enrichedQuote.items.reduce((acc, item) => {
-            console.log('🔍 QuoteDetailView - Processing item:', item);
-            console.log('🔍 QuoteDetailView - item.unitPrice:', item.unitPrice);
-            console.log('🔍 QuoteDetailView - item.quantity:', item.quantity);
-            console.log('🔍 QuoteDetailView - item.discount:', item.discount);
+            console.warn('🔍 QuoteDetailView - Processing item:', item);
+            console.warn('🔍 QuoteDetailView - item.unitPrice:', item.unitPrice);
+            console.warn('🔍 QuoteDetailView - item.quantity:', item.quantity);
+            console.warn('🔍 QuoteDetailView - item.discount:', item.discount);
             
             // Usar directamente los valores del item sin sanitización excesiva
             const unitPrice = item.unitPrice || 0;
@@ -167,7 +167,7 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
             const discount = item.discount || 0;
             
             const itemTotal = (unitPrice * quantity) - discount;
-            console.log('🔍 QuoteDetailView - itemTotal:', itemTotal);
+            console.warn('🔍 QuoteDetailView - itemTotal:', itemTotal);
             
             return acc + itemTotal;
         }, 0);
@@ -194,27 +194,27 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
         
         const total = subtotalWithDiscount + taxAmountWithDiscount;
         
-        console.log('🔍 QuoteDetailView - Calculated totals:', { 
+        console.warn('🔍 QuoteDetailView - Calculated totals:', { 
             subtotal, 
             subtotalWithDiscount, 
             discountAmount, 
             taxAmount, 
             taxAmountWithDiscount, 
-            total 
+            total, 
         });
         
         return { 
             subtotal: subtotalWithDiscount, // Mostrar el subtotal con descuento aplicado
             taxAmount: taxAmountWithDiscount, // Mostrar el IVA con descuento aplicado
             total,
-            discountAmount // Para mostrar en el resumen
+            discountAmount, // Para mostrar en el resumen
         };
     }, [enrichedQuote.items, enrichedQuote.totalDiscount]);
 
 
     const handlePrint = () => {
         if (!client || !vehicle) {
-            alert('Faltan datos de cliente o vehículo para generar el reporte.');
+            console.warn('Faltan datos de cliente o vehículo para generar el reporte.');
             return;
         }
 
@@ -344,8 +344,8 @@ const QuoteDetailView: React.FC<QuoteDetailViewProps> = ({ quote, workOrder, cli
                                     </thead>
                                     <tbody className="divide-y divide-blue-200 dark:divide-blue-800 text-light-text dark:text-dark-text">
                                         {enrichedQuote.items.filter(item => item.type === 'service').map(item => {
-                                    console.log('🔍 QuoteDetailView - Item data:', item);
-                                    console.log('🔍 QuoteDetailView - item.unitPrice:', item.unitPrice, 'type:', typeof item.unitPrice);
+                                    console.warn('🔍 QuoteDetailView - Item data:', item);
+                                    console.warn('🔍 QuoteDetailView - item.unitPrice:', item.unitPrice, 'type:', typeof item.unitPrice);
                                     
                                     const inventoryItem = item.type === 'inventory' ? inventoryMap.get(item.id) : null;
                                     const currentStock = inventoryItem?.stock ?? 0;

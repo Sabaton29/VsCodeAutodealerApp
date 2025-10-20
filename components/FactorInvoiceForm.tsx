@@ -65,7 +65,7 @@ const FactorInvoiceForm: React.FC<FactorInvoiceFormProps> = ({ invoice, accounts
         const { commission, retentionAmount } = calculatedValues;
         
         if (!formData.company || commission <= 0 || !formData.accountId) {
-            alert('Por favor complete todos los campos, incluyendo un porcentaje de comisión válido.');
+            console.warn('Por favor complete todos los campos, incluyendo un porcentaje de comisión válido.');
             return;
         }
 

@@ -108,7 +108,7 @@ const VehicleDetailView: React.FC<VehicleDetailViewProps> = ({ vehicle, client, 
                                             {new Date(item.date).toLocaleDateString('es-CO', { 
                                                 year: 'numeric', 
                                                 month: 'short', 
-                                                day: 'numeric' 
+                                                day: 'numeric', 
                                             })}
                                         </td>
                                         <td className="px-5 py-4">

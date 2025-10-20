@@ -47,7 +47,7 @@ const AddOperatingExpenseForm: React.FC<AddOperatingExpenseFormProps> = ({ onSav
         e.preventDefault();
         if (!currentUser) return;
         if (!formData.description || formData.amount <= 0 || !formData.accountId) {
-            alert('Por favor complete la descripción, un monto válido y seleccione una cuenta.');
+            console.warn('Por favor complete la descripción, un monto válido y seleccione una cuenta.');
             return;
         }
         onSave({ ...formData, userId: currentUser.id });

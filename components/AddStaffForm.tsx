@@ -70,7 +70,7 @@ const AddStaffForm: React.FC<AddStaffFormProps> = ({ onSave, onCancel, locations
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formData.name || !formData.email || !formData.role || !formData.documentNumber) {
-            alert('Por favor complete todos los campos obligatorios.');
+            console.warn('Por favor complete todos los campos obligatorios.');
             return;
         }
         if (isEditing) {

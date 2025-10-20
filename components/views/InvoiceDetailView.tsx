@@ -58,7 +58,7 @@ const formatPaymentTerms = (terms?: PaymentTerms): string => {
 const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({ invoice, workOrder, client, vehicle, appSettings, onBack, openModal, handleToggleInvoiceVat }) => {
     
     // Debug: Verificar datos de la factura
-    console.log('🔍 InvoiceDetailView received data:', {
+    console.warn('🔍 InvoiceDetailView received data:', {
         invoice: {
             id: invoice.id,
             subtotal: invoice.subtotal,
@@ -112,7 +112,7 @@ const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({ invoice, workOrde
     
     const handlePrint = () => {
         if (!client || !vehicle) {
-            alert('Faltan datos de cliente o vehículo para generar el reporte.');
+            console.warn('Faltan datos de cliente o vehículo para generar el reporte.');
             return;
         }
 
@@ -146,7 +146,7 @@ const InvoiceDetailView: React.FC<InvoiceDetailViewProps> = ({ invoice, workOrde
                 printWindow.print();
             }, 500);
         } else {
-             alert('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
+             console.warn('No se pudo abrir la ventana de impresión. Por favor, deshabilite los bloqueadores de ventanas emergentes.');
         }
     };
 

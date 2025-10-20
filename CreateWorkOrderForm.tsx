@@ -127,7 +127,7 @@ const CreateWorkOrderForm: React.FC<CreateWorkOrderFormProps> = ({
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState.clientId || !formState.vehicleId || !formState.serviceRequested) {
-            alert('Por favor, complete los campos de Cliente, Vehículo y Servicio Solicitado.');
+            console.warn('Por favor, complete los campos de Cliente, Vehículo y Servicio Solicitado.');
             return;
         }
         const client = clients.find(c => c.id === formState.clientId);

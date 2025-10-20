@@ -66,7 +66,7 @@ const SettingsView: React.FC<SettingsViewProps> = (props) => {
         }
         switch (activeTab) {
             case 'General':
-                console.log('🔧 SettingsView - Rendering GeneralSettings with appSettings:', appSettings);
+                console.warn('🔧 SettingsView - Rendering GeneralSettings with appSettings:', appSettings);
                 return <GeneralSettings 
                             settings={appSettings?.companyInfo || { name: '', nit: '', logoUrl: '' }} 
                             onSave={(info) => onSaveAppSettings(info)} 

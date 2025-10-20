@@ -1,9 +1,10 @@
 import { supabase } from '../lib/supabase';
+import { DEFAULT_SERVICE_CATEGORIES, DEFAULT_INVENTORY_CATEGORIES } from '../constants';
 import { 
     Location, WorkOrder, Client, Vehicle, StaffMember, Service, InventoryItem, 
     Supplier, PettyCashTransaction, Invoice, Quote, PurchaseOrder, 
     OperatingExpense, FinancialAccount, AppSettings, TimeClockEntry, Loan, 
-    LoanPayment, Notification, Appointment
+    LoanPayment, Notification, Appointment, InvoiceStatus,
 } from '../types';
 
 // Helper function to handle Supabase errors
@@ -156,7 +157,7 @@ const transformData = (data: any, toSnake: boolean = true): any => {
 };
 
 // Generic CRUD operations
-export const insert = async (tableName: string, data: any): Promise<any> => {
+export const insert = async(tableName: string, data: any): Promise<any> => {
     try {
         const cleanedData = cleanData(data);
         const transformedData = transformData(cleanedData);
@@ -181,7 +182,7 @@ export const insert = async (tableName: string, data: any): Promise<any> => {
     }
 };
 
-export const update = async (tableName: string, id: string, data: any): Promise<any> => {
+export const update = async(tableName: string, id: string, data: any): Promise<any> => {
     try {
         const cleanedData = cleanData(data);
         const transformedData = transformData(cleanedData);
@@ -200,7 +201,7 @@ export const update = async (tableName: string, id: string, data: any): Promise<
         }
 };
 
-export const deleteRecord = async (tableName: string, id: string): Promise<boolean> => {
+export const deleteRecord = async(tableName: string, id: string): Promise<boolean> => {
         try {
             const { error } = await supabase
             .from(tableName)
@@ -216,7 +217,7 @@ export const deleteRecord = async (tableName: string, id: string): Promise<boole
 };
 
 // LOCATIONS
-export const getLocations = async (): Promise<Location[]> => {
+export const getLocations = async(): Promise<Location[]> => {
     try {
         const { data, error } = await supabase
             .from('locations')
@@ -231,7 +232,7 @@ export const getLocations = async (): Promise<Location[]> => {
         }
 };
 
-export const createLocation = async (locationData: Omit<Location, 'id'>): Promise<Location> => {
+export const createLocation = async(locationData: Omit<Location, 'id'>): Promise<Location> => {
     try {
         const transformedData = transformData(locationData);
         const { data, error } = await supabase
@@ -248,7 +249,7 @@ export const createLocation = async (locationData: Omit<Location, 'id'>): Promis
     }
 };
 
-export const updateLocation = async (id: string, locationData: Partial<Location>): Promise<Location> => {
+export const updateLocation = async(id: string, locationData: Partial<Location>): Promise<Location> => {
     try {
         const transformedData = transformData(locationData);
         const { data, error } = await supabase
@@ -266,7 +267,7 @@ export const updateLocation = async (id: string, locationData: Partial<Location>
         }
 };
 
-export const deleteLocation = async (id: string): Promise<void> => {
+export const deleteLocation = async(id: string): Promise<void> => {
         try {
             const { error } = await supabase
             .from('locations')
@@ -281,7 +282,7 @@ export const deleteLocation = async (id: string): Promise<void> => {
 };
 
 // WORK ORDERS
-export const getWorkOrders = async (): Promise<WorkOrder[]> => {
+export const getWorkOrders = async(): Promise<WorkOrder[]> => {
     try {
         const { data, error } = await supabase
             .from('work_orders')
@@ -301,7 +302,7 @@ export const getWorkOrders = async (): Promise<WorkOrder[]> => {
         }
 };
 
-export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> => {
+export const getWorkOrderById = async(id: string): Promise<WorkOrder | null> => {
     try {
         const { data, error } = await supabase
             .from('work_orders')
@@ -325,7 +326,7 @@ export const getWorkOrderById = async (id: string): Promise<WorkOrder | null> =>
     }
 };
 
-export const createWorkOrder = async (workOrderData: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<WorkOrder> => {
+export const createWorkOrder = async(workOrderData: Omit<WorkOrder, 'id' | 'createdAt' | 'updatedAt'>): Promise<WorkOrder> => {
     try {
         // Limpiar datos antes de enviar - eliminar campos vacíos que causan errores
         const cleanedData = { ...workOrderData };
@@ -375,7 +376,7 @@ export const createWorkOrder = async (workOrderData: Omit<WorkOrder, 'id' | 'cre
     }
 };
 
-export const updateWorkOrder = async (id: string, workOrderData: Partial<WorkOrder>): Promise<WorkOrder> => {
+export const updateWorkOrder = async(id: string, workOrderData: Partial<WorkOrder>): Promise<WorkOrder> => {
     try {
         
         // Limpiar datos antes de enviar - eliminar campos vacíos que causan errores
@@ -425,7 +426,7 @@ export const updateWorkOrder = async (id: string, workOrderData: Partial<WorkOrd
     }
 };
 
-export const deleteWorkOrder = async (id: string): Promise<void> => {
+export const deleteWorkOrder = async(id: string): Promise<void> => {
     try {
         const { error } = await supabase
             .from('work_orders')
@@ -440,7 +441,7 @@ export const deleteWorkOrder = async (id: string): Promise<void> => {
 };
 
 // CLIENTS
-export const getClients = async (): Promise<Client[]> => {
+export const getClients = async(): Promise<Client[]> => {
     try {
         const { data, error } = await supabase
             .from('clients')
@@ -455,7 +456,7 @@ export const getClients = async (): Promise<Client[]> => {
         }
 };
 
-export const createClient = async (clientData: Omit<Client, 'id' | 'vehicleCount' | 'registrationDate'>): Promise<Client> => {
+export const createClient = async(clientData: Omit<Client, 'id' | 'vehicleCount' | 'registrationDate'>): Promise<Client> => {
     try {
         const transformedData = transformData(clientData);
         const { data, error } = await supabase
@@ -472,7 +473,7 @@ export const createClient = async (clientData: Omit<Client, 'id' | 'vehicleCount
     }
 };
 
-export const updateClient = async (id: string, clientData: Partial<Client>): Promise<Client> => {
+export const updateClient = async(id: string, clientData: Partial<Client>): Promise<Client> => {
     try {
         const transformedData = transformData(clientData);
             const { data, error } = await supabase
@@ -490,7 +491,7 @@ export const updateClient = async (id: string, clientData: Partial<Client>): Pro
     }
 };
 
-export const deleteClient = async (id: string): Promise<void> => {
+export const deleteClient = async(id: string): Promise<void> => {
         try {
             const { error } = await supabase
             .from('clients')
@@ -505,7 +506,7 @@ export const deleteClient = async (id: string): Promise<void> => {
 };
 
 // VEHICLES
-export const getVehicles = async (): Promise<Vehicle[]> => {
+export const getVehicles = async(): Promise<Vehicle[]> => {
     try {
         const { data, error } = await supabase
             .from('vehicles')
@@ -520,7 +521,7 @@ export const getVehicles = async (): Promise<Vehicle[]> => {
         }
 };
 
-export const createVehicle = async (vehicleData: Omit<Vehicle, 'id'>): Promise<Vehicle> => {
+export const createVehicle = async(vehicleData: Omit<Vehicle, 'id'>): Promise<Vehicle> => {
     try {
         const transformedData = transformData(vehicleData);
         const { data, error } = await supabase
@@ -537,7 +538,7 @@ export const createVehicle = async (vehicleData: Omit<Vehicle, 'id'>): Promise<V
     }
 };
 
-export const updateVehicle = async (id: string, vehicleData: Partial<Vehicle>): Promise<Vehicle> => {
+export const updateVehicle = async(id: string, vehicleData: Partial<Vehicle>): Promise<Vehicle> => {
     try {
         const transformedData = transformData(vehicleData);
             const { data, error } = await supabase
@@ -555,7 +556,7 @@ export const updateVehicle = async (id: string, vehicleData: Partial<Vehicle>): 
     }
 };
 
-export const deleteVehicle = async (id: string): Promise<void> => {
+export const deleteVehicle = async(id: string): Promise<void> => {
     try {
         const { error } = await supabase
             .from('vehicles')
@@ -570,7 +571,7 @@ export const deleteVehicle = async (id: string): Promise<void> => {
 };
 
 // STAFF MEMBERS
-export const getStaffMembers = async (): Promise<StaffMember[]> => {
+export const getStaffMembers = async(): Promise<StaffMember[]> => {
     try {
         const { data, error } = await supabase
             .from('staff_members')
@@ -585,7 +586,7 @@ export const getStaffMembers = async (): Promise<StaffMember[]> => {
     }
 };
 
-export const createStaffMember = async (staffData: Omit<StaffMember, 'id' | 'avatarUrl'>): Promise<StaffMember> => {
+export const createStaffMember = async(staffData: Omit<StaffMember, 'id' | 'avatarUrl'>): Promise<StaffMember> => {
     try {
         const transformedData = transformData(staffData);
         const { data, error } = await supabase
@@ -602,7 +603,7 @@ export const createStaffMember = async (staffData: Omit<StaffMember, 'id' | 'ava
     }
 };
 
-export const updateStaffMember = async (id: string, staffData: Partial<StaffMember>): Promise<StaffMember> => {
+export const updateStaffMember = async(id: string, staffData: Partial<StaffMember>): Promise<StaffMember> => {
     try {
         const transformedData = transformData(staffData);
         const { data, error } = await supabase
@@ -620,7 +621,7 @@ export const updateStaffMember = async (id: string, staffData: Partial<StaffMemb
     }
 };
 
-export const deleteStaffMember = async (id: string): Promise<void> => {
+export const deleteStaffMember = async(id: string): Promise<void> => {
     try {
         const { error } = await supabase
             .from('staff_members')
@@ -635,7 +636,7 @@ export const deleteStaffMember = async (id: string): Promise<void> => {
 };
 
 // SERVICES
-export const getServices = async (): Promise<Service[]> => {
+export const getServices = async(): Promise<Service[]> => {
     try {
         const { data, error } = await supabase
             .from('services')
@@ -650,7 +651,7 @@ export const getServices = async (): Promise<Service[]> => {
     }
 };
 
-export const createService = async (serviceData: Omit<Service, 'id'>): Promise<Service> => {
+export const createService = async(serviceData: Omit<Service, 'id'>): Promise<Service> => {
     try {
         const transformedData = transformData(serviceData);
         const { data, error } = await supabase
@@ -667,7 +668,7 @@ export const createService = async (serviceData: Omit<Service, 'id'>): Promise<S
     }
 };
 
-export const updateService = async (id: string, serviceData: Partial<Service>): Promise<Service> => {
+export const updateService = async(id: string, serviceData: Partial<Service>): Promise<Service> => {
     try {
         const transformedData = transformData(serviceData);
         const { data, error } = await supabase
@@ -685,7 +686,7 @@ export const updateService = async (id: string, serviceData: Partial<Service>): 
     }
 };
 
-export const deleteService = async (id: string): Promise<void> => {
+export const deleteService = async(id: string): Promise<void> => {
     try {
         const { error } = await supabase
             .from('services')
@@ -700,7 +701,7 @@ export const deleteService = async (id: string): Promise<void> => {
 };
 
 // INVENTORY ITEMS
-export const getInventoryItems = async (): Promise<InventoryItem[]> => {
+export const getInventoryItems = async(): Promise<InventoryItem[]> => {
     try {
         const { data, error } = await supabase
             .from('inventory_items')
@@ -715,7 +716,7 @@ export const getInventoryItems = async (): Promise<InventoryItem[]> => {
     }
 };
 
-export const createInventoryItem = async (itemData: Omit<InventoryItem, 'id'>): Promise<InventoryItem> => {
+export const createInventoryItem = async(itemData: Omit<InventoryItem, 'id'>): Promise<InventoryItem> => {
     try {
         const transformedData = transformData(itemData);
         const { data, error } = await supabase
@@ -732,7 +733,7 @@ export const createInventoryItem = async (itemData: Omit<InventoryItem, 'id'>): 
     }
 };
 
-export const updateInventoryItem = async (id: string, itemData: Partial<InventoryItem>): Promise<InventoryItem> => {
+export const updateInventoryItem = async(id: string, itemData: Partial<InventoryItem>): Promise<InventoryItem> => {
     try {
         const transformedData = transformData(itemData);
         const { data, error } = await supabase
@@ -750,7 +751,7 @@ export const updateInventoryItem = async (id: string, itemData: Partial<Inventor
     }
 };
 
-export const deleteInventoryItem = async (id: string): Promise<void> => {
+export const deleteInventoryItem = async(id: string): Promise<void> => {
     try {
         const { error } = await supabase
             .from('inventory_items')
@@ -765,7 +766,7 @@ export const deleteInventoryItem = async (id: string): Promise<void> => {
 };
 
 // SUPPLIERS
-export const getSuppliers = async (): Promise<Supplier[]> => {
+export const getSuppliers = async(): Promise<Supplier[]> => {
     try {
         const { data, error } = await supabase
             .from('suppliers')
@@ -780,7 +781,7 @@ export const getSuppliers = async (): Promise<Supplier[]> => {
     }
 };
 
-export const createSupplier = async (supplierData: Omit<Supplier, 'id'>): Promise<Supplier> => {
+export const createSupplier = async(supplierData: Omit<Supplier, 'id'>): Promise<Supplier> => {
     try {
         const transformedData = transformData(supplierData);
         const { data, error } = await supabase
@@ -797,7 +798,7 @@ export const createSupplier = async (supplierData: Omit<Supplier, 'id'>): Promis
     }
 };
 
-export const updateSupplier = async (id: string, supplierData: Partial<Supplier>): Promise<Supplier> => {
+export const updateSupplier = async(id: string, supplierData: Partial<Supplier>): Promise<Supplier> => {
     try {
         const transformedData = transformData(supplierData);
         const { data, error } = await supabase
@@ -815,7 +816,7 @@ export const updateSupplier = async (id: string, supplierData: Partial<Supplier>
     }
 };
 
-export const deleteSupplier = async (id: string): Promise<void> => {
+export const deleteSupplier = async(id: string): Promise<void> => {
     try {
         const { error } = await supabase
             .from('suppliers')
@@ -830,7 +831,7 @@ export const deleteSupplier = async (id: string): Promise<void> => {
 };
 
 // QUOTES
-export const getQuotes = async (): Promise<Quote[]> => {
+export const getQuotes = async(): Promise<Quote[]> => {
     try {
         const { data, error } = await supabase
             .from('quotes')
@@ -845,7 +846,7 @@ export const getQuotes = async (): Promise<Quote[]> => {
     }
 };
 
-export const createQuote = async (quoteData: Omit<Quote, 'id'>): Promise<Quote> => {
+export const createQuote = async(quoteData: Omit<Quote, 'id'>): Promise<Quote> => {
     try {
         const cleanedData = cleanData(quoteData);
         const transformedData = transformData(cleanedData);
@@ -870,7 +871,7 @@ export const createQuote = async (quoteData: Omit<Quote, 'id'>): Promise<Quote> 
     }
 };
 
-export const updateQuote = async (id: string, quoteData: Partial<Quote>): Promise<Quote> => {
+export const updateQuote = async(id: string, quoteData: Partial<Quote>): Promise<Quote> => {
     try {
         const cleanedData = cleanData(quoteData);
         const transformedData = transformData(cleanedData);
@@ -894,7 +895,7 @@ export const updateQuote = async (id: string, quoteData: Partial<Quote>): Promis
     }
 };
 
-export const deleteQuote = async (id: string): Promise<void> => {
+export const deleteQuote = async(id: string): Promise<void> => {
     try {
         const { error } = await supabase
             .from('quotes')
@@ -909,7 +910,7 @@ export const deleteQuote = async (id: string): Promise<void> => {
 };
 
 // Get quote with items (quotes + quote_items)
-export const getQuoteWithItems = async (quoteId: string): Promise<any> => {
+export const getQuoteWithItems = async(quoteId: string): Promise<any> => {
     try {
         // Get the quote
         const { data: quote, error: quoteError } = await supabase
@@ -929,7 +930,7 @@ export const getQuoteWithItems = async (quoteId: string): Promise<any> => {
         
         return {
             ...quote,
-            items: finalItems
+            items: finalItems,
         };
     } catch (error) {
         handleSupabaseError(error, 'get quote with items');
@@ -938,7 +939,7 @@ export const getQuoteWithItems = async (quoteId: string): Promise<any> => {
 };
 
 // APP SETTINGS
-export const getAppSettings = async (): Promise<AppSettings | null> => {
+export const getAppSettings = async(): Promise<AppSettings | null> => {
     try {
         // Primero intentar obtener todos los registros y tomar el más reciente
         const { data, error } = await supabase
@@ -971,37 +972,36 @@ export const getAppSettings = async (): Promise<AppSettings | null> => {
     }
 };
 
-// Función para obtener configuración por defecto
+// Función para obtener configuración por defecto (forma compatible con AppSettings)
 const getDefaultAppSettings = (): AppSettings => {
     return {
         id: 'default',
-        companyName: 'Autodealer Cloud',
-        companyNit: '900123456-7',
-        companyLogoUrl: '/images/company/Logo.png',
         companyInfo: {
+            name: 'Autodealer Cloud',
+            nit: '900123456-7',
+            logoUrl: '/images/company/Logo.png',
             address: 'Calle Falsa 123',
             phone: '555-1234',
-            email: 'info@autodealer.com'
         },
         billingSettings: {
-            currency: 'USD',
-            taxRate: 0.19
+            vatRate: 19,
+            currencySymbol: '$',
+            defaultTerms: 'Pago dentro de 30 días',
+            bankInfo: '',
         },
         operationsSettings: {
-            serviceCategories: ['Mecánica General', 'Eléctrico', 'Pintura'],
-            inventoryCategories: ['Filtros', 'Aceites', 'Llantas']
+            serviceCategories: DEFAULT_SERVICE_CATEGORIES,
+            inventoryCategories: DEFAULT_INVENTORY_CATEGORIES,
         },
         diagnosticSettings: {
             basic: [],
             intermediate: [],
-            advanced: []
+            advanced: [],
         },
-        createdAt: new Date(),
-        updatedAt: new Date()
     };
 };
 
-export const updateAppSettings = async (settingsData: Partial<AppSettings>): Promise<AppSettings> => {
+export const updateAppSettings = async(settingsData: Partial<AppSettings>): Promise<AppSettings> => {
     try {
         const transformedData = transformData(settingsData);
         const { data, error } = await supabase
@@ -1020,7 +1020,7 @@ export const updateAppSettings = async (settingsData: Partial<AppSettings>): Pro
                 return {
                     ...getDefaultAppSettings(),
                     ...settingsData,
-                    updatedAt: new Date()
+                    updatedAt: new Date(),
                 } as AppSettings;
             }
             
@@ -1036,15 +1036,15 @@ export const updateAppSettings = async (settingsData: Partial<AppSettings>): Pro
         return {
             ...getDefaultAppSettings(),
             ...settingsData,
-            updatedAt: new Date()
+            updatedAt: new Date(),
         } as AppSettings;
     }
 };
 
 // Funciones financieras - Conectadas a la base de datos
-export const getPettyCashTransactions = async (): Promise<PettyCashTransaction[]> => {
+export const getPettyCashTransactions = async(): Promise<PettyCashTransaction[]> => {
     try {
-        console.log('🔍 getPettyCashTransactions - Fetching from Supabase...');
+        console.debug('🔍 getPettyCashTransactions - Fetching from Supabase...');
         const { data, error } = await supabase
             .from('petty_cash_transactions')
             .select('*')
@@ -1059,7 +1059,7 @@ export const getPettyCashTransactions = async (): Promise<PettyCashTransaction[]
             throw error;
         }
 
-        console.log('✅ getPettyCashTransactions - Success:', data?.length || 0, 'transactions');
+        console.debug('✅ getPettyCashTransactions - Success:', data?.length || 0, 'transactions');
         return data?.map(toCamelCase) || [];
     } catch (error) {
         console.error('❌ getPettyCashTransactions - Error:', error);
@@ -1067,9 +1067,9 @@ export const getPettyCashTransactions = async (): Promise<PettyCashTransaction[]
     }
 };
 
-export const getInvoices = async (): Promise<Invoice[]> => {
+export const getInvoices = async(): Promise<Invoice[]> => {
     try {
-        console.log('🔍 getInvoices - Fetching invoices from Supabase...');
+        console.debug('🔍 getInvoices - Fetching invoices from Supabase...');
         const { data, error } = await supabase
             .from('invoices')
             .select('*')
@@ -1081,7 +1081,7 @@ export const getInvoices = async (): Promise<Invoice[]> => {
                 message: error.message,
                 details: error.details,
                 hint: error.hint,
-                code: error.code
+                code: error.code,
             });
             
             // Si la tabla no existe, devolver array vacío pero loguear el problema
@@ -1102,16 +1102,38 @@ export const getInvoices = async (): Promise<Invoice[]> => {
                     console.error('❌ getInvoices - Fallback query also failed:', fallbackError);
                     return [];
                 }
-                
-                console.log('✅ getInvoices - Fallback query successful:', fallbackData?.length || 0);
-                return fallbackData || [];
+
+                console.debug('✅ getInvoices - Fallback query successful:', fallbackData?.length || 0);
+                // Map snake_case fallback rows to Invoice[] with camelCase fields
+                const mapped = (fallbackData || []).map((invoice: any) => ({
+                    id: invoice.id,
+                    workOrderId: invoice.work_order_id,
+                    clientId: invoice.client_id,
+                    clientName: invoice.client_name,
+                    vehicleSummary: invoice.vehicle_summary,
+                    issueDate: invoice.issue_date,
+                    dueDate: invoice.due_date,
+                    subtotal: invoice.subtotal,
+                    taxAmount: invoice.tax_amount,
+                    total: invoice.total,
+                    status: invoice.status as InvoiceStatus,
+                    locationId: invoice.location_id,
+                    items: invoice.items,
+                    notes: invoice.notes,
+                    paymentTerms: invoice.payment_terms,
+                    vatIncluded: invoice.vat_included,
+                    sequentialId: invoice.sequential_id,
+                    factoringInfo: invoice.factoring_info,
+                })) as Invoice[];
+
+                return mapped;
             }
             
             throw error;
         }
 
-        console.log('✅ getInvoices - Successfully fetched invoices:', data?.length || 0);
-        console.log('🔍 getInvoices - Raw data:', data);
+        console.debug('✅ getInvoices - Successfully fetched invoices:', data?.length || 0);
+        console.debug('🔍 getInvoices - Raw data:', data);
         
         // Convertir de snake_case a camelCase
         const convertedData = data?.map(invoice => ({
@@ -1132,10 +1154,10 @@ export const getInvoices = async (): Promise<Invoice[]> => {
             paymentTerms: invoice.payment_terms,
             vatIncluded: invoice.vat_included,
             sequentialId: invoice.sequential_id,
-            factoringInfo: invoice.factoring_info
+            factoringInfo: invoice.factoring_info,
         })) || [];
         
-        console.log('🔍 getInvoices - Converted data:', convertedData);
+        console.debug('🔍 getInvoices - Converted data:', convertedData);
         return convertedData;
     } catch (error) {
         console.error('❌ getInvoices - Error fetching invoices:', error);
@@ -1143,15 +1165,15 @@ export const getInvoices = async (): Promise<Invoice[]> => {
     }
 };
 
-export const getPurchaseOrders = async (): Promise<PurchaseOrder[]> => {
+export const getPurchaseOrders = async(): Promise<PurchaseOrder[]> => {
     return [];
 };
 
 // Función para insertar facturas
 // Funciones de inserción para tablas financieras
-export const insertPettyCashTransaction = async (transaction: PettyCashTransaction): Promise<PettyCashTransaction | null> => {
+export const insertPettyCashTransaction = async(transaction: PettyCashTransaction): Promise<PettyCashTransaction | null> => {
     try {
-        console.log('🔍 insertPettyCashTransaction - Inserting transaction:', transaction);
+        console.debug('🔍 insertPettyCashTransaction - Inserting transaction:', transaction);
         
         const transactionData = {
             id: transaction.id,
@@ -1167,7 +1189,7 @@ export const insertPettyCashTransaction = async (transaction: PettyCashTransacti
             account_id: transaction.accountId,
             user_id: transaction.userId,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         };
         
         const { data, error } = await supabase
@@ -1181,7 +1203,7 @@ export const insertPettyCashTransaction = async (transaction: PettyCashTransacti
             return null;
         }
 
-        console.log('✅ insertPettyCashTransaction - Success:', data);
+        console.debug('✅ insertPettyCashTransaction - Success:', data);
         return toCamelCase(data);
     } catch (error) {
         console.error('❌ insertPettyCashTransaction - Error:', error);
@@ -1189,9 +1211,9 @@ export const insertPettyCashTransaction = async (transaction: PettyCashTransacti
     }
 };
 
-export const insertOperatingExpense = async (expense: OperatingExpense): Promise<OperatingExpense | null> => {
+export const insertOperatingExpense = async(expense: OperatingExpense): Promise<OperatingExpense | null> => {
     try {
-        console.log('🔍 insertOperatingExpense - Inserting expense:', expense);
+        console.debug('🔍 insertOperatingExpense - Inserting expense:', expense);
         
         const expenseData = {
             id: expense.id,
@@ -1203,7 +1225,7 @@ export const insertOperatingExpense = async (expense: OperatingExpense): Promise
             account_id: expense.accountId,
             user_id: expense.userId,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         };
         
         const { data, error } = await supabase
@@ -1217,7 +1239,7 @@ export const insertOperatingExpense = async (expense: OperatingExpense): Promise
             return null;
         }
 
-        console.log('✅ insertOperatingExpense - Success:', data);
+        console.debug('✅ insertOperatingExpense - Success:', data);
         return toCamelCase(data);
     } catch (error) {
         console.error('❌ insertOperatingExpense - Error:', error);
@@ -1225,9 +1247,9 @@ export const insertOperatingExpense = async (expense: OperatingExpense): Promise
     }
 };
 
-export const insertFinancialAccount = async (account: FinancialAccount): Promise<FinancialAccount | null> => {
+export const insertFinancialAccount = async(account: FinancialAccount): Promise<FinancialAccount | null> => {
     try {
-        console.log('🔍 insertFinancialAccount - Inserting account:', account);
+        console.debug('🔍 insertFinancialAccount - Inserting account:', account);
         
         const accountData = {
             id: account.id,
@@ -1236,7 +1258,7 @@ export const insertFinancialAccount = async (account: FinancialAccount): Promise
             location_id: account.locationId,
             assigned_user_ids: account.assignedUserIds,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         };
         
         const { data, error } = await supabase
@@ -1250,7 +1272,7 @@ export const insertFinancialAccount = async (account: FinancialAccount): Promise
             return null;
         }
 
-        console.log('✅ insertFinancialAccount - Success:', data);
+        console.debug('✅ insertFinancialAccount - Success:', data);
         return toCamelCase(data);
     } catch (error) {
         console.error('❌ insertFinancialAccount - Error:', error);
@@ -1258,9 +1280,9 @@ export const insertFinancialAccount = async (account: FinancialAccount): Promise
     }
 };
 
-export const insertLoan = async (loan: Loan): Promise<Loan | null> => {
+export const insertLoan = async(loan: Loan): Promise<Loan | null> => {
     try {
-        console.log('🔍 insertLoan - Inserting loan:', loan);
+        console.debug('🔍 insertLoan - Inserting loan:', loan);
         
         const loanData = {
             id: loan.id,
@@ -1271,7 +1293,7 @@ export const insertLoan = async (loan: Loan): Promise<Loan | null> => {
             issue_date: loan.issueDate,
             deduction_per_pay_period: loan.deductionPerPayPeriod,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         };
         
         const { data, error } = await supabase
@@ -1285,7 +1307,7 @@ export const insertLoan = async (loan: Loan): Promise<Loan | null> => {
             return null;
         }
 
-        console.log('✅ insertLoan - Success:', data);
+        console.debug('✅ insertLoan - Success:', data);
         return toCamelCase(data);
     } catch (error) {
         console.error('❌ insertLoan - Error:', error);
@@ -1293,9 +1315,9 @@ export const insertLoan = async (loan: Loan): Promise<Loan | null> => {
     }
 };
 
-export const insertLoanPayment = async (payment: LoanPayment): Promise<LoanPayment | null> => {
+export const insertLoanPayment = async(payment: LoanPayment): Promise<LoanPayment | null> => {
     try {
-        console.log('🔍 insertLoanPayment - Inserting payment:', payment);
+        console.debug('🔍 insertLoanPayment - Inserting payment:', payment);
         
         const paymentData = {
             id: payment.id,
@@ -1304,7 +1326,7 @@ export const insertLoanPayment = async (payment: LoanPayment): Promise<LoanPayme
             payment_date: payment.paymentDate,
             is_payroll_deduction: payment.isPayrollDeduction,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         };
         
         const { data, error } = await supabase
@@ -1318,7 +1340,7 @@ export const insertLoanPayment = async (payment: LoanPayment): Promise<LoanPayme
             return null;
         }
 
-        console.log('✅ insertLoanPayment - Success:', data);
+        console.debug('✅ insertLoanPayment - Success:', data);
         return toCamelCase(data);
     } catch (error) {
         console.error('❌ insertLoanPayment - Error:', error);
@@ -1326,9 +1348,9 @@ export const insertLoanPayment = async (payment: LoanPayment): Promise<LoanPayme
     }
 };
 
-export const insertTimeClockEntry = async (entry: TimeClockEntry): Promise<TimeClockEntry | null> => {
+export const insertTimeClockEntry = async(entry: TimeClockEntry): Promise<TimeClockEntry | null> => {
     try {
-        console.log('🔍 insertTimeClockEntry - Inserting entry:', entry);
+        console.debug('🔍 insertTimeClockEntry - Inserting entry:', entry);
         
         const entryData = {
             id: entry.id,
@@ -1338,7 +1360,7 @@ export const insertTimeClockEntry = async (entry: TimeClockEntry): Promise<TimeC
             location_id: entry.locationId,
             notes: entry.notes,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         };
         
         const { data, error } = await supabase
@@ -1352,7 +1374,7 @@ export const insertTimeClockEntry = async (entry: TimeClockEntry): Promise<TimeC
             return null;
         }
 
-        console.log('✅ insertTimeClockEntry - Success:', data);
+        console.debug('✅ insertTimeClockEntry - Success:', data);
         return toCamelCase(data);
     } catch (error) {
         console.error('❌ insertTimeClockEntry - Error:', error);
@@ -1360,9 +1382,9 @@ export const insertTimeClockEntry = async (entry: TimeClockEntry): Promise<TimeC
     }
 };
 
-export const insertInvoice = async (invoice: Invoice): Promise<Invoice | null> => {
+export const insertInvoice = async(invoice: Invoice): Promise<Invoice | null> => {
     try {
-        console.log('🔍 insertInvoice - Inserting invoice:', invoice);
+        console.debug('🔍 insertInvoice - Inserting invoice:', invoice);
         
         // Convertir a snake_case para Supabase
         const invoiceData = {
@@ -1385,10 +1407,10 @@ export const insertInvoice = async (invoice: Invoice): Promise<Invoice | null> =
             sequential_id: invoice.sequentialId,
             factoring_info: invoice.factoringInfo,
             created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
         };
         
-        console.log('🔍 insertInvoice - Converted data for Supabase:', invoiceData);
+        console.debug('🔍 insertInvoice - Converted data for Supabase:', invoiceData);
         
         const { data, error } = await supabase
             .from('invoices')
@@ -1402,13 +1424,13 @@ export const insertInvoice = async (invoice: Invoice): Promise<Invoice | null> =
                 message: error.message,
                 details: error.details,
                 hint: error.hint,
-                code: error.code
+                code: error.code,
             });
             
             // Si la tabla no existe, mostrar mensaje de error más claro
             if (error.code === 'PGRST116' || error.message.includes('relation "invoices" does not exist')) {
                 console.error('❌ insertInvoice - Table "invoices" does not exist. Please create it first.');
-                alert('Error: La tabla de facturas no existe en la base de datos. Por favor, ejecuta el script SQL para crear la tabla.');
+                console.warn('Error: La tabla de facturas no existe en la base de datos. Por favor, ejecuta el script SQL para crear la tabla.');
                 return null;
             }
             
@@ -1424,18 +1446,18 @@ export const insertInvoice = async (invoice: Invoice): Promise<Invoice | null> =
                     
                 if (fallbackError) {
                     console.error('❌ insertInvoice - Fallback insert also failed:', fallbackError);
-                    alert('Error: No se pudo insertar la factura. Verifica la estructura de la tabla.');
+                    console.warn('Error: No se pudo insertar la factura. Verifica la estructura de la tabla.');
                     return null;
                 }
                 
-                console.log('✅ insertInvoice - Fallback insert successful:', fallbackData);
+                console.debug('✅ insertInvoice - Fallback insert successful:', fallbackData);
                 return fallbackData;
             }
             
             throw error;
         }
 
-        console.log('✅ insertInvoice - Successfully inserted invoice:', data);
+        console.debug('✅ insertInvoice - Successfully inserted invoice:', data);
         
         // Convertir de vuelta a camelCase
         const convertedData: Invoice = {
@@ -1456,10 +1478,10 @@ export const insertInvoice = async (invoice: Invoice): Promise<Invoice | null> =
             paymentTerms: data.payment_terms,
             vatIncluded: data.vat_included,
             sequentialId: data.sequential_id,
-            factoringInfo: data.factoring_info
+            factoringInfo: data.factoring_info,
         };
         
-        console.log('✅ insertInvoice - Converted response:', convertedData);
+        console.debug('✅ insertInvoice - Converted response:', convertedData);
         return convertedData;
     } catch (error) {
         console.error('❌ insertInvoice - Error inserting invoice:', error);
@@ -1467,9 +1489,9 @@ export const insertInvoice = async (invoice: Invoice): Promise<Invoice | null> =
     }
 };
 
-export const getOperatingExpenses = async (): Promise<OperatingExpense[]> => {
+export const getOperatingExpenses = async(): Promise<OperatingExpense[]> => {
     try {
-        console.log('🔍 getOperatingExpenses - Fetching from Supabase...');
+        console.debug('🔍 getOperatingExpenses - Fetching from Supabase...');
         const { data, error } = await supabase
             .from('operating_expenses')
             .select('*')
@@ -1484,7 +1506,7 @@ export const getOperatingExpenses = async (): Promise<OperatingExpense[]> => {
             throw error;
         }
 
-        console.log('✅ getOperatingExpenses - Success:', data?.length || 0, 'expenses');
+        console.debug('✅ getOperatingExpenses - Success:', data?.length || 0, 'expenses');
         return data?.map(toCamelCase) || [];
     } catch (error) {
         console.error('❌ getOperatingExpenses - Error:', error);
@@ -1492,9 +1514,9 @@ export const getOperatingExpenses = async (): Promise<OperatingExpense[]> => {
     }
 };
 
-export const getFinancialAccounts = async (): Promise<FinancialAccount[]> => {
+export const getFinancialAccounts = async(): Promise<FinancialAccount[]> => {
     try {
-        console.log('🔍 getFinancialAccounts - Fetching from Supabase...');
+        console.debug('🔍 getFinancialAccounts - Fetching from Supabase...');
         const { data, error } = await supabase
             .from('financial_accounts')
             .select('*')
@@ -1509,7 +1531,7 @@ export const getFinancialAccounts = async (): Promise<FinancialAccount[]> => {
             throw error;
         }
 
-        console.log('✅ getFinancialAccounts - Success:', data?.length || 0, 'accounts');
+        console.debug('✅ getFinancialAccounts - Success:', data?.length || 0, 'accounts');
         return data?.map(toCamelCase) || [];
     } catch (error) {
         console.error('❌ getFinancialAccounts - Error:', error);
@@ -1517,9 +1539,9 @@ export const getFinancialAccounts = async (): Promise<FinancialAccount[]> => {
     }
 };
 
-export const getTimeClockEntries = async (): Promise<TimeClockEntry[]> => {
+export const getTimeClockEntries = async(): Promise<TimeClockEntry[]> => {
     try {
-        console.log('🔍 getTimeClockEntries - Fetching from Supabase...');
+        console.debug('🔍 getTimeClockEntries - Fetching from Supabase...');
         const { data, error } = await supabase
             .from('time_clock_entries')
             .select('*')
@@ -1534,7 +1556,7 @@ export const getTimeClockEntries = async (): Promise<TimeClockEntry[]> => {
             throw error;
         }
 
-        console.log('✅ getTimeClockEntries - Success:', data?.length || 0, 'entries');
+        console.debug('✅ getTimeClockEntries - Success:', data?.length || 0, 'entries');
         return data?.map(toCamelCase) || [];
     } catch (error) {
         console.error('❌ getTimeClockEntries - Error:', error);
@@ -1542,9 +1564,9 @@ export const getTimeClockEntries = async (): Promise<TimeClockEntry[]> => {
     }
 };
 
-export const getLoans = async (): Promise<Loan[]> => {
+export const getLoans = async(): Promise<Loan[]> => {
     try {
-        console.log('🔍 getLoans - Fetching from Supabase...');
+        console.debug('🔍 getLoans - Fetching from Supabase...');
         const { data, error } = await supabase
             .from('loans')
             .select('*')
@@ -1559,7 +1581,7 @@ export const getLoans = async (): Promise<Loan[]> => {
             throw error;
         }
 
-        console.log('✅ getLoans - Success:', data?.length || 0, 'loans');
+        console.debug('✅ getLoans - Success:', data?.length || 0, 'loans');
         return data?.map(toCamelCase) || [];
     } catch (error) {
         console.error('❌ getLoans - Error:', error);
@@ -1567,9 +1589,9 @@ export const getLoans = async (): Promise<Loan[]> => {
     }
 };
 
-export const getLoanPayments = async (): Promise<LoanPayment[]> => {
+export const getLoanPayments = async(): Promise<LoanPayment[]> => {
     try {
-        console.log('🔍 getLoanPayments - Fetching from Supabase...');
+        console.debug('🔍 getLoanPayments - Fetching from Supabase...');
         const { data, error } = await supabase
             .from('loan_payments')
             .select('*')
@@ -1584,7 +1606,7 @@ export const getLoanPayments = async (): Promise<LoanPayment[]> => {
             throw error;
         }
 
-        console.log('✅ getLoanPayments - Success:', data?.length || 0, 'payments');
+        console.debug('✅ getLoanPayments - Success:', data?.length || 0, 'payments');
         return data?.map(toCamelCase) || [];
     } catch (error) {
         console.error('❌ getLoanPayments - Error:', error);
@@ -1592,11 +1614,11 @@ export const getLoanPayments = async (): Promise<LoanPayment[]> => {
     }
 };
 
-export const getNotifications = async (): Promise<Notification[]> => {
+export const getNotifications = async(): Promise<Notification[]> => {
     return [];
 };
 
-export const getAppointments = async (): Promise<Appointment[]> => {
+export const getAppointments = async(): Promise<Appointment[]> => {
     try {
         const { data, error } = await supabase
             .from('appointments')
@@ -1617,7 +1639,7 @@ export const getAppointments = async (): Promise<Appointment[]> => {
 };
 
 // Funciones específicas que necesita DataContext
-export const insertNotification = async (notificationData: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> => {
+export const insertNotification = async(notificationData: Omit<Notification, 'id' | 'createdAt'>): Promise<Notification> => {
     try {
         const transformedData = transformData(notificationData);
         const { data, error } = await supabase
@@ -1635,7 +1657,7 @@ export const insertNotification = async (notificationData: Omit<Notification, 'i
 };
 
 // UPLOAD FILE TO STORAGE
-export const uploadFileToStorage = async (file: File, bucket: string, path: string): Promise<string> => {
+export const uploadFileToStorage = async(file: File, bucket: string, path: string): Promise<string> => {
     try {
         const { data, error } = await supabase.storage
             .from(bucket)

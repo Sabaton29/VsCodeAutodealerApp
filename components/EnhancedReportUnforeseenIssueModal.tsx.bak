@@ -1,0 +1,783 @@
+import React, { useState, useContext, useEffect, useRef } from 'react';
+import { WorkOrder, Service, InventoryItem, Supplier, UnforeseenIssue, Client, Vehicle } from '../types';
+import { Icon } from './Icon';
+import { DataContext } from './DataContext';
+import { UIContext } from './UIContext';
+import PrintableUnforeseenIssueReport from './PrintableUnforeseenIssueReport';
+
+interface EnhancedReportUnforeseenIssueModalProps {
+    workOrder: WorkOrder;
+    client?: Client;
+    vehicle?: Vehicle;
+    onSave: (issue: UnforeseenIssue) => void;
+    onCancel: () => void;
+    onCreateQuoteFromIssue?: (issue: UnforeseenIssue) => void;
+}
+
+interface ServiceItem {
+    serviceId: string;
+    serviceName: string;
+    quantity: number;
+    estimatedPrice: number;
+    notes: string;
+}
+
+interface PartItem {
+    partId: string;
+    partName: string;
+    quantity: number;
+    estimatedPrice: number;
+    supplierId: string;
+    notes: string;
+}
+
+const EnhancedReportUnforeseenIssueModal: React.FC<EnhancedReportUnforeseenIssueModalProps> = ({ 
+    workOrder, 
+    client,
+    vehicle,
+    onSave, 
+    onCancel,
+    onCreateQuoteFromIssue,
+}) => {
+    const data = useContext(DataContext);
+    const ui = useContext(UIContext);
+    
+    const [description, setDescription] = useState('');
+    const [priority, setPriority] = useState<'low' | 'medium' | 'high' | 'urgent'>('medium');
+    const [estimatedCost, setEstimatedCost] = useState<number>(0);
+    const [notes, setNotes] = useState('');
+    
+    // Fotos
+    const [selectedImages, setSelectedImages] = useState<File[]>([]);
+    const [imagePreviews, setImagePreviews] = useState<string[]>([]);
+    // Cámara / captura
+    const [showCaptureModal, setShowCaptureModal] = useState(false);
+    const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+    const videoRef = useRef<HTMLVideoElement | null>(null);
+    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    
+    // Servicios
+    const [selectedServices, setSelectedServices] = useState<ServiceItem[]>([]);
+    const [showServiceSelector, setShowServiceSelector] = useState(false);
+    const [serviceSearchTerm, setServiceSearchTerm] = useState('');
+    
+    // Repuestos
+    const [selectedParts, setSelectedParts] = useState<PartItem[]>([]);
+    const [showPartSelector, setShowPartSelector] = useState(false);
+    const [partSearchTerm, setPartSearchTerm] = useState('');
+    
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showPrintableReport, setShowPrintableReport] = useState(false);
+    const [savedIssue, setSavedIssue] = useState<UnforeseenIssue | null>(null);
+
+    // Filtrar servicios y repuestos
+    const filteredServices = data.services.filter(service => 
+        service.name.toLowerCase().includes(serviceSearchTerm.toLowerCase()),
+    );
+    
+    const filteredParts = data.inventoryItems.filter(part => 
+        part.name.toLowerCase().includes(partSearchTerm.toLowerCase()),
+    );
+
+    const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        if (files.length > 0) {
+            setSelectedImages(prev => [...prev, ...files]);
+            
+            // Crear previews
+            const newPreviews = files.map(file => URL.createObjectURL(file));
+            setImagePreviews(prev => [...prev, ...newPreviews]);
+        }
+    };
+
+    const handleCameraCapture = async() => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                video: { 
+                    facingMode: 'environment',
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 },
+                },
+            });
+            // Guardar stream y mostrar modal controlado por React
+            setCameraStream(stream);
+            setShowCaptureModal(true);
+            // Assign stream to video element when available via effect below
+        } catch (error) {
+            console.error('Error accediendo a la cámara:', error);
+            console.warn('No se pudo acceder a la cámara. Por favor, usa la opción de seleccionar archivos.');
+        }
+    };
+
+    // Efecto para asignar el stream al video cuando cambia
+    useEffect(() => {
+        if (videoRef.current && cameraStream) {
+            videoRef.current.srcObject = cameraStream;
+            videoRef.current.play().catch(() => {});
+        }
+        return () => {};
+    }, [cameraStream]);
+
+    const captureFromCamera = () => {
+        if (!videoRef.current) return;
+        const video = videoRef.current;
+        const canvas = canvasRef.current || document.createElement('canvas');
+        canvas.width = video.videoWidth || 1280;
+        canvas.height = video.videoHeight || 720;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob((blob) => {
+            if (blob) {
+                const file = new File([blob], `camera_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                setSelectedImages(prev => [...prev, file]);
+                setImagePreviews(prev => [...prev, URL.createObjectURL(file)]);
+            }
+        }, 'image/jpeg', 0.8);
+
+        // Stop stream and close modal
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setShowCaptureModal(false);
+    };
+
+    const cancelCapture = () => {
+        if (cameraStream) {
+            cameraStream.getTracks().forEach(track => track.stop());
+            setCameraStream(null);
+        }
+        setShowCaptureModal(false);
+    };
+
+    const removeImage = (index: number) => {
+        setSelectedImages(prev => prev.filter((_, i) => i !== index));
+        setImagePreviews(prev => {
+            URL.revokeObjectURL(prev[index]);
+            return prev.filter((_, i) => i !== index);
+        });
+    };
+
+    const addService = (service: Service) => {
+        const newService: ServiceItem = {
+            serviceId: service.id,
+            serviceName: service.name,
+            quantity: 1,
+            estimatedPrice: (service as any).price || 0,
+            notes: '',
+        };
+        setSelectedServices(prev => [...prev, newService]);
+        setShowServiceSelector(false);
+        setServiceSearchTerm('');
+    };
+
+    const updateService = (index: number, field: keyof ServiceItem, value: any) => {
+        setSelectedServices(prev => 
+            prev.map((service, i) => 
+                i === index ? { ...service, [field]: value } : service,
+            ),
+        );
+    };
+
+    const removeService = (index: number) => {
+        setSelectedServices(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const addPart = (part: InventoryItem) => {
+        const newPart: PartItem = {
+            partId: part.id,
+            partName: part.name,
+            quantity: 1,
+            estimatedPrice: part.salePrice || 0,
+            supplierId: part.supplierId || '',
+            notes: '',
+        };
+        setSelectedParts(prev => [...prev, newPart]);
+        setShowPartSelector(false);
+        setPartSearchTerm('');
+    };
+
+    const updatePart = (index: number, field: keyof PartItem, value: any) => {
+        setSelectedParts(prev => 
+            prev.map((part, i) => 
+                i === index ? { ...part, [field]: value } : part,
+            ),
+        );
+    };
+
+    const removePart = (index: number) => {
+        setSelectedParts(prev => prev.filter((_, i) => i !== index));
+    };
+
+    const calculateTotalCost = () => {
+        const servicesCost = selectedServices.reduce((total, service) => 
+            total + (service.quantity * service.estimatedPrice), 0,
+        );
+        const partsCost = selectedParts.reduce((total, part) => 
+            total + (part.quantity * part.estimatedPrice), 0,
+        );
+        return servicesCost + partsCost;
+    };
+
+    const handleSubmit = async(e: React.FormEvent) => {
+        e.preventDefault();
+        
+        if (!description.trim()) {
+            console.warn('Por favor, describe el imprevisto encontrado');
+            return;
+        }
+
+        setIsSubmitting(true);
+        try {
+            // Subir imágenes si las hay
+            let uploadedImageUrls: string[] = [];
+            if (selectedImages.length > 0) {
+                try {
+                    console.debug('🔍 EnhancedReportUnforeseenIssueModal - Subiendo imágenes:', selectedImages.length);
+                    
+                    // Subir imágenes directamente usando uploadFileToStorage con el mismo path que las tareas
+                    const uploadPromises = selectedImages.map(async(file, index) => {
+                        const fileName = `unforeseen_${workOrder.id}_${Date.now()}_${index}.${file.name.split('.').pop()}`;
+                        const path = `progress/${workOrder.id}/${fileName}`;
+                        console.debug('🔍 EnhancedReportUnforeseenIssueModal - Subiendo archivo:', fileName, 'path:', path);
+                        // Importar directamente el servicio de Supabase
+                        const { uploadFileToStorage } = await import('../services/supabase');
+                        return await uploadFileToStorage(file, 'progress-updates', path);
+                    });
+                    
+                    uploadedImageUrls = (await Promise.all(uploadPromises)).filter(url => url !== null) as string[];
+                    console.debug('🔍 EnhancedReportUnforeseenIssueModal - URLs subidas:', uploadedImageUrls);
+                } catch (uploadError) {
+                    console.warn('Error subiendo imágenes, continuando sin ellas:', uploadError);
+                    uploadedImageUrls = [];
+                }
+            }
+
+            // Crear el imprevisto
+            const issue: UnforeseenIssue = {
+                id: `issue_${Date.now()}`,
+                reportedById: (data as any).currentUser?.id || 'system',
+                timestamp: new Date().toISOString(),
+                description: description.trim(),
+                imageUrls: uploadedImageUrls,
+                requiredServices: selectedServices.length > 0 ? selectedServices : undefined,
+                requiredParts: selectedParts.length > 0 ? selectedParts : undefined,
+                priority,
+                status: 'pending',
+                estimatedCost: calculateTotalCost() || estimatedCost,
+                notes: notes.trim() || undefined,
+            };
+
+            await onSave(issue);
+            setSavedIssue(issue);
+            console.warn('Imprevisto reportado exitosamente');
+            // Mostrar el reporte imprimible después de un pequeño delay
+            setTimeout(() => {
+                setShowPrintableReport(true);
+            }, 500);
+        } catch (error) {
+            console.error('Error reportando imprevisto:', error);
+            console.warn('Error al reportar imprevisto');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
+
+    const getPriorityColor = (priority: string) => {
+        switch (priority) {
+            case 'low': return 'text-green-400';
+            case 'medium': return 'text-yellow-400';
+            case 'high': return 'text-orange-400';
+            case 'urgent': return 'text-red-400';
+            default: return 'text-gray-400';
+        }
+    };
+
+    const getPriorityLabel = (priority: string) => {
+        switch (priority) {
+            case 'low': return 'Baja';
+            case 'medium': return 'Media';
+            case 'high': return 'Alta';
+            case 'urgent': return 'Urgente';
+            default: return 'Media';
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                <div className="p-6">
+                    <div className="flex items-center justify-between mb-6">
+                        <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                            Reportar Imprevisto
+                        </h2>
+                        <button
+                            onClick={onCancel}
+                            className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                        >
+                            <Icon name="x-mark" className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-6">
+                        {/* Información básica */}
+                        <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Prioridad
+                                </label>
+                                <select
+                                    value={priority}
+                                    onChange={(e) => setPriority(e.target.value as any)}
+                                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                >
+                                    <option value="low">Baja</option>
+                                    <option value="medium">Media</option>
+                                    <option value="high">Alta</option>
+                                    <option value="urgent">Urgente</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        {/* Descripción */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Descripción del Imprevisto *
+                            </label>
+                            <textarea
+                                value={description}
+                                onChange={(e) => setDescription(e.target.value)}
+                                rows={4}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Describe detalladamente el problema encontrado..."
+                                required
+                            />
+                        </div>
+
+                        {/* Subida de fotos */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Evidencia Fotográfica
+                            </label>
+                            <div className="flex gap-3 mb-4">
+                                <button
+                                    type="button"
+                                    onClick={handleCameraCapture}
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                >
+                                    <Icon name="camera" className="w-4 h-4" />
+                                    Tomar Foto
+                                </button>
+                                <label className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors cursor-pointer">
+                                    <Icon name="image" className="w-4 h-4" />
+                                    Seleccionar Archivos
+                                    <input
+                                        type="file"
+                                        multiple
+                                        accept="image/*"
+                                        onChange={handleImageUpload}
+                                        className="hidden"
+                                    />
+                                </label>
+                            </div>
+                            
+                            {imagePreviews.length > 0 && (
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    {imagePreviews.map((preview, index) => (
+                                        <div key={index} className="relative">
+                                            <img
+                                                src={preview}
+                                                alt={`Preview ${index + 1}`}
+                                                className="w-full h-24 object-cover rounded-lg"
+                                            />
+                                            <button
+                                                type="button"
+                                                onClick={() => removeImage(index)}
+                                                className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs hover:bg-red-700"
+                                            >
+                                                ×
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Servicios requeridos */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Servicios Requeridos
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowServiceSelector(!showServiceSelector)}
+                                    className="px-3 py-1 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700"
+                                >
+                                    <Icon name="plus" className="w-4 h-4 mr-1" />
+                                    Agregar Servicio
+                                </button>
+                            </div>
+                            
+                            {showServiceSelector && (
+                                <div className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar servicios..."
+                                        value={serviceSearchTerm}
+                                        onChange={(e) => setServiceSearchTerm(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                                    />
+                                    <div className="max-h-40 overflow-y-auto space-y-2">
+                                        {filteredServices.map(service => (
+                                            <div key={service.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border">
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{service.name}</p>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">${((service as any).price || 0).toLocaleString()}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addService(service)}
+                                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                >
+                                                    Agregar
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedServices.map((service, index) => (
+                                <div key={index} className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                    <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Servicio</label>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{service.serviceName}</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cantidad</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={service.quantity}
+                                                onChange={(e) => updateService(index, 'quantity', Number(e.target.value))}
+                                                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Precio Unit.</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={service.estimatedPrice}
+                                                onChange={(e) => updateService(index, 'estimatedPrice', Number(e.target.value))}
+                                                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <div className="flex items-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => removeService(index)}
+                                                className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                                            >
+                                                <Icon name="trash" className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notas</label>
+                                        <input
+                                            type="text"
+                                            value={service.notes}
+                                            onChange={(e) => updateService(index, 'notes', e.target.value)}
+                                            placeholder="Notas adicionales..."
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Repuestos requeridos */}
+                        <div>
+                            <div className="flex items-center justify-between mb-2">
+                                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                                    Repuestos Requeridos
+                                </label>
+                                <button
+                                    type="button"
+                                    onClick={() => setShowPartSelector(!showPartSelector)}
+                                    className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                                >
+                                    <Icon name="plus" className="w-4 h-4 mr-1" />
+                                    Agregar Repuesto
+                                </button>
+                            </div>
+                            
+                            {showPartSelector && (
+                                <div className="mb-4 p-4 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700">
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar repuestos..."
+                                        value={partSearchTerm}
+                                        onChange={(e) => setPartSearchTerm(e.target.value)}
+                                        className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500 mb-3"
+                                    />
+                                    <div className="max-h-40 overflow-y-auto space-y-2">
+                                        {filteredParts.map(part => (
+                                            <div key={part.id} className="flex items-center justify-between p-2 bg-white dark:bg-gray-800 rounded border">
+                                                <div>
+                                                    <p className="font-medium text-gray-900 dark:text-white">{part.name}</p>
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">${(part.salePrice || 0).toLocaleString()}</p>
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    onClick={() => addPart(part)}
+                                                    className="px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                                                >
+                                                    Agregar
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {selectedParts.map((part, index) => (
+                                <div key={index} className="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                                    <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Repuesto</label>
+                                            <p className="text-sm font-medium text-gray-900 dark:text-white">{part.partName}</p>
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cantidad</label>
+                                            <input
+                                                type="number"
+                                                min="1"
+                                                value={part.quantity}
+                                                onChange={(e) => updatePart(index, 'quantity', Number(e.target.value))}
+                                                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Precio Unit.</label>
+                                            <input
+                                                type="number"
+                                                min="0"
+                                                step="0.01"
+                                                value={part.estimatedPrice}
+                                                onChange={(e) => updatePart(index, 'estimatedPrice', Number(e.target.value))}
+                                                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Proveedor</label>
+                                            <select
+                                                value={part.supplierId}
+                                                onChange={(e) => updatePart(index, 'supplierId', e.target.value)}
+                                                className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                            >
+                                                <option value="">Seleccionar</option>
+                                                {data.suppliers.map(supplier => (
+                                                    <option key={supplier.id} value={supplier.id}>
+                                                        {supplier.name}
+                                                    </option>
+                                                ))}
+                                            </select>
+                                        </div>
+                                        <div className="flex items-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => removePart(index)}
+                                                className="px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
+                                            >
+                                                <Icon name="trash" className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="mt-2">
+                                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Notas</label>
+                                        <input
+                                            type="text"
+                                            value={part.notes}
+                                            onChange={(e) => updatePart(index, 'notes', e.target.value)}
+                                            placeholder="Notas adicionales..."
+                                            className="w-full px-2 py-1 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+                                        />
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+
+                        {/* Resumen de costos */}
+                        {(selectedServices.length > 0 || selectedParts.length > 0) && (
+                            <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg">
+                                <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Resumen de Costos Estimados</h3>
+                                <div className="grid grid-cols-2 gap-4 text-sm">
+                                    <div>
+                                        <span className="text-gray-600 dark:text-gray-400">Servicios:</span>
+                                        <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                                            ${selectedServices.reduce((total, s) => total + (s.quantity * s.estimatedPrice), 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div>
+                                        <span className="text-gray-600 dark:text-gray-400">Repuestos:</span>
+                                        <span className="ml-2 font-medium text-gray-900 dark:text-white">
+                                            ${selectedParts.reduce((total, p) => total + (p.quantity * p.estimatedPrice), 0).toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="col-span-2 border-t border-gray-300 dark:border-gray-600 pt-2">
+                                        <span className="font-semibold text-gray-900 dark:text-white">Total Estimado:</span>
+                                        <span className="ml-2 font-bold text-lg text-blue-600 dark:text-blue-400">
+                                            ${calculateTotalCost().toLocaleString()}
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Notas adicionales */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Notas Adicionales
+                            </label>
+                            <textarea
+                                value={notes}
+                                onChange={(e) => setNotes(e.target.value)}
+                                rows={3}
+                                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                placeholder="Información adicional sobre el imprevisto..."
+                            />
+                        </div>
+
+                        {/* Botones */}
+                        <div className="flex justify-end gap-4 pt-4">
+                            <button
+                                type="button"
+                                onClick={onCancel}
+                                className="px-6 py-2 text-sm font-semibold text-gray-700 dark:text-gray-300 bg-gray-200 dark:bg-gray-700 rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600"
+                            >
+                                Cancelar
+                            </button>
+                            <button
+                                type="submit"
+                                disabled={isSubmitting || !description.trim()}
+                                className="flex items-center gap-2 px-6 py-2 text-sm font-semibold text-white bg-orange-600 rounded-lg shadow-md hover:bg-orange-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                            >
+                                <Icon name="exclamation-triangle" className="w-5 h-5" />
+                                {isSubmitting ? 'Enviando...' : 'Enviar Reporte'}
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            {/* Modal de Reporte Imprimible */}
+            {showPrintableReport && savedIssue && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+                        <div className="flex justify-between items-center p-4 border-b">
+                            <h3 className="text-lg font-semibold">Reporte de Imprevisto</h3>
+                            <div className="flex gap-2">
+                                {onCreateQuoteFromIssue && savedIssue && (
+                                    <button
+                                        onClick={() => {
+                                            onCreateQuoteFromIssue(savedIssue);
+                                            setShowPrintableReport(false);
+                                        }}
+                                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                                    >
+                                        <Icon name="plus" className="w-4 h-4 mr-2" />
+                                        Añadir Cotización
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => {
+                                        const printWindow = window.open('', '_blank');
+                                        if (printWindow) {
+                                            printWindow.document.write(`
+                                                <!DOCTYPE html>
+                                                <html lang="es">
+                                                <head>
+                                                    <meta charset="UTF-8" />
+                                                    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                                                    <title>Reporte de Imprevisto - ${workOrder.id}</title>
+                                                    <script src="https://cdn.tailwindcss.com"></script>
+                                                </head>
+                                                <body>
+                                                    ${document.querySelector('.printable-unforeseen-report')?.outerHTML || ''}
+                                                </body>
+                                                </html>
+                                            `);
+                                            printWindow.document.close();
+                                            printWindow.print();
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                                >
+                                    <Icon name="printer" className="w-4 h-4 mr-2" />
+                                    Imprimir
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setShowPrintableReport(false);
+                                        onCancel();
+                                    }}
+                                    className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 transition-colors"
+                                >
+                                    Cerrar
+                                </button>
+                            </div>
+                        </div>
+                        <div className="p-4">
+                            <div className="printable-unforeseen-report">
+                                <PrintableUnforeseenIssueReport
+                                    workOrder={workOrder}
+                                    client={client || {} as Client}
+                                    vehicle={vehicle || {} as Vehicle}
+                                    companyInfo={data.appSettings?.companyInfo || null}
+                                    issue={savedIssue}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Modal de captura controlado por React */}
+            {showCaptureModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-lg p-6 max-w-md mx-4 w-full">
+                        <h3 className="text-lg font-semibold mb-4 text-center">Capturar Foto</h3>
+                        <div className="mb-4">
+                            <video ref={videoRef} id="captureVideo" width="100%" height="auto" autoPlay playsInline className="rounded-md" />
+                        </div>
+                        <div className="flex gap-3 justify-center">
+                            <button
+                                type="button"
+                                onClick={captureFromCamera}
+                                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            >
+                                Capturar
+                            </button>
+                            <button
+                                type="button"
+                                onClick={cancelCapture}
+                                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+                            >
+                                Cancelar
+                            </button>
+                        </div>
+                        {/* canvas hidden for capture */}
+                        <canvas ref={canvasRef} style={{ display: 'none' }} />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+export default EnhancedReportUnforeseenIssueModal;
